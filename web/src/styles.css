@@ -212,3 +212,103 @@ footer{font-size:10px;color:#9eacb9;margin-top:20px}
   .queue-stats{order:2;flex-basis:100%}
   .queue-offer{flex-wrap:wrap}
 }
+
+/* UX-004: prevent the operator workspace controls from being clipped.
+   The global desktop shell deliberately uses overflow:hidden; the operator
+   desk has more actions and requires its own scrollable page. */
+.content.content--desk{
+  height:100dvh;
+  min-height:0;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  overflow-x:hidden;
+  overflow-y:auto;
+  scrollbar-gutter:stable;
+  overscroll-behavior-y:contain;
+}
+.content--desk .topbar,
+.content--desk .notice,
+.content--desk .alert,
+.content--desk footer{flex-shrink:0}
+.content--desk .desk-layout{
+  flex:0 0 auto;
+  min-height:0;
+  overflow:visible;
+  margin-top:14px;
+  margin-bottom:8px;
+}
+.content--desk .desk-grid{
+  flex:none;
+  height:clamp(670px,78dvh,900px);
+  min-height:670px;
+  align-items:stretch;
+}
+.content--desk .desk-inbox{
+  min-height:0;
+  height:100%;
+  max-height:none;
+  overflow-y:auto;
+}
+.content--desk .desk-chat{
+  min-height:0;
+  height:100%;
+  overflow:hidden;
+}
+.content--desk .desk-chat .conversation-head,
+.content--desk .desk-compose,
+.content--desk .desk-footer-actions,
+.content--desk .desk-timeline{
+  flex-shrink:0;
+}
+.content--desk .desk-chat-list{
+  min-height:130px;
+  flex:1 1 auto;
+  overflow-y:auto;
+}
+.content--desk .desk-footer-actions{
+  align-items:end;
+  gap:10px;
+}
+.content--desk .desk-transfer{
+  grid-template-columns:minmax(110px,1fr) minmax(190px,1.2fr) auto;
+}
+.content--desk .desk-footer-actions > .primary{
+  align-self:end;
+}
+@media(max-width:1180px){
+  .content--desk .desk-footer-actions{
+    flex-wrap:wrap;
+    align-items:stretch;
+  }
+  .content--desk .desk-transfer{
+    flex-basis:100%;
+    grid-template-columns:minmax(100px,1fr) minmax(140px,1.3fr) auto;
+  }
+  .content--desk .desk-footer-actions > .primary{align-self:flex-end}
+}
+@media(max-width:1000px){
+  .content--desk .desk-grid{
+    height:auto;
+    min-height:0;
+    grid-template-columns:minmax(0,1fr);
+  }
+  .content--desk .desk-inbox{
+    height:auto;
+    max-height:380px;
+    overflow-y:auto;
+  }
+  .content--desk .desk-chat{
+    height:720px;
+    min-height:0;
+  }
+}
+@media(max-width:620px){
+  .content--desk .desk-chat{height:760px}
+  .content--desk .desk-transfer{
+    grid-template-columns:minmax(0,1fr);
+  }
+  .content--desk .desk-transfer label{grid-column:1}
+  .content--desk .desk-footer-actions > .primary{width:100%;justify-content:center}
+  .content--desk .desk-overview{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
