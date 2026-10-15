@@ -21,6 +21,8 @@ test('a POC has distinct URLs for all workspaces', () => {
     assert.ok(app.includes('path="'+path+'"'), 'missing route '+path)
   }
   assert.match(read('src/main.tsx'), /<BrowserRouter>/)
+  assert.match(app, /if\(homeMode\)return <WorkspaceHome\/>/)
+  assert.ok(existsSync(resolve(root, 'src/workspaces/WorkspaceHome.tsx')))
 })
 
 test('each supervisor screen has an independent page module', () => {
