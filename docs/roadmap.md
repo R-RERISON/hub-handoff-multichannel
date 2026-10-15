@@ -3,6 +3,12 @@
 ## POC-002 / Primeira entrega
 SQLite + SQLAlchemy, FastAPI, distribuição manual e atômica, sessões, operadores, mensagens, outbox pendente, React/TypeScript cockpit e testes locais. Não usa GitHub Actions; nenhum serviço externo.
 
+## POC-003 — Fluxo de operação humana (implementação publicada)
+
+Incremento em branch `feat/003-operator-workflow`: mesa de operador independente, oferta com prazo, aceite/recusa, reserva de capacidade incluindo ofertas, transferência para N2, histórico auditável e testes de concorrência. Pendente de homologação local e build React/TypeScript. Veja [POC-003](specs/POC-003-operator-workflow.md).
+
+Este incremento **não substitui** a SPEC de adapter Teams: continua pendente e virá após estabilização do núcleo.
+
 ## POC-003 / Evolução imediata
 Extrair repositories/services da API única; Alembic para migrações; campos de política de fila, habilidades, SLA, cobertura de turnos; idempotência e validação de ownership completas; documentação de erros; testes adicionais de conflitos, retries e cross-operation.
 
