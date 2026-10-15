@@ -45,6 +45,9 @@ class TransferRequest(OperatorAction):
 
 
 def as_offer(offer: HandoffOffer, session: HandoffSession) -> dict:
+    expiry = offer.expires_at
+    if expiry.tzinfo is None:
+        expiry = expiry.replace(tzinfo=UTC)
     return {
         "offer_id": offer.id,
         "session_id": session.id,
@@ -53,7 +56,7 @@ def as_offer(offer: HandoffOffer, session: HandoffSession) -> dict:
         "requester_label": session.requester_label,
         "subject": session.subject,
         "status": offer.status,
-        "expires_at": offer.expires_at.isoformat(),
+        "expires_at": expiry.isoformat(),
     }
 
 
@@ -291,6 +294,24 @@ def register_operator_workflow(
             handoff.operator_id = None
             handoff.status = "QUEUED"
             handoff.updated_at = utc_now()
+            db.commit()
+            return as_handoff(handoff)
+
+    @router.post("/operators/{operator_id}/handoffs/{handoff_id}/close")
+    def close_operator_handoff(operator_id: str, handoff_id: str):
+        """POC identity checked against assignment, but not authenticated per operator."""
+        with factory() as db:
+            exclusive_tx(db)
+            handoff = db.get(HandoffSession, handoff_id)
+            if handoff is None:
+                raise HTTPException(404, "Atendimento inexistente")
+            if handoff.operator_id != operator_id:
+                raise HTTPException(403, "Operador não é responsável pelo atendimento")
+            if handoff.status != "ACTIVE":
+                raise HTTPException(409, "Somente atendimento ativo pode ser encerrado")
+            handoff.status = "CLOSED"
+            handoff.updated_at = utc_now()
+            event(db, handoff.id, "CLOSED", operator_id)
             db.commit()
             return as_handoff(handoff)
 
