@@ -17,6 +17,13 @@ Manual completo: [Setup em um comando](docs/setup-one-command.md).
 
 Plataforma independente para atendimento humano originado em bots/agentes. **Esta versão é uma POC de simulação local.** Não integra o Microsoft Teams, Cisco Finesse ou bases corporativas; não está apta a produção.
 
+
+## Homologação visual orientada — UX-001
+
+A interface de Conversas possui uma jornada guiada para a POC: **Criar solicitação → Distribuir → Receber mensagem → Responder → Encerrar**. O botão principal apresenta a próxima ação adequada ao estado da sessão selecionada. O sistema sinaliza mensagens simuladas e evita confundi-las com entregas reais no Teams.
+
+Após atualizar pelo Git, execute ` .\\start.cmd --check ` para validar backend/frontend e ` .\\start.cmd ` para abrir o ambiente. Ver [roteiro completo da UX-001](docs/ux/UX-001-guided-handoff.md).
+
 ## Stack escolhida
 - **Backend:** Python 3.12+, FastAPI, SQLAlchemy 2.
 - **Banco POC:** SQLite em arquivo, WAL e BEGIN IMMEDIATE para despacho.
