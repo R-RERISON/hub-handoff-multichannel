@@ -1,43 +1,38 @@
-# Arquitetura — Visão de contexto
+# Arquitetura atual — POC SQLite
 
-## Decisão consolidada: Embedded-first, Native-ready
+## Contexto
+Usuário simulado -> API FastAPI -> SQLite -> Workspace React.
+Primeiro canal real futuro: Teams via bot original -> adapter Embedded -> Hub -> workspace operador -> outbox -> adapter do bot original.
 
-    Usuário no Teams
-       ↕
-    Bot original (identidade e conversa do canal)
-       ↕ adapter REST/webhook e ACK
-    Handoff Hub API
-       ↕
-    Núcleo: Sessions | Queues | Dispatch | Messages | Operators | Audit
-       ↕
-    SQL Server (sessões, eventos, inbox, outbox, auditoria)
-       ↕
-    Workers de notificação e publicação
-       ↕
-    Workspace próprio do operador / Cockpit supervisor
+## Limites do produto
+- Hub é proprietário da sessão, fila, operador, mensagens e auditoria.
+- Bot de origem é proprietário apenas do transporte de conversa no Teams e mantém sua identidade.
+- Nunca reutilizar credentials/conversationId entre bots.
+- Scripts Tornado existentes servem como **referência funcional** para requisitos; não são código de migração.
 
-O Hub possui as regras de negócio e o estado. O bot original apenas recebe e publica mensagens usando **suas próprias credenciais e conversation reference**. Enquanto a sessão estiver em atendimento humano, o bot suspende respostas automáticas e retransmite os eventos. Se o Hub ficar indisponível, não se deve liberar o LLM silenciosamente.
+## Stack
+- FastAPI, SQLAlchemy 2 e SQLite WAL para laboratório em máquina única.
+- React, TypeScript e Vite para interface independente.
+- Idempotency-Key, tabela messages, session_events e outbox.
+- Testes locais, sem pipelines GitHub Actions.
+- Futura avaliação SQL Server + Alembic; não implementados ainda.
 
-## Versão inicial
-FastAPI em monólito modular, SQL Server com migrations, outbox/inbox duráveis, workers independentes do processo web. SSO Entra ID para operadores, OAuth2 client credentials para adapters, segregação por operação/tenant. React/TypeScript para workspace e supervisão. Redis ou broker são opcionais e não substituem a transação do banco.
+## Implementação presente
+- Operation / Integration / Queue / Operator / QueueMembership.
+- HandoffSession / SessionEvent / Message / OutboxEvent.
+- Distribuição manual com BEGIN IMMEDIATE, sem sobrealocação em concorrência de SQLite.
+- Estados QUEUED -> ACTIVE -> CLOSED.
+- Workspace e cockpit simulados, sem conexão Teams e sem identidade corporativa.
 
-## Domínios
-- Integrations: registro de bots, capabilities, chaves e canais.
-- Sessions: propriedade e histórico da sessão, estados, encerramento.
-- Queue/Dispatch: regras de seleção, prioridade, reserva e aceite.
-- Operators/Presence: status humano, capacidade e provider Finesse opcional.
-- Messaging: inbox, outbox, anexos, sequência, idempotência e delivery status.
-- Operations: jornada, feriado, SLA, transferência, pesquisa e indicadores.
-- Identity: autenticação, autorização, tenant, operação e auditoria.
+## Evoluções
+1. Services e repositories isolados; Entra ID/OAuth/RBAC; multioperação.
+2. Alembic e regras completas de transferência, abandono, horários, SLA.
+3. Worker outbox e protocolo seguro de confirmação de entrega.
+4. Adapter Teams Embedded com bot original e feature flag.
+5. Bot Native Teams, outros canais, Finesse e relatórios.
 
-## Modo Native posterior
-Handoff Hub terá seu próprio bot/aplicativo no Teams. Dependendo da configuração, o usuário abre outra conversa. A identidade do canal de origem não pode ser assumida por outro bot.
-
-## Segurança e falhas
-Conferir JWT, scopes, recurso e tenant em cada ação; autenticar callbacks; proteger dados pessoais; scanning de anexos e bloqueio de SSRF. Reservas atômicas. ACK perdido, eventos duplicados e reconciliação devem ser testados.
-
-## Fontes oficiais
+## Fontes
+- https://www.sqlite.org/wal.html
+- https://www.sqlite.org/lang_transaction.html
+- https://docs.sqlalchemy.org/en/20/dialects/sqlite.html
 - https://learn.microsoft.com/en-us/microsoftteams/platform/bots/how-to/conversations/send-proactive-messages
-- https://learn.microsoft.com/en-us/microsoft-copilot-studio/configure-generic-handoff
-- https://learn.microsoft.com/en-us/microsoft-copilot-studio/guidance/channels
-- https://learn.microsoft.com/en-us/python/api/msteams-sdk-python
