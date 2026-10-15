@@ -109,12 +109,16 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
                 db.add(Integration(id="demo-bot", operation_id="demo", name="Bot Simulado", channel="simulator"))
             if db.get(Queue, "n1") is None:
                 db.add(Queue(id="n1", operation_id="demo", name="Suporte N1"))
+            if db.get(Queue, "n2") is None:
+                db.add(Queue(id="n2", operation_id="demo", name="Suporte N2"))
             for oid, name in [("op-ana", "Ana (demonstração)"), ("op-bruno", "Bruno (demonstração)")]:
                 if db.get(Operator, oid) is None:
                     db.add(Operator(id=oid, operation_id="demo", name=name,
                                     presence="AVAILABLE", capacity=1))
                 if db.get(QueueMembership, ("n1", oid)) is None:
                     db.add(QueueMembership(queue_id="n1", operator_id=oid))
+            if db.get(QueueMembership, ("n2", "op-bruno")) is None:
+                db.add(QueueMembership(queue_id="n2", operator_id="op-bruno"))
         return {"result": "demo_ready", "operation_id": "demo", "queue_id": "n1"}
 
     @app.get("/v1/dashboard", dependencies=[Depends(authenticate)])
