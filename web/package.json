@@ -1,7 +1,7 @@
 {
   "name": "handoff-hub-web",
   "private": true,
-  "version": "0.2.0-poc",
+  "version": "0.3.0-poc",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",

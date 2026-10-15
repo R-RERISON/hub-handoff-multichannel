@@ -32,6 +32,18 @@ A POC conta com um **snapshot** `GET /v1/dashboard` que consolida as leituras de
 
 Validação local: `.\\start.cmd --check`; inicialização: `.\\start.cmd`. Roteiro detalhado: [UX-002](docs/ux/UX-002-operations-review.md). Não houve alteração de esquema SQLite nem conexão com Teams.
 
+## POC-003 — Operação humana com mesa independente
+
+O fluxo operacional adicional permite **ofertar** atendimento em uma fila, **aceitar ou recusar** na Mesa do Operador, conversar com usuário simulado, **transferir para N2** com motivo auditado e encerrar. O antigo fluxo guiado permanece disponível para testes de regressão.
+
+Novo caminho de homologação: **Conversas → Criar solicitação → Filas → Ofertar próximo (N1) → Mesa do Operador → Aceitar → Conversar → Transferir N2 → Ofertar N2 → Aceitar → Encerrar**.
+
+O banco SQLite existente recebe duas tabelas novas (`handoff_offers`, `session_transfers`) por bootstrap aditivo; os registros atuais são preservados. Esta POC não possui Entra ID, RBAC, integração Teams ou envio externo.
+
+O guia técnico completo está em [POC-003 Operação Humana](docs/specs/POC-003-operator-workflow.md).
+
+Atualização da branch: `git switch feat/003-operator-workflow` e `git pull --ff-only origin feat/003-operator-workflow`. Validar via `.\start.cmd --check` e executar via `.\start.cmd`.
+
 ## Stack escolhida
 - **Backend:** Python 3.12+, FastAPI, SQLAlchemy 2.
 - **Banco POC:** SQLite em arquivo, WAL e BEGIN IMMEDIATE para despacho.
