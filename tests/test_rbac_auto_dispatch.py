@@ -59,12 +59,16 @@ def test_passwords_and_server_rbac(tmp_path) -> None:
         ana = login(c, passwords, "ana.demo")
         supervisor = login(c, passwords, "supervisor.demo")
         auditor = login(c, passwords, "auditor.demo")
+        admin = login(c, passwords, "admin.demo")
         bruno = login(c, passwords, "bruno.demo")
         assert c.get("/v1/auth/me", headers=auth(ana)).json()["operator_id"] == "op-ana"
         assert c.get("/v1/dashboard", headers=auth(ana)).status_code == 403
         assert c.get("/v1/operators/op-bruno/work", headers=auth(ana)).status_code == 403
         assert c.get("/v1/operators/op-ana/work", headers=auth(ana)).status_code == 200
         assert c.get("/v1/operators/op-ana/work", headers=auth(bruno)).status_code == 403
+        assert c.get("/v1/operators/op-ana/work", headers=auth(admin)).status_code == 403
+        assert c.post("/v1/dispatch/offer", headers=auth(admin), json={}).status_code == 403
+        assert c.get("/v1/dashboard", headers=auth(admin)).status_code == 200
         assert c.get("/v1/dashboard", headers=auth(supervisor)).status_code == 200
         assert c.get("/v1/dashboard", headers=auth(auditor)).status_code == 200
         assert c.post("/v1/dispatch/offer", headers=auth(ana), json={}).status_code == 403
