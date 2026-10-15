@@ -29,7 +29,7 @@ function Logo() {
 function ActiveLink({to,icon,label,count}:{
   to:string;icon:ReactNode;label:string;count?:number
 }) {
-  return <NavLink to={to} className={({isActive})=>'nav '+(isActive?'active':'')}>
+  return <NavLink to={to} end={to==='/supervisao'} className={({isActive})=>'nav '+(isActive?'active':'')}>
     {icon}<span>{label}</span>
     {count!==undefined&&<em>{count}</em>}
   </NavLink>
