@@ -228,3 +228,63 @@ def test_dispatch_requeues_expired_offer_before_reading_queue(tmp_path) -> None:
         assert again["result"] == "offered"
         assert again["offer"]["session_id"] == handoff_id
         assert again["offer"]["offer_id"] != first["offer_id"]
+
+
+def test_n1_to_n2_queue_counters_and_bruno_inbox(tmp_path) -> None:
+    """A transferred session must be visible queued, then offered to Bruno."""
+    with TestClient(app_for(tmp_path)) as client:
+        assert client.post("/v1/demo/bootstrap", headers=AUTH).status_code == 200
+        handoff_id = create_handoff(client, 22)
+        first = client.post("/v1/dispatch/offer", headers=AUTH, json={
+            "queue_id": "n1",
+        }).json()
+        assert first["result"] == "offered"
+        op = first["offer"]["operator_id"]
+        accepted = client.post(
+            f"/v1/handoffs/{handoff_id}/accept",
+            headers=AUTH,
+            json={"operator_id": op},
+        )
+        assert accepted.status_code == 200
+
+        transferred = client.post(
+            f"/v1/handoffs/{handoff_id}/transfer",
+            headers=AUTH,
+            json={
+                "operator_id": op,
+                "queue_id": "n2",
+                "reason": "Teste de encaminhamento a N2",
+            },
+        )
+        assert transferred.status_code == 200
+        assert transferred.json()["queue_id"] == "n2"
+        assert transferred.json()["status"] == "QUEUED"
+        before = client.get("/v1/dashboard", headers=AUTH).json()
+        q2_before = next(q for q in before["queues"] if q["id"] == "n2")
+        assert q2_before["waiting"] == 1
+        assert q2_before["offered"] == 0
+
+        second = client.post(
+            "/v1/dispatch/offer",
+            headers=AUTH,
+            json={"queue_id": "n2", "operation_id": "demo"},
+        ).json()
+        assert second["result"] == "offered"
+        assert second["offer"]["queue_id"] == "n2"
+        assert second["offer"]["session_id"] == handoff_id
+        assert second["offer"]["operator_id"] == "op-bruno"
+
+        after = client.get("/v1/dashboard", headers=AUTH).json()
+        q2_after = next(q for q in after["queues"] if q["id"] == "n2")
+        assert q2_after["waiting"] == 0
+        assert q2_after["offered"] == 1
+        assert q2_after["active"] == 0
+        assert any(
+            h["id"] == handoff_id and h["status"] == "OFFERED"
+            and h["operator_id"] == "op-bruno" and h["queue_id"] == "n2"
+            for h in after["handoffs"]
+        )
+        bruno = client.get("/v1/operators/op-bruno/work", headers=AUTH).json()
+        ana = client.get("/v1/operators/op-ana/work", headers=AUTH).json()
+        assert [o["session_id"] for o in bruno["offers"]] == [handoff_id]
+        assert all(o["session_id"] != handoff_id for o in ana["offers"])
