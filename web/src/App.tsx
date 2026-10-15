@@ -258,7 +258,7 @@ export default function App() {
         <small>Funções planejadas · Não operacionais</small></div>
     </aside>
     <main className="admin-portal__main">
-      <header className="portal-topbar"><span>Administração / POC 0.4</span>
+      <header className="portal-topbar"><span>Administração / POC 0.5</span>
         <button className="outline" onClick={()=>navigate('/inicio')}>
           <ArrowLeftRight size={15}/> Trocar espaço
         </button><button className="outline" onClick={()=>void logout()}>Sair</button></header>
