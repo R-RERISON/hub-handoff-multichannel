@@ -1,5 +1,6 @@
 """Health and restricted-access tests for the local-only POC."""
 from fastapi.testclient import TestClient
+
 from handoff_hub.poc_api import create_app
 
 
