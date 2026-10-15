@@ -139,10 +139,18 @@ def register_operator_workflow(
                 select(QueueMembership.operator_id)
                 .where(QueueMembership.queue_id == body.queue_id)
             ).all()
+            declined_ids = set(db.scalars(
+                select(HandoffOffer.operator_id)
+                .where(
+                    HandoffOffer.session_id == waiting.id,
+                    HandoffOffer.status == "DECLINED",
+                )
+            ).all())
             operators = db.scalars(
                 select(Operator)
                 .where(
                     Operator.id.in_(ids),
+                    Operator.id.not_in(declined_ids),
                     Operator.operation_id == body.operation_id,
                     Operator.presence == "AVAILABLE",
                 )
