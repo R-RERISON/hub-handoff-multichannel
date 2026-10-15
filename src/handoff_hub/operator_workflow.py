@@ -27,6 +27,7 @@ from handoff_hub.poc_db import (
 )
 
 OFFER_SECONDS = 120
+DECLINE_COOLDOWN_SECONDS = 120
 RESERVED_STATUSES = ("OFFERED", "ACTIVE")
 
 
@@ -147,6 +148,9 @@ def register_operator_workflow(
                 .where(
                     HandoffOffer.session_id == waiting.id,
                     HandoffOffer.status == "DECLINED",
+                    HandoffOffer.resolved_at > (
+                        utc_naive() - timedelta(seconds=DECLINE_COOLDOWN_SECONDS)
+                    ),
                 )
             ).all())
             operators = db.scalars(
