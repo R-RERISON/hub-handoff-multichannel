@@ -106,7 +106,7 @@ def run_dispatch_cycle(factory) -> dict:
                     was_declined = db.scalar(select(HandoffOffer.id).where(
                         HandoffOffer.session_id == handoff.id,
                         HandoffOffer.operator_id == op.id,
-                        HandoffOffer.status == "DECLINED",
+                        HandoffOffer.status.in_(("DECLINED", "EXPIRED")),
                         HandoffOffer.resolved_at > now - timedelta(
                             seconds=DECLINE_COOLDOWN_SECONDS
                         ),
