@@ -115,6 +115,44 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
                     db.add(QueueMembership(queue_id="n1", operator_id=oid))
         return {"result": "demo_ready", "operation_id": "demo", "queue_id": "n1"}
 
+    @app.get("/v1/dashboard", dependencies=[Depends(authenticate)])
+    def dashboard_snapshot():
+        """One read for the local cockpit; excludes message bodies and outbox payloads."""
+        with factory() as db:
+            qs = db.scalars(select(Queue).order_by(Queue.id)).all()
+            ops = db.scalars(select(Operator).order_by(Operator.name)).all()
+            recent = db.scalars(
+                select(HandoffSession)
+                .order_by(HandoffSession.created_at.desc(), HandoffSession.id.desc())
+                .limit(200)
+            ).all()
+            waiting_by_queue = dict(db.execute(
+                select(HandoffSession.queue_id, func.count())
+                .where(HandoffSession.status == "QUEUED")
+                .group_by(HandoffSession.queue_id)
+            ).all())
+            active_by_operator = dict(db.execute(
+                select(HandoffSession.operator_id, func.count())
+                .where(HandoffSession.status == "ACTIVE")
+                .group_by(HandoffSession.operator_id)
+            ).all())
+            outbox_by_status = dict(db.execute(
+                select(OutboxEvent.status, func.count()).group_by(OutboxEvent.status)
+            ).all())
+            return {
+                "handoffs": [as_handoff(h) for h in recent],
+                "queues": [{"id": q.id, "operation_id": q.operation_id, "name": q.name,
+                            "waiting": waiting_by_queue.get(q.id, 0)} for q in qs],
+                "operators": [{"id": o.id, "operation_id": o.operation_id,
+                               "name": o.name, "presence": o.presence,
+                               "capacity": o.capacity,
+                               "active": active_by_operator.get(o.id, 0)} for o in ops],
+                "outbox": {
+                    "total": sum(outbox_by_status.values()),
+                    "pending": outbox_by_status.get("PENDING_ADAPTER", 0),
+                },
+            }
+
     @app.get("/v1/queues", dependencies=[Depends(authenticate)])
     def queues():
         with factory() as db:
