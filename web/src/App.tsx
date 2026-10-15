@@ -164,23 +164,6 @@ export default function App() {
     finally{setBusy(false)}
   }
 
-  async function offerNext(queueId:string){
-    setBusy(true);setError('');setNotice('')
-    try{
-      const result = await api('/v1/dispatch/offer','POST',{queue_id:queueId,operation_id:'demo'})
-      await refresh()
-      if(result.result==='offered'){
-        setOperatorId(result.offer.operator_id)
-        navigate('/operador')
-      }else if(result.result==='no_operator_available'){
-        setNotice('Nenhum operador disponível ou com capacidade nesta fila.')
-      }else{
-        setNotice('Fila vazia: não há solicitação aguardando oferta.')
-      }
-    }catch(e){setError((e as Error).message)}
-    finally{setBusy(false)}
-  }
-
   async function changePresence(operator:string,presence:string){
     setBusy(true);setError('')
     try{
@@ -189,11 +172,6 @@ export default function App() {
       setNotice('Presença demonstrativa atualizada.')
     }catch(e){setError((e as Error).message)}
     finally{setBusy(false)}
-  }
-
-  function openOperator(id:string){
-    setOperatorId(id)
-    navigate('/operador')
   }
 
   if(!connected)return <div className="login-wrap">
@@ -320,8 +298,7 @@ export default function App() {
           tickets={snapshot.handoffs} api={api}/>}/>
         <Route path="/supervisao/filas" element={<SupervisorQueues
           queues={snapshot.queues} operators={snapshot.operators}
-          tickets={snapshot.handoffs} busy={busy}
-          onOffer={offerNext} onOpenOperator={openOperator}/>}/>
+          tickets={snapshot.handoffs} api={api}/>}/>
         <Route path="/supervisao/equipe" element={<SupervisorTeam
           operators={snapshot.operators} busy={busy} onPresence={changePresence}/>}/>
         <Route path="/laboratorio" element={<DemoLab
