@@ -117,3 +117,11 @@ footer{font-size:10px;color:#9eacb9;margin-top:20px}
   .journey{flex-shrink:0;margin-top:13px;margin-bottom:0}
   .content footer{margin-top:8px}
 }
+
+/* Functional conversation filters replacing decorative tab labels */
+.tabs{display:flex;align-items:center;gap:5px;overflow-x:auto;flex-wrap:nowrap;padding:7px 10px 10px}
+.tabs button{border:0;background:transparent;color:#8298ac;font-size:10px;font-weight:700;border-radius:6px;padding:6px 7px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.tabs button:hover{background:#f0f5fa;color:#335f90}
+.tabs button.current{background:#e7f2ff;color:#2774d3}
+.tabs button b{padding:2px 5px;background:#ecf1f7;color:inherit;border-radius:4px;font-size:10px}
+.tabs button.current b{background:#d4e9ff}
