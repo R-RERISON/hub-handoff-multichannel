@@ -93,7 +93,7 @@ export default function App() {
 
   useEffect(()=>{
     if(!connected||!token)return
-    const ping=()=>{if(document.visibilityState==='visible')void api('/v1/auth/heartbeat','POST').catch(e=>setError((e as Error).message))}
+    const ping=()=>{void api('/v1/auth/heartbeat','POST').catch(e=>setError((e as Error).message))}
     ping()
     const id=window.setInterval(ping,10000)
     document.addEventListener('visibilitychange',ping)
