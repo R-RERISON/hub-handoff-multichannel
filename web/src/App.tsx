@@ -110,6 +110,7 @@ export default function App() {
         subject:['Solicitação de acesso','Ajuda com aplicativo','Equipamento indisponível'][tickets.length%3]
       },{'Idempotency-Key':id})
       selectTicket(item.id)
+      setFilter('all')
       setNotice('Solicitação criada. Agora distribua o próximo atendimento da fila.')
     })
   }
@@ -119,6 +120,7 @@ export default function App() {
       const result = await api('/v1/dispatch/next','POST',{})
       if (result.result === 'assigned') {
         selectTicket(result.session.id)
+        setFilter('all')
         setNotice('Atendimento atribuído. Agora simule uma mensagem do usuário.')
       } else if (result.result === 'no_operator_available') {
         setNotice('Não há operadores disponíveis. Confira o status na seção Operadores.')
