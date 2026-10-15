@@ -1,15 +1,24 @@
 """SQLite proof-of-concept schema, intentionally independent of Teams and legacy systems."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
+
 from sqlalchemy import (
-    CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text,
-    UniqueConstraint, create_engine, event,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    create_engine,
+    event,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def make_id() -> str:
