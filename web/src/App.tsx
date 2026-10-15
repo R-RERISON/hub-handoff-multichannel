@@ -212,7 +212,7 @@ export default function App() {
       <button className={'nav '+(view==='desk'?'active':'')} onClick={()=>{setView('desk');setNotice('')}}><Headset size={18}/> Mesa do Operador <em>{offerCount}</em></button>
       <div className="sidebar-bottom"><span className="online-dot"/> API local · SQLite <small>POC 0.3.0 · sem Teams</small></div>
     </aside>
-    <main className="content">
+    <main className={"content"+(view==="desk"?" content--desk":"")}>
       <header className="topbar"><div><span className="kicker">OPERAÇÃO DEMONSTRATIVA</span>
         <h2>{view==='inbox'?'Central de atendimento':view==='queues'?'Gestão de filas':view==='operators'?'Equipe de operadores':'Mesa do operador'}</h2></div>
         <div className="top-actions"><span className="local-tag"><ShieldCheck size={15}/> AMBIENTE LOCAL</span>
@@ -231,7 +231,7 @@ export default function App() {
         onClose={()=>void closeSelected()}
         onGoOperator={()=>{if(selected?.operator_id)setDeskOperatorId(selected.operator_id);setView('desk')}}
       />}
-      <div className="metrics">
+      {view!=="desk"&&<div className="metrics">
         {[
           {name:'Em atendimento',value:active,detail:'Conversas em andamento',icon:<MessageSquareText/>},
           {name:'Aguardando atendimento',value:waiting+offerCount,detail:waiting+' na fila · '+offerCount+' ofertado(s)',icon:<ClipboardList/>},
@@ -239,7 +239,7 @@ export default function App() {
           {name:'Sem envio externo',value:delivery.pending,detail:'Respostas aguardando conector',icon:<Activity/>}
         ].map(m=><div className="metric" key={m.name}><div className="metric-name">{m.name}<span>{m.icon}</span></div>
           <strong>{m.value}</strong><small>{m.detail}</small></div>)}
-      </div>
+      </div>}
       {view==='inbox'&&<div className="workspace">
         <section className="panel sessions"><div className="panel-header"><div><h3>Conversas</h3><p>Atendimentos registrados</p></div>
           <button className="primary small" disabled={busy} onClick={()=>void createTicket()}><Plus size={14}/> Nova solicitação</button></div>
