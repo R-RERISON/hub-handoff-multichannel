@@ -57,3 +57,23 @@ test('supervisor history is read-only; simulator has its own screen', () => {
   assert.match(lab,/Criar solicitação simulada/)
   assert.match(lab,/onCreate/)
 })
+
+
+test('RBAC client uses bearer identity rather than shared POC key', () => {
+  const app=read('src/App.tsx')
+  assert.match(app,/\/v1\/auth\/login/)
+  assert.match(app,/Authorization.*Bearer/)
+  assert.match(app,/if\(!permitted\)return/)
+  assert.match(app,/\/v1\/auth\/heartbeat/)
+  assert.doesNotMatch(app,/['"]X-POC-Key['"]\s*:/)
+})
+
+test('operator workspace shows a pending-offer popup without manual dispatcher', () => {
+  const desk=read('src/OperatorDesk.tsx')
+  const queues=read('src/workspaces/SupervisorQueues.tsx')
+  assert.match(desk,/role="alertdialog"/)
+  assert.match(desk,/lockedIdentity/)
+  assert.match(desk,/setInterval\(poll,3000\)/)
+  assert.match(queues,/Ordem atual de distribuição/)
+  assert.doesNotMatch(queues,/Ofertar próximo/)
+})
