@@ -1,320 +1,264 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import GuidedDemo, { type JourneyStage } from './GuidedDemo'
-import OperatorDesk from './OperatorDesk'
+import { useCallback, useEffect, useState } from 'react'
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import {
-  Activity, ArrowRight, CheckCircle2, CircleHelp, ClipboardList, Headset,
-  Inbox, Layers, Lock, MessageSquareText, Plus, RefreshCw, Send,
-  Server, ShieldCheck, UserRoundCheck, Users
+  Activity, ArrowLeftRight, ArrowRight, Bot, ChartNoAxesCombined,
+  CheckCircle2, FlaskConical, Headset, Layers, Lock, LogOut,
+  MessageSquareText, RefreshCw, Settings2, ShieldCheck, Users
 } from 'lucide-react'
+import OperatorDesk from './OperatorDesk'
+import AdminLanding from './workspaces/AdminLanding'
+import DemoLab from './workspaces/DemoLab'
+import SupervisorConversations from './workspaces/SupervisorConversations'
+import SupervisorOverview from './workspaces/SupervisorOverview'
+import SupervisorQueues from './workspaces/SupervisorQueues'
+import SupervisorTeam from './workspaces/SupervisorTeam'
+import type { Api, DashboardSnapshot } from './workspaces/types'
 
-type Ticket = {
-  id: string; operation_id: string; integration_id: string; queue_id: string
-  requester_label: string; subject: string; status: string; operator_id: string | null
-  created_at: string
+const API_URL = 'http://127.0.0.1:8000'
+const EMPTY_SNAPSHOT: DashboardSnapshot = {
+  handoffs: [], queues: [], operators: [], outbox: { total: 0, pending: 0 },
 }
-type Queue = {id: string; name: string; waiting: number; offered: number; active: number}
-type Operator = {id: string; name: string; presence: string; capacity: number; active: number; offered?: number}
-type Message = {id: string; sender: string; content: string; created_at: string}
-type DashboardSnapshot = {
-  handoffs: Ticket[]; queues: Queue[]; operators: Operator[]
-  outbox: {total: number; pending: number}
+
+function Logo() {
+  return <div className="brand">
+    <div className="app-mark"><Headset size={20}/></div>
+    <div><b>Handoff Hub</b><small>MULTICHANNEL PLATFORM</small></div>
+  </div>
 }
-const API = 'http://127.0.0.1:8000'
-const time = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})
-const initials = (name: string) => name.split(' ').slice(0,2).map(x => x[0]).join('').toUpperCase()
+
+function ActiveLink({to,icon,label,count}:{
+  to:string;icon:React.ReactNode;label:string;count?:number
+}) {
+  return <NavLink to={to} className={({isActive})=>'nav '+(isActive?'active':'')}>
+    {icon}<span>{label}</span>
+    {count!==undefined&&<em>{count}</em>}
+  </NavLink>
+}
 
 export default function App() {
-  const [key, setKey] = useState('')
-  const [connected, setConnected] = useState(false)
-  const [tickets, setTickets] = useState<Ticket[]>([])
-  const [queues, setQueues] = useState<Queue[]>([])
-  const [operators, setOperators] = useState<Operator[]>([])
-  const [delivery, setDelivery] = useState({total:0, pending:0})
-  const [filter, setFilter] = useState<'all'|'active'|'queued'|'offered'|'closed'>('all')
-  const [deskOperatorId,setDeskOperatorId] = useState('op-ana')
-  const [messages, setMessages] = useState<Message[]>([])
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [draft, setDraft] = useState('')
-  const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
-  const replyRef = useRef<HTMLTextAreaElement>(null)
-  const chatListRef = useRef<HTMLDivElement>(null)
-  const [busy, setBusy] = useState(false)
-  const [view, setView] = useState<'inbox'|'queues'|'operators'|'desk'>('inbox')
-  const selected = tickets.find(t => t.id === selectedId)
-  const visibleTickets = tickets.filter(t => filter==='all' || t.status.toLowerCase()===filter)
-  const stage: JourneyStage = !selected ? 'create'
-    : selected.status === 'QUEUED' ? 'assign'
-    : selected.status === 'OFFERED' ? 'pending'
-    : selected.status === 'CLOSED' ? 'done'
-    : !messages.some(m => m.sender === 'USER') ? 'receive'
-    : !messages.some(m => m.sender === 'OPERATOR') ? 'reply'
-    : 'close'
-  const selectTicket = (id: string) => { setMessages([]); setSelectedId(id); setView('inbox'); }
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [key,setKey] = useState('')
+  const [connected,setConnected] = useState(false)
+  const [snapshot,setSnapshot] = useState<DashboardSnapshot>(EMPTY_SNAPSHOT)
+  const [operatorId,setOperatorId] = useState('op-ana')
+  const [busy,setBusy] = useState(false)
+  const [error,setError] = useState('')
+  const [notice,setNotice] = useState('')
+  const operatorMode = location.pathname.startsWith('/operador')
+  const adminMode = location.pathname.startsWith('/administracao')
+  const offered = snapshot.handoffs.filter(t=>t.status==='OFFERED').length
+  const waiting = snapshot.queues.reduce((sum,q)=>sum+q.waiting,0)
 
-  const api = useCallback(async (path: string, method='GET', body?: object, extra?: Record<string,string>) => {
-    const response = await fetch(API+path, {
-      method, headers:{'X-POC-Key':key,'Content-Type':'application/json',...(extra||{})},
-      body:body ? JSON.stringify(body) : undefined
+  const api:Api = useCallback(async (
+    path:string,method='GET',body?:object,extra?:Record<string,string>
+  )=>{
+    const response = await fetch(API_URL+path, {
+      method,
+      headers: {'X-POC-Key':key,'Content-Type':'application/json',...(extra||{})},
+      body: body ? JSON.stringify(body) : undefined,
     })
-    if (!response.ok) throw new Error(String(response.status)+': '+(await response.text()).slice(0,220))
+    if(!response.ok)throw new Error(String(response.status)+': '+(await response.text()).slice(0,240))
     return response.json()
-  }, [key])
+  },[key])
 
-  const refresh = useCallback(async () => {
-    if (!connected) return
+  const refresh = useCallback(async ()=>{
+    if(!connected)return
     try {
-      const snapshot: DashboardSnapshot = await api('/v1/dashboard')
-      setTickets(snapshot.handoffs)
-      setQueues(snapshot.queues)
-      setOperators(snapshot.operators)
-      setDelivery(snapshot.outbox)
-      if (view==='inbox' && selectedId) {
-        setMessages(await api('/v1/handoffs/'+selectedId+'/messages'))
-      }
-    } catch(e) {setError((e as Error).message)}
-  }, [connected,selectedId,view,api])
+      const data:DashboardSnapshot = await api('/v1/dashboard')
+      setSnapshot(data)
+    }catch(e){setError((e as Error).message)}
+  },[connected,api])
 
-  useEffect(() => {
-    if (!connected) return
-    const tick = () => { if (document.visibilityState==='visible') void refresh() }
-    const interval = window.setInterval(tick,15000)
+  useEffect(()=>{
+    if(!connected)return
+    const tick = ()=>{if(document.visibilityState==='visible')void refresh()}
+    const id = window.setInterval(tick,15000)
     document.addEventListener('visibilitychange',tick)
-    return () => {window.clearInterval(interval);document.removeEventListener('visibilitychange',tick)}
-  },[refresh,connected])
-  useEffect(() => {
-    if (!connected || !selectedId) {setMessages([]);return}
-    void api('/v1/handoffs/'+selectedId+'/messages').then(setMessages).catch(e => setError(e.message))
-  },[connected,selectedId,api])
+    return ()=>{
+      window.clearInterval(id)
+      document.removeEventListener('visibilitychange',tick)
+    }
+  },[connected,refresh])
 
-  useEffect(() => {
-    if (view!=='inbox' || !chatListRef.current) return
-    chatListRef.current.scrollTop = chatListRef.current.scrollHeight
-  }, [messages.length,selectedId,view])
+  useEffect(()=>{
+    setError('')
+    setNotice('')
+  },[location.pathname])
 
-  async function run(fn:()=>Promise<unknown>) {
-    setBusy(true);setError('');setNotice('')
-    try {await fn();await refresh()} catch(e) {setError((e as Error).message)}
-    finally {setBusy(false)}
-  }
-  async function connect() {
+  async function connect(){
     setBusy(true);setError('')
-    try {
+    try{
       await api('/v1/demo/bootstrap','POST')
-      const snapshot: DashboardSnapshot = await api('/v1/dashboard')
-      setTickets(snapshot.handoffs);setQueues(snapshot.queues)
-      setOperators(snapshot.operators);setDelivery(snapshot.outbox);setConnected(true)
-    } catch(e) {setError((e as Error).message)}
-    finally {setBusy(false)}
+      const data:DashboardSnapshot=await api('/v1/dashboard')
+      setSnapshot(data);setConnected(true)
+      if(location.pathname==='/')navigate('/supervisao',{replace:true})
+    }catch(e){setError((e as Error).message)}
+    finally{setBusy(false)}
   }
-  const waiting=tickets.filter(t => t.status==='QUEUED').length
-  const active=tickets.filter(t => t.status==='ACTIVE').length
-  const free=operators.filter(o=>o.presence==='AVAILABLE'&&o.active+(o.offered??0)<o.capacity).length
-  const offerCount=tickets.filter(t=>t.status==='OFFERED').length
 
-  async function createTicket() {
-    const id=crypto.randomUUID()
-    await run(async () => {
-      const item=await api('/v1/handoffs','POST',{
-        external_conversation_id:'demo-'+id,requester_label:'Usuário simulado '+(tickets.length+1),
-        subject:['Solicitação de acesso','Ajuda com aplicativo','Equipamento indisponível'][tickets.length%3]
+  async function createTicket(){
+    setBusy(true);setError('');setNotice('')
+    try{
+      const id=crypto.randomUUID()
+      const previous=snapshot.handoffs.length
+      await api('/v1/handoffs','POST',{
+        external_conversation_id:'demo-'+id,
+        requester_label:'Usuário simulado '+(previous+1),
+        subject:['Solicitação de acesso','Ajuda com aplicativo','Equipamento indisponível'][previous%3],
       },{'Idempotency-Key':id})
-      selectTicket(item.id)
-      setFilter('all')
-      setNotice('Solicitação criada. Agora distribua o próximo atendimento da fila.')
-    })
+      await refresh()
+      setNotice('Solicitação criada na fila Suporte N1. Agora oferte a um operador disponível.')
+      navigate('/supervisao/filas')
+    }catch(e){setError((e as Error).message)}
+    finally{setBusy(false)}
   }
 
-  async function dispatchNext() {
-    await run(async () => {
-      const result = await api('/v1/dispatch/next','POST',{})
-      if (result.result === 'assigned') {
-        selectTicket(result.session.id)
-        setFilter('all')
-        setNotice('Atendimento atribuído. Agora simule uma mensagem do usuário.')
-      } else if (result.result === 'no_operator_available') {
-        setNotice('Não há operadores disponíveis. Confira o status na seção Operadores.')
-      } else {
-        setNotice('Fila vazia. Crie uma solicitação de teste primeiro.')
+  async function offerNext(queueId:string){
+    setBusy(true);setError('');setNotice('')
+    try{
+      const result = await api('/v1/dispatch/offer','POST',{queue_id:queueId,operation_id:'demo'})
+      await refresh()
+      if(result.result==='offered'){
+        setOperatorId(result.offer.operator_id)
+        navigate('/operador')
+      }else if(result.result==='no_operator_available'){
+        setNotice('Nenhum operador disponível ou com capacidade nesta fila.')
+      }else{
+        setNotice('Fila vazia: não há solicitação aguardando oferta.')
       }
-    })
+    }catch(e){setError((e as Error).message)}
+    finally{setBusy(false)}
   }
 
-  async function offerNext(queue_id: string) {
-    await run(async () => {
-      const result = await api('/v1/dispatch/offer','POST',{queue_id,operation_id:'demo'})
-      if (result.result==='offered') {
-        setSelectedId(result.offer.session_id)
-        setDeskOperatorId(result.offer.operator_id)
-        setView('desk')
-        const assignee = operators.find(op=>op.id===result.offer.operator_id)
-        const qName = queues.find(q=>q.id===queue_id)?.name ?? queue_id.toUpperCase()
-        setNotice('Oferta da fila '+qName+' destinada a '+(assignee?.name ?? result.offer.operator_id)+'. Aceite na Mesa do Operador.')
-      } else if (result.result==='no_operator_available') {
-        setNotice('Sem capacidade: operador indisponível ou com vaga já reservada.')
-      } else {
-        setNotice('Nenhum atendimento aguardando nessa fila.')
-      }
-    })
+  async function changePresence(operator:string,presence:string){
+    setBusy(true);setError('')
+    try{
+      await api('/v1/operators/'+operator+'/presence','PATCH',{presence})
+      await refresh()
+      setNotice('Presença demonstrativa atualizada.')
+    }catch(e){setError((e as Error).message)}
+    finally{setBusy(false)}
   }
 
-  function focusReply() {
-    if (!draft.trim()) setDraft('Olá! Recebi sua solicitação e vou ajudar a resolver.')
-    replyRef.current?.focus()
+  function openOperator(id:string){
+    setOperatorId(id)
+    navigate('/operador')
   }
 
-  async function closeSelected() {
-    if (!selected) return
-    await run(async () => {
-      await api('/v1/handoffs/'+selected.id+'/close','POST')
-      setNotice('Atendimento encerrado. A capacidade do operador foi liberada.')
-    })
-  }
+  if(!connected)return <div className="login-wrap">
+    <section className="login-panel">
+      <div className="app-mark"><Headset size={26}/></div>
+      <span className="kicker">HANDOFF HUB · SQLITE POC</span>
+      <h1>Uma plataforma. Workspaces independentes.</h1>
+      <p>Acesse a Mesa do Operador, a Supervisão ou o Laboratório. A navegação é separada, mas utiliza a mesma operação demonstrativa.</p>
+      <label htmlFor="poc-key">Chave de acesso local</label>
+      <input id="poc-key" type="password" autoComplete="off" value={key}
+        onChange={e=>setKey(e.target.value)}
+        onKeyDown={e=>{if(e.key==='Enter')void connect()}}
+        placeholder="Chave exibida pelo start.cmd"/>
+      <button className="primary full" disabled={!key||busy} onClick={()=>void connect()}>
+        <Lock size={16}/> Entrar no Handoff Hub <ArrowRight size={16}/>
+      </button>
+      {error&&<p className="alert" role="alert">{error}</p>}
+      <small>POC local · Sem Entra ID ou controle de acesso individual</small>
+    </section>
+  </div>
 
-  async function send(sender:'USER'|'OPERATOR') {
-    if (!selected || (sender==='OPERATOR'&&!draft.trim())) return
-    const content=sender==='USER'?'Olá! Poderia me auxiliar com meu acesso?':draft.trim()
-    const handoffId=selected.id
-    await run(async () => {
-      await api('/v1/handoffs/'+handoffId+'/messages','POST',{
-        sender,content,external_message_id:crypto.randomUUID()
-      })
-      setMessages(await api('/v1/handoffs/'+handoffId+'/messages'))
-      if (sender==='OPERATOR') {
-        setDraft('')
-        setNotice('Resposta registrada na outbox. Nenhuma mensagem foi enviada ao Teams.')
-      } else {
-        setNotice('Mensagem fictícia recebida. Responda como operador.')
-      }
-    })
-  }
+  if(operatorMode)return <div className="operator-portal">
+    <header className="operator-portal__header">
+      <Logo/>
+      <div className="operator-portal__location"><Headset size={17}/> Portal do Operador
+        <span>Workspace dedicado</span></div>
+      <div className="operator-portal__actions">
+        <span className="local-tag"><ShieldCheck size={15}/> SIMULAÇÃO LOCAL</span>
+        <button className="outline" onClick={()=>navigate('/supervisao')}>
+          <ArrowLeftRight size={16}/> Ir para Supervisão
+        </button>
+      </div>
+    </header>
+    <main className="operator-portal__main">
+      <Routes>
+        <Route path="/operador" element={<OperatorDesk
+          operators={snapshot.operators}
+          queues={snapshot.queues}
+          api={api}
+          preferredOperatorId={operatorId}
+          onChanged={refresh}
+          onGoQueues={()=>navigate('/supervisao/filas')}
+        />}/>
+        <Route path="*" element={<Navigate to="/operador" replace/>}/>
+      </Routes>
+    </main>
+    <div className="portal-disclaimer">POC 0.4 · A seleção do operador ainda é simulada · Nenhuma mensagem é entregue ao Teams</div>
+  </div>
 
-  if (!connected) return <div className="login-wrap"><section className="login-panel">
-    <div className="app-mark"><Headset size={26}/></div>
-    <div className="kicker">HANDOFF HUB · SQLITE POC</div>
-    <h1>Central de atendimento independente.</h1>
-    <p>Experimente a gestão de filas, operadores e conversas em ambiente local. Nenhuma mensagem é enviada ao Teams.</p>
-    <label htmlFor="poc-key">Chave local configurada no backend</label>
-    <input id="poc-key" type="password" autoComplete="off" value={key} onChange={e=>setKey(e.target.value)}
-      placeholder="HANDOFF_POC_KEY" onKeyDown={e=>{if(e.key==='Enter')void connect()}}/>
-    <button className="primary full" disabled={!key||busy} onClick={()=>void connect()}><Lock size={16}/> Entrar na POC <ArrowRight size={16}/></button>
-    {error&&<p className="alert">{error}</p>}
-    <small>Chave armazenada apenas na memória desta aba.</small>
-  </section></div>
-
-  return <div className="layout">
-    <aside className="sidebar">
-      <div className="brand"><div className="app-mark"><Headset size={20}/></div><div><b>Handoff Hub</b><small>CONTROL CENTER</small></div></div>
-      <span className="sidebar-title">WORKSPACE</span>
-      <button className={'nav '+(view==='inbox'?'active':'')} onClick={()=>{setView('inbox');setNotice('')}}><Inbox size={18}/> Conversas <em>{tickets.length}</em></button>
-      <button className={'nav '+(view==='queues'?'active':'')} onClick={()=>{setView('queues');setNotice('')}}><Layers size={18}/> Filas <em>{waiting}</em></button>
-      <button className={'nav '+(view==='operators'?'active':'')} onClick={()=>{setView('operators');setNotice('')}}><Users size={18}/> Operadores</button>
-      <button className={'nav '+(view==='desk'?'active':'')} onClick={()=>{setView('desk');setNotice('')}}><Headset size={18}/> Mesa do Operador <em>{offerCount}</em></button>
-      <div className="sidebar-bottom"><span className="online-dot"/> API local · SQLite <small>POC 0.3.0 · sem Teams</small></div>
+  if(adminMode)return <div className="admin-portal">
+    <aside className="sidebar sidebar--admin">
+      <Logo/>
+      <div className="sidebar-title">ADMINISTRAÇÃO</div>
+      <ActiveLink to="/administracao" icon={<Settings2 size={18}/>} label="Visão administrativa"/>
+      <div className="sidebar-bottom"><span className="online-dot"/> Ambiente local
+        <small>Funções planejadas · Não operacionais</small></div>
     </aside>
-    <main className={"content"+(view==="desk"?" content--desk":"")}>
-      <header className="topbar"><div><span className="kicker">OPERAÇÃO DEMONSTRATIVA</span>
-        <h2>{view==='inbox'?'Central de atendimento':view==='queues'?'Gestão de filas':view==='operators'?'Equipe de operadores':'Mesa do operador'}</h2></div>
-        <div className="top-actions"><span className="local-tag"><ShieldCheck size={15}/> AMBIENTE LOCAL</span>
-          <button className="icon-btn" aria-label="Atualizar" onClick={()=>void refresh()}><RefreshCw size={17}/></button></div></header>
-      {error&&<div className="alert" role="alert"><CircleHelp size={17}/>{error}<button onClick={()=>setError('')}>Fechar</button></div>}
-      {notice&&<div className="notice" role="status"><CheckCircle2 size={16}/><span>{notice}</span><button onClick={()=>setNotice('')} aria-label="Dispensar aviso">×</button></div>}
-      {view==='inbox'&&<GuidedDemo
-        stage={stage}
-        busy={busy}
-        hasWaiting={waiting>0}
-        availableOperators={free}
-        onCreate={()=>void createTicket()}
-        onAssign={()=>void dispatchNext()}
-        onSimulateUser={()=>void send('USER')}
-        onFocusReply={focusReply}
-        onClose={()=>void closeSelected()}
-        onGoOperator={()=>{if(selected?.operator_id)setDeskOperatorId(selected.operator_id);setView('desk')}}
-      />}
-      {view!=="desk"&&<div className="metrics">
-        {[
-          {name:'Em atendimento',value:active,detail:'Conversas em andamento',icon:<MessageSquareText/>},
-          {name:'Aguardando atendimento',value:waiting+offerCount,detail:waiting+' na fila · '+offerCount+' ofertado(s)',icon:<ClipboardList/>},
-          {name:'Operadores livres',value:free,detail:'Capacidade disponível',icon:<UserRoundCheck/>},
-          {name:'Sem envio externo',value:delivery.pending,detail:'Respostas aguardando conector',icon:<Activity/>}
-        ].map(m=><div className="metric" key={m.name}><div className="metric-name">{m.name}<span>{m.icon}</span></div>
-          <strong>{m.value}</strong><small>{m.detail}</small></div>)}
-      </div>}
-      {view==='inbox'&&<div className="workspace">
-        <section className="panel sessions"><div className="panel-header"><div><h3>Conversas</h3><p>Atendimentos registrados</p></div>
-          <button className="primary small" disabled={busy} onClick={()=>void createTicket()}><Plus size={14}/> Nova solicitação</button></div>
-          <div className="tabs" role="group" aria-label="Filtrar conversas">
-            <button type="button" className={filter==='all'?'current':''} aria-pressed={filter==='all'} onClick={()=>setFilter('all')}>Todas <b>{tickets.length}</b></button>
-            <button type="button" className={filter==='active'?'current':''} aria-pressed={filter==='active'} onClick={()=>setFilter('active')}>Em atendimento <b>{active}</b></button>
-            <button type="button" className={filter==='queued'?'current':''} aria-pressed={filter==='queued'} onClick={()=>setFilter('queued')}>Na fila <b>{waiting}</b></button>
-            <button type="button" className={filter==='offered'?'current':''} aria-pressed={filter==='offered'} onClick={()=>setFilter('offered')}>Ofertadas <b>{offerCount}</b></button>
-            <button type="button" className={filter==='closed'?'current':''} aria-pressed={filter==='closed'} onClick={()=>setFilter('closed')}>Encerradas <b>{tickets.filter(t=>t.status==='CLOSED').length}</b></button>
-          </div>
-          <div className="sessions-scroll">{tickets.length===0&&<div className="empty empty--help"><MessageSquareText size={27}/><strong>Sua primeira conversa começa aqui</strong><p>Crie uma solicitação fictícia para experimentar a fila e o atendimento.</p><button className="primary small" disabled={busy} onClick={()=>void createTicket()}>Criar solicitação</button></div>}
-            {tickets.length>0 && visibleTickets.length===0 && <p className="empty">Nenhuma conversa nesta categoria.</p>}
-            {visibleTickets.map(t=><button key={t.id} onClick={()=>selectTicket(t.id)} className={'session '+(t.id===selectedId?'selected':'')}>
-              <div className="avatar">{initials(t.requester_label)}</div><div className="session-info">
-                <div className="session-title"><b>{t.requester_label}</b><small>{time(t.created_at)}</small></div>
-                <p>{t.subject}</p><div className="session-meta"><span className={'status '+t.status.toLowerCase()}>{t.status==='QUEUED'?'Na fila':t.status==='OFFERED'?'Oferta pendente':t.status==='ACTIVE'?'Ativo':'Encerrado'}</span><small>{t.queue_id.toUpperCase()}</small></div>
-              </div></button>)}</div></section>
-        <section className="panel conversation">{selected?<><div className="conversation-head"><div className="avatar">{initials(selected.requester_label)}</div>
-          <div><b>{selected.requester_label}</b><p>{selected.subject} · {selected.integration_id}</p></div><span className={'status '+selected.status.toLowerCase()}>{selected.status}</span></div>
-          <div className="context"><Server size={15}/> Sessão {selected.id.slice(0,8)} · {selected.operator_id||'Aguardando operador'}</div>
-          <div className={'context-hint context-hint--'+selected.status.toLowerCase()}>
-            {selected.status==='QUEUED'?<>
-              <div><strong>Aguardando distribuição</strong><p>A solicitação entrou na fila. Distribua o próximo atendimento para iniciar a conversa.</p></div>
-              <button className="primary small" disabled={busy||free===0} onClick={()=>void dispatchNext()}>Distribuir próximo da fila <ArrowRight size={14}/></button>
-            </>:selected.status==='ACTIVE' && !messages.some(m=>m.sender==='USER')?<>
-              <div><strong>Operador atribuído</strong><p>Agora simule o recebimento de uma mensagem para testar a resposta humana.</p></div>
-              <button className="primary small" disabled={busy} onClick={()=>void send('USER')}>Receber mensagem de teste <ArrowRight size={14}/></button>
-            </>:selected.status==='CLOSED'?<div><strong>Atendimento encerrado</strong><p>O operador está livre para receber outra solicitação.</p></div>:null}
-          </div>
-          <div className="chat-list" ref={chatListRef}><div className="chat-notice">SIMULAÇÃO LOCAL · NÃO ENVIADA AO TEAMS</div>
-            {!messages.length&&<div className="empty">Nenhuma mensagem nesta conversa.</div>}
-            {messages.map(m=><div key={m.id} className={'bubble-row '+(m.sender==='OPERATOR'?'right':'')}><div className="bubble"><b>{m.sender==='OPERATOR'?'Operador':'Usuário simulado'}</b><p>{m.content}</p><small>{time(m.created_at)}</small></div></div>)}
-          </div><div className="composer"><div className="composer-hint">Sua resposta como operador será registrada na outbox, sem envio ao Teams.</div><textarea ref={replyRef} aria-label="Resposta do operador" value={draft} onChange={e=>setDraft(e.target.value)}
-            disabled={selected.status!=='ACTIVE'} placeholder="Escreva uma mensagem..." rows={2}/>
-            <div className="composer-actions"><button className="outline" disabled={busy||selected.status==='CLOSED'} onClick={()=>void send('USER')}><Plus size={13}/> Mensagem de teste</button>
-              <button className="outline" disabled={busy||selected.status!=='ACTIVE'} onClick={()=>void closeSelected()}><CheckCircle2 size={13}/> Encerrar</button>
-              <button className="primary" disabled={busy||selected.status!=='ACTIVE'||!draft.trim()} onClick={()=>void send('OPERATOR')}>Enviar resposta <Send size={14}/></button></div>
-          </div></>:<div className="center-empty"><MessageSquareText size={38}/><h3>Inicie um atendimento de teste</h3><p>Primeiro, crie uma solicitação. Depois distribua, converse e encerre — tudo pela interface.</p><button className="primary" disabled={busy} onClick={()=>void createTicket()}><Plus size={15}/> Criar primeira solicitação</button></div>}</section>
-        <aside className="side-panels"><section className="panel widget"><h3>Distribuição</h3><p>Fila por ordem de chegada e reserva transacional.</p>
-          <button className="primary full" disabled={busy||!waiting} onClick={()=>void dispatchNext()}><UserRoundCheck size={15}/> Distribuir próximo da fila</button>
-          <h4>Filas acompanhadas</h4>{queues.map(q=><div className="line" key={q.id}><span>{q.name}</span><b>{q.waiting}</b></div>)}</section>
-          <section className="panel widget"><h3>Integrações</h3><div className="line"><span>Backend local</span><b className="good">Online</b></div>
-            <div className="line"><span>Teams adapter</span><b>Não instalado</b></div>
-            <div className="line"><span>Respostas sem envio</span><b>{delivery.pending} de {delivery.total}</b></div></section></aside>
-      </div>}
-      {view==='queues'&&<section className="panel list-panel"><div className="panel-header"><div><h3>Filas configuradas</h3><p>Supervisão: ofereça atendimentos e aguarde o aceite do operador.</p></div></div>
-        {queues.map(q=>{
-          const offeredTickets = tickets.filter(t=>t.queue_id===q.id&&t.status==='OFFERED')
-          return <div className="queue-detail" key={q.id}>
-            <div className="record"><div className="record-icon"><Layers size={20}/></div><div className="fill"><b>{q.name}</b><p>Operação demonstrativa · {q.id}</p></div>
-              <div className="queue-stats"><span>{q.waiting} na fila</span><span>{q.offered} ofertado(s)</span><span>{q.active} ativo(s)</span></div>
-              <button className="primary small" disabled={busy||q.waiting===0} onClick={()=>void offerNext(q.id)}>Ofertar próximo <ArrowRight size={14}/></button>
-            </div>
-            {offeredTickets.map(ticket=>{
-              const assigned = operators.find(o=>o.id===ticket.operator_id)
-              return <div className="queue-offer" key={ticket.id}>
-                <div><strong>{ticket.requester_label}</strong> · {ticket.subject}<small>Oferta pendente para {assigned?.name??ticket.operator_id}. O ticket saiu de "Na fila" e aguarda aceite.</small></div>
-                <button className="outline small" onClick={()=>{if(ticket.operator_id)setDeskOperatorId(ticket.operator_id);setView('desk')}}>Abrir mesa de {assigned?.name?.split(' ')[0]??'operador'} <ArrowRight size={14}/></button>
-              </div>
-            })}
-          </div>
-        })}
-        <p className="desk-supervisor-hint">Uma oferta é reservada ao operador por até dois minutos. Enquanto aguarda aceite, o ticket aparece em <b>Ofertado(s)</b>, não em <b>Na fila</b>. O botão Ofertar próximo já direciona para a mesa correta.</p>
-      </section>}
-      {view==='operators'&&<section className="panel list-panel"><div className="panel-header"><div><h3>Operadores</h3><p>Capacidade e presença</p></div></div>
-        {operators.map(o=><div className="record" key={o.id}><div className="avatar">{initials(o.name)}</div><div className="fill"><b>{o.name}</b><p>{o.active} ativo(s) · {o.offered??0} oferta(s) reservada(s) · capacidade {o.capacity}</p></div>
-          <select aria-label={'Presença de '+o.name} value={o.presence} disabled={busy} onChange={e=>void run(()=>api('/v1/operators/'+o.id+'/presence','PATCH',{presence:e.target.value}))}>
-            <option value="AVAILABLE">Disponível</option><option value="AWAY">Em pausa</option><option value="OFFLINE">Offline</option>
-          </select></div>)}</section>}
-      {view==='desk'&&<OperatorDesk
-        operators={operators} queues={queues} api={api}
-        preferredOperatorId={deskOperatorId}
-        onChanged={refresh} onGoQueues={()=>setView('queues')}
-      />}
-      <footer>Handoff Hub · SQLite POC · Sem autenticação corporativa · Uso local de desenvolvimento</footer>
+    <main className="admin-portal__main">
+      <header className="portal-topbar"><span>Administração / POC 0.4</span>
+        <button className="outline" onClick={()=>navigate('/supervisao')}>
+          <ArrowLeftRight size={15}/> Voltar à Supervisão
+        </button></header>
+      <Routes><Route path="/administracao" element={<AdminLanding/>}/>
+        <Route path="*" element={<Navigate to="/administracao" replace/>}/></Routes>
+    </main>
+  </div>
+
+  return <div className="layout layout--supervisor">
+    <aside className="sidebar sidebar--supervisor">
+      <Logo/>
+      <span className="sidebar-title">CENTRAL DE SUPERVISÃO</span>
+      <ActiveLink to="/supervisao" icon={<ChartNoAxesCombined size={18}/>} label="Visão geral"/>
+      <ActiveLink to="/supervisao/conversas" icon={<MessageSquareText size={18}/>} label="Conversas" count={snapshot.handoffs.length}/>
+      <ActiveLink to="/supervisao/filas" icon={<Layers size={18}/>} label="Filas" count={waiting+offered}/>
+      <ActiveLink to="/supervisao/equipe" icon={<Users size={18}/>} label="Equipe"/>
+      <div className="sidebar-separator"/>
+      <span className="sidebar-title">AMBIENTE DE TESTES</span>
+      <ActiveLink to="/laboratorio" icon={<FlaskConical size={18}/>} label="Laboratório"/>
+      <div className="sidebar-separator"/>
+      <span className="sidebar-title">OUTROS ESPAÇOS</span>
+      <NavLink className="nav nav--external" to="/operador"><Headset size={18}/><span>Mesa do Operador</span><ArrowRight size={14}/></NavLink>
+      <NavLink className="nav nav--external" to="/administracao"><Settings2 size={18}/><span>Administração</span><ArrowRight size={14}/></NavLink>
+      <div className="sidebar-bottom"><span className="online-dot"/> API local · SQLite
+        <small>POC 0.4 · Sem integração Teams</small></div>
+    </aside>
+    <main className="supervisor-main">
+      <header className="portal-topbar">
+        <span>Handoff Hub / Operação demonstrativa</span>
+        <div className="portal-topbar__actions">
+          <span className="local-tag"><ShieldCheck size={15}/> AMBIENTE LOCAL</span>
+          <button className="icon-btn" aria-label="Atualizar dados" onClick={()=>void refresh()}>
+            <RefreshCw size={17}/>
+          </button>
+        </div>
+      </header>
+      {error&&<div className="alert" role="alert">{error}
+        <button onClick={()=>setError('')}>Fechar</button></div>}
+      {notice&&<div className="notice" role="status"><CheckCircle2 size={16}/>{notice}
+        <button aria-label="Dispensar aviso" onClick={()=>setNotice('')}>×</button></div>}
+      <Routes>
+        <Route path="/" element={<Navigate to="/supervisao" replace/>}/>
+        <Route path="/supervisao" element={<SupervisorOverview snapshot={snapshot}/>}/>
+        <Route path="/supervisao/conversas" element={<SupervisorConversations
+          tickets={snapshot.handoffs} api={api}/>}/>
+        <Route path="/supervisao/filas" element={<SupervisorQueues
+          queues={snapshot.queues} operators={snapshot.operators}
+          tickets={snapshot.handoffs} busy={busy}
+          onOffer={offerNext} onOpenOperator={openOperator}/>}/>
+        <Route path="/supervisao/equipe" element={<SupervisorTeam
+          operators={snapshot.operators} busy={busy} onPresence={changePresence}/>}/>
+        <Route path="/laboratorio" element={<DemoLab
+          tickets={snapshot.handoffs} busy={busy} onCreate={createTicket}/>}/>
+        <Route path="*" element={<Navigate to="/supervisao" replace/>}/>
+      </Routes>
+      <footer>Handoff Hub · POC SQLite 0.4 · Identidades demonstrativas · Dados locais</footer>
     </main>
   </div>
 }
