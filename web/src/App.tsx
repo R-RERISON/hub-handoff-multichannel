@@ -205,7 +205,7 @@ export default function App() {
       <button className={'nav '+(view==='queues'?'active':'')} onClick={()=>{setView('queues');setNotice('')}}><Layers size={18}/> Filas <em>{waiting}</em></button>
       <button className={'nav '+(view==='operators'?'active':'')} onClick={()=>{setView('operators');setNotice('')}}><Users size={18}/> Operadores</button>
       <button className={'nav '+(view==='desk'?'active':'')} onClick={()=>{setView('desk');setNotice('')}}><Headset size={18}/> Mesa do Operador <em>{offerCount}</em></button>
-      <div className="sidebar-bottom"><span className="online-dot"/> API local · SQLite <small>POC 0.2.0 · sem Teams</small></div>
+      <div className="sidebar-bottom"><span className="online-dot"/> API local · SQLite <small>POC 0.3.0 · sem Teams</small></div>
     </aside>
     <main className="content">
       <header className="topbar"><div><span className="kicker">OPERAÇÃO DEMONSTRATIVA</span>
