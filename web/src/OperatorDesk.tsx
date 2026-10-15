@@ -163,7 +163,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
           )}><CheckCircle2 size={16}/> Aceitar atendimento</button>
         </div>
       </div>
-    </div>
+    </div>}
     <div className="desk-top">
       <div>
         <div className="desk-kicker"><Headset size={15}/> WORKSPACE INDEPENDENTE DO OPERADOR</div>
