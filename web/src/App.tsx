@@ -12,7 +12,7 @@ type Ticket = {
   requester_label: string; subject: string; status: string; operator_id: string | null
   created_at: string
 }
-type Queue = {id: string; name: string; waiting: number}
+type Queue = {id: string; name: string; waiting: number; offered: number; active: number}
 type Operator = {id: string; name: string; presence: string; capacity: number; active: number; offered?: number}
 type Message = {id: string; sender: string; content: string; created_at: string}
 type DashboardSnapshot = {
@@ -30,7 +30,8 @@ export default function App() {
   const [queues, setQueues] = useState<Queue[]>([])
   const [operators, setOperators] = useState<Operator[]>([])
   const [delivery, setDelivery] = useState({total:0, pending:0})
-  const [filter, setFilter] = useState<'all'|'active'|'queued'|'closed'>('all')
+  const [filter, setFilter] = useState<'all'|'active'|'queued'|'offered'|'closed'>('all')
+  const [deskOperatorId,setDeskOperatorId] = useState('op-ana')
   const [messages, setMessages] = useState<Message[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
@@ -144,7 +145,11 @@ export default function App() {
       const result = await api('/v1/dispatch/offer','POST',{queue_id,operation_id:'demo'})
       if (result.result==='offered') {
         setSelectedId(result.offer.session_id)
-        setNotice('Oferta criada para '+result.offer.operator_id+'. Acesse Mesa do Operador para aceitar ou recusar.')
+        setDeskOperatorId(result.offer.operator_id)
+        setView('desk')
+        const assignee = operators.find(op=>op.id===result.offer.operator_id)
+        const qName = queues.find(q=>q.id===queue_id)?.name ?? queue_id.toUpperCase()
+        setNotice('Oferta da fila '+qName+' destinada a '+(assignee?.name ?? result.offer.operator_id)+'. Aceite na Mesa do Operador.')
       } else if (result.result==='no_operator_available') {
         setNotice('Sem capacidade: operador indisponível ou com vaga já reservada.')
       } else {
@@ -224,7 +229,7 @@ export default function App() {
         onSimulateUser={()=>void send('USER')}
         onFocusReply={focusReply}
         onClose={()=>void closeSelected()}
-        onGoOperator={()=>setView('desk')}
+        onGoOperator={()=>{if(selected?.operator_id)setDeskOperatorId(selected.operator_id);setView('desk')}}
       />}
       <div className="metrics">
         {[
@@ -242,6 +247,7 @@ export default function App() {
             <button type="button" className={filter==='all'?'current':''} aria-pressed={filter==='all'} onClick={()=>setFilter('all')}>Todas <b>{tickets.length}</b></button>
             <button type="button" className={filter==='active'?'current':''} aria-pressed={filter==='active'} onClick={()=>setFilter('active')}>Em atendimento <b>{active}</b></button>
             <button type="button" className={filter==='queued'?'current':''} aria-pressed={filter==='queued'} onClick={()=>setFilter('queued')}>Na fila <b>{waiting}</b></button>
+            <button type="button" className={filter==='offered'?'current':''} aria-pressed={filter==='offered'} onClick={()=>setFilter('offered')}>Ofertadas <b>{offerCount}</b></button>
             <button type="button" className={filter==='closed'?'current':''} aria-pressed={filter==='closed'} onClick={()=>setFilter('closed')}>Encerradas <b>{tickets.filter(t=>t.status==='CLOSED').length}</b></button>
           </div>
           <div className="sessions-scroll">{tickets.length===0&&<div className="empty empty--help"><MessageSquareText size={27}/><strong>Sua primeira conversa começa aqui</strong><p>Crie uma solicitação fictícia para experimentar a fila e o atendimento.</p><button className="primary small" disabled={busy} onClick={()=>void createTicket()}>Criar solicitação</button></div>}
@@ -280,10 +286,23 @@ export default function App() {
             <div className="line"><span>Respostas sem envio</span><b>{delivery.pending} de {delivery.total}</b></div></section></aside>
       </div>}
       {view==='queues'&&<section className="panel list-panel"><div className="panel-header"><div><h3>Filas configuradas</h3><p>Supervisão: ofereça atendimentos e aguarde o aceite do operador.</p></div></div>
-        {queues.map(q=><div className="record" key={q.id}><div className="record-icon"><Layers size={20}/></div><div className="fill"><b>{q.name}</b><p>Operação demonstrativa · {q.id}</p></div><span className="pill">{q.waiting} aguardando</span>
-          <button className="primary small" disabled={busy||q.waiting===0} onClick={()=>void offerNext(q.id)}>Ofertar próximo <ArrowRight size={14}/></button>
-        </div>)}
-        <p className="desk-supervisor-hint">Após criar a oferta, abra <b>Mesa do Operador</b> e selecione a identidade indicada para aceitar ou recusar. As ofertas expiram em dois minutos.</p>
+        {queues.map(q=>{
+          const offeredTickets = tickets.filter(t=>t.queue_id===q.id&&t.status==='OFFERED')
+          return <div className="queue-detail" key={q.id}>
+            <div className="record"><div className="record-icon"><Layers size={20}/></div><div className="fill"><b>{q.name}</b><p>Operação demonstrativa · {q.id}</p></div>
+              <div className="queue-stats"><span>{q.waiting} na fila</span><span>{q.offered} ofertado(s)</span><span>{q.active} ativo(s)</span></div>
+              <button className="primary small" disabled={busy||q.waiting===0} onClick={()=>void offerNext(q.id)}>Ofertar próximo <ArrowRight size={14}/></button>
+            </div>
+            {offeredTickets.map(ticket=>{
+              const assigned = operators.find(o=>o.id===ticket.operator_id)
+              return <div className="queue-offer" key={ticket.id}>
+                <div><strong>{ticket.requester_label}</strong> · {ticket.subject}<small>Oferta pendente para {assigned?.name??ticket.operator_id}. O ticket saiu de "Na fila" e aguarda aceite.</small></div>
+                <button className="outline small" onClick={()=>{if(ticket.operator_id)setDeskOperatorId(ticket.operator_id);setView('desk')}}>Abrir mesa de {assigned?.name?.split(' ')[0]??'operador'} <ArrowRight size={14}/></button>
+              </div>
+            })}
+          </div>
+        })}
+        <p className="desk-supervisor-hint">Uma oferta é reservada ao operador por até dois minutos. Enquanto aguarda aceite, o ticket aparece em <b>Ofertado(s)</b>, não em <b>Na fila</b>. O botão Ofertar próximo já direciona para a mesa correta.</p>
       </section>}
       {view==='operators'&&<section className="panel list-panel"><div className="panel-header"><div><h3>Operadores</h3><p>Capacidade e presença</p></div></div>
         {operators.map(o=><div className="record" key={o.id}><div className="avatar">{initials(o.name)}</div><div className="fill"><b>{o.name}</b><p>{o.active} ativo(s) · {o.offered??0} oferta(s) reservada(s) · capacidade {o.capacity}</p></div>
@@ -292,6 +311,7 @@ export default function App() {
           </select></div>)}</section>}
       {view==='desk'&&<OperatorDesk
         operators={operators} queues={queues} api={api}
+        preferredOperatorId={deskOperatorId}
         onChanged={refresh} onGoQueues={()=>setView('queues')}
       />}
       <footer>Handoff Hub · SQLite POC · Sem autenticação corporativa · Uso local de desenvolvimento</footer>
