@@ -1,5 +1,7 @@
 # Desenvolvimento local via Git e VS Code
 
+**Fluxo preferencial:** ` .\start.cmd ` inicia backend e frontend no mesmo terminal, instala dependências quando necessário, gera a chave local, abre o navegador e encerra os dois processos com Ctrl+C. Para testes locais, execute ` .\start.cmd --check `. Mais detalhes em [Setup em um comando](setup-one-command.md).
+
 O GitHub é a fonte das versões. O desenvolvedor clona e atualiza via Git; não usamos GitHub Actions.
 
 ## Primeira instalação (PowerShell)
