@@ -124,3 +124,35 @@ Pare `start.cmd` com Ctrl+C. Faça `git fetch origin` e `git pull --ff-only orig
 Se não houver capacidade em N2, a sessão deve continuar em `QUEUED` e a interface informar `no_operator_available`.
 
 **Validação desta correção ainda depende de `start.cmd --check` e da inspeção visual no Windows.**
+
+
+## UX-003.2 — Correção de corte da Mesa do Operador
+
+### Reprodução / causa
+
+Captura em desktop mostra a tela da Mesa do Operador terminando antes dos controles de transferência e encerramento. A folha de estilos global aplica `height:100dvh` e `overflow:hidden` à área `.content` em telas largas; a implementação adicional ainda usava `.desk-layout{overflow:hidden}`, comprimindo uma grade contendo cabeçalho, conversação, campo de resposta, transferência e histórico.
+
+O conteúdo estava presente no DOM, mas não era acessível pela rolagem principal.
+
+### Ajuste publicado
+
+- `App.tsx` atribui `content--desk` somente à Mesa do Operador.
+- Removida a segunda linha de métricas globais no workspace do operador (a Mesa possui indicadores próprios).
+- `.content--desk` recebe `overflow-y:auto` e altura controlada pela viewport; sidebar permanece independente.
+- `.desk-layout` deixa de cortar conteúdo. A grade possui altura mínima suficiente e o histórico das mensagens mantém rolagem interna.
+- As ações da base do chat (resposta, transferência, encerramento, timeline) não encolhem nem são cortadas.
+- Breakpoints abaixo de 1180/1000/620px reorganizam formulário de transferência, painéis e ações.
+
+### Homologação obrigatória
+
+No VS Code, após atualizar a branch, executar `.\start.cmd --check` e `.\start.cmd`.
+
+Com atendimento ativo:
+1. Abrir Mesa do Operador em navegador desktop (por exemplo, 1730x865).
+2. Rolar a **área principal**, não a sidebar; conferir que **Transferir** e **Encerrar atendimento** estão acessíveis.
+3. Conferir rolagem independente da lista de mensagens.
+4. Validar também em 1366x768, 1280x720 e uma largura de 800px usando DevTools.
+5. Testar transferência para N2, aceite de Bruno e encerramento.
+6. Confirmar que Conversas, Filas e Operadores não sofreram regressão visual.
+
+**Nenhuma alteração em SQLite ou nas APIs de negócio.** Não marcar homologado sem retorno da execução Windows.
