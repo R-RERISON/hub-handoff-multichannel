@@ -208,3 +208,23 @@ def test_operator_scoped_close_requires_matching_assignee(tmp_path) -> None:
         assert c.post(
             f"/v1/operators/{op_id}/handoffs/{handoff_id}/close", headers=AUTH
         ).status_code == 409
+
+
+def test_dispatch_requeues_expired_offer_before_reading_queue(tmp_path) -> None:
+    database = tmp_path / "spec003.db"
+    with TestClient(app_for(tmp_path)) as client:
+        client.post("/v1/demo/bootstrap", headers=AUTH)
+        handoff_id = create_handoff(client, 10)
+        first = client.post("/v1/dispatch/offer", headers=AUTH, json={}).json()["offer"]
+        past = (datetime.now(UTC) - timedelta(minutes=10)).replace(
+            tzinfo=None
+        ).isoformat(sep=" ")
+        with connect_sqlite(database) as conn:
+            conn.execute(
+                "UPDATE handoff_offers SET expires_at = ? WHERE id = ?",
+                (past, first["offer_id"]),
+            )
+        again = client.post("/v1/dispatch/offer", headers=AUTH, json={}).json()
+        assert again["result"] == "offered"
+        assert again["offer"]["session_id"] == handoff_id
+        assert again["offer"]["offer_id"] != first["offer_id"]
