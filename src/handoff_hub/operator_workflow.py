@@ -122,7 +122,9 @@ def register_operator_workflow(
         """Reserve capacity for up to two minutes, without marking the chat ACTIVE."""
         with factory() as db:
             exclusive_tx(db)
-            requeue_expired(db)
+            if requeue_expired(db):
+                # This POC uses autoflush=False; release reservations before SELECTs.
+                db.flush()
             queue = db.get(Queue, body.queue_id)
             if queue is None or queue.operation_id != body.operation_id:
                 raise HTTPException(404, "Fila não encontrada")
