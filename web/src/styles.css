@@ -102,3 +102,18 @@ footer{font-size:10px;color:#9eacb9;margin-top:20px}
   .context-hint{flex-wrap:wrap}
   .context-hint .primary{max-width:none;width:100%}
 }
+
+/* Keep the operator workspace inside the viewport on wide desktop screens. */
+@media (min-width: 1351px) and (min-height: 740px) {
+  .layout{height:100dvh;min-height:0}
+  .sidebar{height:100dvh;min-height:0}
+  .content{height:100dvh;min-height:0;display:flex;flex-direction:column;overflow:hidden;padding-top:22px;padding-bottom:11px}
+  .workspace{flex:1;height:auto;min-height:0}
+  .sessions,.conversation{min-height:0;overflow:hidden}
+  .side-panels{min-height:0;overflow-y:auto}
+  .metrics{margin:14px 0;flex-shrink:0}
+  .metric{padding:13px 16px 11px}
+  .metric strong{font-size:25px;margin:5px 0 2px}
+  .journey{flex-shrink:0;margin-top:13px;margin-bottom:0}
+  .content footer{margin-top:8px}
+}
