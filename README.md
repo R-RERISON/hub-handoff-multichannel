@@ -1,5 +1,20 @@
 # Handoff Hub Multichannel — SQLite POC v0.2
 
+## Inicialização recomendada no Windows — um único comando
+
+No PowerShell do VS Code, na raiz do projeto:
+
+    .\start.cmd
+
+O inicializador instala dependências quando necessário, gerencia o segredo local da POC, sobe FastAPI e Vite no mesmo terminal e abre o navegador. Encerre tudo com Ctrl+C.
+
+Para testes automatizados sem iniciar serviços:
+
+    .\start.cmd --check
+
+Manual completo: [Setup em um comando](docs/setup-one-command.md).
+
+
 Plataforma independente para atendimento humano originado em bots/agentes. **Esta versão é uma POC de simulação local.** Não integra o Microsoft Teams, Cisco Finesse ou bases corporativas; não está apta a produção.
 
 ## Stack escolhida
