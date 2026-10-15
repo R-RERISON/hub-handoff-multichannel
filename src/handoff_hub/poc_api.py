@@ -13,8 +13,17 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from handoff_hub.poc_db import (
-    HandoffSession, Integration, Message, Operation, Operator, OutboxEvent,
-    Queue, QueueMembership, SessionEvent, make_session_factory, utc_now,
+    HandoffSession,
+    Integration,
+    Message,
+    Operation,
+    Operator,
+    OutboxEvent,
+    Queue,
+    QueueMembership,
+    SessionEvent,
+    make_session_factory,
+    utc_now,
 )
 
 
