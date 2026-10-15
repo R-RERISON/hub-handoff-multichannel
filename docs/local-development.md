@@ -1,3 +1,23 @@
+## Nova branch — POC 0.4 / Portais independentes
+
+```powershell
+cd C:\Projetos\hub-handoff\hub-handoff-multichannel
+git status --short
+git fetch origin
+git switch --track origin/feat/004-separated-workspaces
+git pull --ff-only origin feat/004-separated-workspaces
+
+.\start.cmd --check
+.\start.cmd
+```
+
+Se já existir a branch local, use `git switch feat/004-separated-workspaces`.
+
+O inicializador mantém a API e a SPA no mesmo terminal. Na SPA há a tela `/inicio` com escolha entre Mesa do Operador, Supervisão, Administração e Laboratório. React Router foi acrescentado ao `web/package.json`: o setup instala automaticamente essa dependência quando detectar mudança.
+
+**Nenhuma alteração no esquema SQLite** nesta etapa. A arquitetura e os testes de aceite estão documentados em [UX-004](ux/UX-004-workspace-separation.md). A administração é somente estrutura visual planejada, não funcionalidades CRUD reais.
+
+
 # Desenvolvimento local via Git e VS Code
 
 **Fluxo preferencial:** ` .\start.cmd ` inicia backend e frontend no mesmo terminal, instala dependências quando necessário, gera a chave local, abre o navegador e encerra os dois processos com Ctrl+C. Para testes locais, execute ` .\start.cmd --check `. Mais detalhes em [Setup em um comando](setup-one-command.md).

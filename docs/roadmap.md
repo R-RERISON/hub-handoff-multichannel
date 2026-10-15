@@ -1,3 +1,12 @@
+## POC-004 — Portais separados e navegação por rotas
+
+Implementação publicada na branch `feat/004-separated-workspaces`. Separação real de interfaces de Operador, Supervisão, Administração (landing planejada) e Laboratório, com React Router e componentes independentes. Mesmo FastAPI e SQLite da POC 0.3, sem alteração de esquema.
+
+Critérios: build React/TypeScript, testes locais de contrato de rotas, renderização em múltiplas resoluções e regressão N1 → N2 → Bruno. Não usar GitHub Actions. **Próxima etapa depois da homologação**: design system/componentes compartilhados, autorização por perfis reais e experiência completa de supervisão.
+
+Ver [UX-004](ux/UX-004-workspace-separation.md) e [ADR-0004](architecture/ADR-0004-separated-workspaces.md).
+
+
 # Roadmap com custo mínimo e testes locais
 
 ## POC-002 / Primeira entrega

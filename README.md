@@ -1,4 +1,37 @@
-# Handoff Hub Multichannel — SQLite POC v0.2
+# Handoff Hub Multichannel — POC 0.4 (workspaces separados)
+
+## Navegação atual
+
+Após autenticar com a chave local, acesse a **tela de escolha de workspace**. Cada espaço é uma página independente e possui uma URL própria:
+
+| Portal | URL local | Uso |
+|---|---|---|
+| Escolher espaço | http://127.0.0.1:5173/inicio | Seleção de contexto na POC |
+| Mesa do Operador | http://127.0.0.1:5173/operador | Ofertas, mensagens, transferência, encerramento |
+| Supervisão | http://127.0.0.1:5173/supervisao | Dashboard gerencial |
+| Histórico | http://127.0.0.1:5173/supervisao/conversas | Consulta somente leitura |
+| Filas | http://127.0.0.1:5173/supervisao/filas | Distribuição e ofertas |
+| Equipe | http://127.0.0.1:5173/supervisao/equipe | Presença e capacidade |
+| Laboratório | http://127.0.0.1:5173/laboratorio | Gerar tickets fictícios |
+| Administração | http://127.0.0.1:5173/administracao | Estrutura planejada, sem CRUD real |
+
+A navegação entre portais é demonstrativa e **não representa RBAC ou SSO**. O backend e o SQLite permanecem inalterados nesta entrega.
+
+**Para atualizar e validar:**
+
+```powershell
+git status --short
+git fetch origin
+git switch --track origin/feat/004-separated-workspaces
+git pull --ff-only origin feat/004-separated-workspaces
+.\start.cmd --check
+.\start.cmd
+```
+
+Se a branch já existir localmente, use `git switch feat/004-separated-workspaces`.
+
+Leia [ADR-0004](docs/architecture/ADR-0004-separated-workspaces.md) e [UX-004](docs/ux/UX-004-workspace-separation.md).
+
 
 ## Inicialização recomendada no Windows — um único comando
 
