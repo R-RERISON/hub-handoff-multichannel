@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, MessageSquareText, Search } from 'lucide-react'
+import { MessageSquareText, Search } from 'lucide-react'
 import type { Api, ChatMessage, Ticket } from './types'
 import { formatTime } from './types'
 
