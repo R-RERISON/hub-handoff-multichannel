@@ -235,7 +235,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
           <textarea value={reply} onChange={e=>setReply(e.target.value)} rows={2}
             maxLength={4000} placeholder="Escreva sua resposta para o usuário simulado" aria-label="Responder como operador"/>
           <div className="desk-actions">
-            <button className="outline small" disabled={busy} onClick={()=>void sendMessage('USER')}>Simular usuário</button>
+            {!lockedIdentity&&<button className="outline small" disabled={busy} onClick={()=>void sendMessage('USER')}>Simular usuário</button>}
             <button className="primary small" disabled={busy||!reply.trim()} onClick={()=>void sendMessage('OPERATOR')}><Send size={14}/> Enviar resposta</button>
           </div>
         </div>
