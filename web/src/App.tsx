@@ -14,7 +14,10 @@ type Ticket = {
 type Queue = {id: string; name: string; waiting: number}
 type Operator = {id: string; name: string; presence: string; capacity: number; active: number}
 type Message = {id: string; sender: string; content: string; created_at: string}
-type Outbox = {id: string; session_id: string; status: string}
+type DashboardSnapshot = {
+  handoffs: Ticket[]; queues: Queue[]; operators: Operator[]
+  outbox: {total: number; pending: number}
+}
 const API = 'http://127.0.0.1:8000'
 const time = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})
 const initials = (name: string) => name.split(' ').slice(0,2).map(x => x[0]).join('').toUpperCase()
@@ -25,7 +28,8 @@ export default function App() {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [queues, setQueues] = useState<Queue[]>([])
   const [operators, setOperators] = useState<Operator[]>([])
-  const [outbox, setOutbox] = useState<Outbox[]>([])
+  const [delivery, setDelivery] = useState({total:0, pending:0})
+  const [filter, setFilter] = useState<'all'|'active'|'queued'|'closed'>('all')
   const [messages, setMessages] = useState<Message[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
@@ -35,6 +39,7 @@ export default function App() {
   const [busy, setBusy] = useState(false)
   const [view, setView] = useState<'inbox'|'queues'|'operators'>('inbox')
   const selected = tickets.find(t => t.id === selectedId)
+  const visibleTickets = tickets.filter(t => filter==='all' || t.status.toLowerCase()===filter)
   const stage: JourneyStage = !selected ? 'create'
     : selected.status === 'QUEUED' ? 'assign'
     : selected.status === 'CLOSED' ? 'done'
@@ -55,13 +60,24 @@ export default function App() {
   const refresh = useCallback(async () => {
     if (!connected) return
     try {
-      const [t,q,o,b] = await Promise.all([api('/v1/handoffs'),api('/v1/queues'),api('/v1/operators'),api('/v1/outbox')])
-      setTickets(t);setQueues(q);setOperators(o);setOutbox(b)
-      if (selectedId) setMessages(await api('/v1/handoffs/'+selectedId+'/messages'))
+      const snapshot: DashboardSnapshot = await api('/v1/dashboard')
+      setTickets(snapshot.handoffs)
+      setQueues(snapshot.queues)
+      setOperators(snapshot.operators)
+      setDelivery(snapshot.outbox)
+      if (view==='inbox' && selectedId) {
+        setMessages(await api('/v1/handoffs/'+selectedId+'/messages'))
+      }
     } catch(e) {setError((e as Error).message)}
-  }, [connected,selectedId,api])
+  }, [connected,selectedId,view,api])
 
-  useEffect(() => {void refresh();const i=window.setInterval(() => void refresh(),5000);return () => clearInterval(i)},[refresh])
+  useEffect(() => {
+    if (!connected) return
+    const tick = () => { if (document.visibilityState==='visible') void refresh() }
+    const interval = window.setInterval(tick,15000)
+    document.addEventListener('visibilitychange',tick)
+    return () => {window.clearInterval(interval);document.removeEventListener('visibilitychange',tick)}
+  },[refresh,connected])
   useEffect(() => {
     if (!connected || !selectedId) {setMessages([]);return}
     void api('/v1/handoffs/'+selectedId+'/messages').then(setMessages).catch(e => setError(e.message))
@@ -76,8 +92,9 @@ export default function App() {
     setBusy(true);setError('')
     try {
       await api('/v1/demo/bootstrap','POST')
-      const [t,q,o,b] = await Promise.all([api('/v1/handoffs'),api('/v1/queues'),api('/v1/operators'),api('/v1/outbox')])
-      setTickets(t);setQueues(q);setOperators(o);setOutbox(b);setConnected(true)
+      const snapshot: DashboardSnapshot = await api('/v1/dashboard')
+      setTickets(snapshot.handoffs);setQueues(snapshot.queues)
+      setOperators(snapshot.operators);setDelivery(snapshot.outbox);setConnected(true)
     } catch(e) {setError((e as Error).message)}
     finally {setBusy(false)}
   }
@@ -159,9 +176,9 @@ export default function App() {
     <aside className="sidebar">
       <div className="brand"><div className="app-mark"><Headset size={20}/></div><div><b>Handoff Hub</b><small>CONTROL CENTER</small></div></div>
       <span className="sidebar-title">WORKSPACE</span>
-      <button className={'nav '+(view==='inbox'?'active':'')} onClick={()=>setView('inbox')}><Inbox size={18}/> Conversas <em>{active}</em></button>
-      <button className={'nav '+(view==='queues'?'active':'')} onClick={()=>setView('queues')}><Layers size={18}/> Filas <em>{waiting}</em></button>
-      <button className={'nav '+(view==='operators'?'active':'')} onClick={()=>setView('operators')}><Users size={18}/> Operadores</button>
+      <button className={'nav '+(view==='inbox'?'active':'')} onClick={()=>{setView('inbox');setNotice('')}}><Inbox size={18}/> Conversas <em>{tickets.length}</em></button>
+      <button className={'nav '+(view==='queues'?'active':'')} onClick={()=>{setView('queues');setNotice('')}}><Layers size={18}/> Filas <em>{waiting}</em></button>
+      <button className={'nav '+(view==='operators'?'active':'')} onClick={()=>{setView('operators');setNotice('')}}><Users size={18}/> Operadores</button>
       <div className="sidebar-bottom"><span className="online-dot"/> API local · SQLite <small>POC 0.2.0 · sem Teams</small></div>
     </aside>
     <main className="content">
@@ -187,16 +204,22 @@ export default function App() {
           {name:'Em atendimento',value:active,detail:'Conversas em andamento',icon:<MessageSquareText/>},
           {name:'Aguardando',value:waiting,detail:'Solicitações em fila',icon:<ClipboardList/>},
           {name:'Operadores livres',value:free,detail:'Capacidade disponível',icon:<UserRoundCheck/>},
-          {name:'Entrega pendente',value:outbox.filter(x=>x.status==='PENDING_ADAPTER').length,detail:'Sem adapter Teams',icon:<Activity/>}
+          {name:'Sem envio externo',value:delivery.pending,detail:'Respostas aguardando conector',icon:<Activity/>}
         ].map(m=><div className="metric" key={m.name}><div className="metric-name">{m.name}<span>{m.icon}</span></div>
           <strong>{m.value}</strong><small>{m.detail}</small></div>)}
       </div>
       {view==='inbox'&&<div className="workspace">
         <section className="panel sessions"><div className="panel-header"><div><h3>Conversas</h3><p>Atendimentos registrados</p></div>
           <button className="primary small" disabled={busy} onClick={()=>void createTicket()}><Plus size={14}/> Nova solicitação</button></div>
-          <div className="tabs">Todas <b>{tickets.length}</b><span>Ativas {active}</span><span>Fila {waiting}</span></div>
+          <div className="tabs" role="group" aria-label="Filtrar conversas">
+            <button type="button" className={filter==='all'?'current':''} aria-pressed={filter==='all'} onClick={()=>setFilter('all')}>Todas <b>{tickets.length}</b></button>
+            <button type="button" className={filter==='active'?'current':''} aria-pressed={filter==='active'} onClick={()=>setFilter('active')}>Em atendimento <b>{active}</b></button>
+            <button type="button" className={filter==='queued'?'current':''} aria-pressed={filter==='queued'} onClick={()=>setFilter('queued')}>Na fila <b>{waiting}</b></button>
+            <button type="button" className={filter==='closed'?'current':''} aria-pressed={filter==='closed'} onClick={()=>setFilter('closed')}>Encerradas <b>{tickets.filter(t=>t.status==='CLOSED').length}</b></button>
+          </div>
           <div className="sessions-scroll">{tickets.length===0&&<div className="empty empty--help"><MessageSquareText size={27}/><strong>Sua primeira conversa começa aqui</strong><p>Crie uma solicitação fictícia para experimentar a fila e o atendimento.</p><button className="primary small" disabled={busy} onClick={()=>void createTicket()}>Criar solicitação</button></div>}
-            {tickets.map(t=><button key={t.id} onClick={()=>selectTicket(t.id)} className={'session '+(t.id===selectedId?'selected':'')}>
+            {tickets.length>0 && visibleTickets.length===0 && <p className="empty">Nenhuma conversa nesta categoria.</p>}
+            {visibleTickets.map(t=><button key={t.id} onClick={()=>selectTicket(t.id)} className={'session '+(t.id===selectedId?'selected':'')}>
               <div className="avatar">{initials(t.requester_label)}</div><div className="session-info">
                 <div className="session-title"><b>{t.requester_label}</b><small>{time(t.created_at)}</small></div>
                 <p>{t.subject}</p><div className="session-meta"><span className={'status '+t.status.toLowerCase()}>{t.status==='QUEUED'?'Na fila':t.status==='ACTIVE'?'Ativo':'Encerrado'}</span><small>{t.queue_id.toUpperCase()}</small></div>
@@ -227,10 +250,10 @@ export default function App() {
           <h4>Filas acompanhadas</h4>{queues.map(q=><div className="line" key={q.id}><span>{q.name}</span><b>{q.waiting}</b></div>)}</section>
           <section className="panel widget"><h3>Integrações</h3><div className="line"><span>Backend local</span><b className="good">Online</b></div>
             <div className="line"><span>Teams adapter</span><b>Não instalado</b></div>
-            <div className="line"><span>Outbox</span><b>{outbox.length} eventos</b></div></section></aside>
+            <div className="line"><span>Respostas sem envio</span><b>{delivery.pending} de {delivery.total}</b></div></section></aside>
       </div>}
       {view==='queues'&&<section className="panel list-panel"><div className="panel-header"><div><h3>Filas configuradas</h3><p>Distribuição SQLite</p></div>
-        <button className="primary small" disabled={busy||!waiting} onClick={()=>void run(()=>api('/v1/dispatch/next','POST',{}))}>Distribuir próximo da fila <ArrowRight size={14}/></button></div>
+        <button className="primary small" disabled={busy||!waiting} onClick={()=>void dispatchNext()}>Distribuir próximo da fila <ArrowRight size={14}/></button></div>
         {queues.map(q=><div className="record" key={q.id}><div className="record-icon"><Layers size={20}/></div><div><b>{q.name}</b><p>Operação demonstrativa · {q.id}</p></div><span className="pill">{q.waiting} aguardando</span></div>)}</section>}
       {view==='operators'&&<section className="panel list-panel"><div className="panel-header"><div><h3>Operadores</h3><p>Capacidade e presença</p></div></div>
         {operators.map(o=><div className="record" key={o.id}><div className="avatar">{initials(o.name)}</div><div className="fill"><b>{o.name}</b><p>{o.active} de {o.capacity} atendimento(s)</p></div>
