@@ -70,3 +70,16 @@ Sem GitHub Actions. Sem migração automática do sistema legado.
 ## Gates enterprise que permanecem abertos
 
 Autenticação Entra ID/OIDC, RBAC granular e isolamento por operação, Alembic, worker multi-instância, entrega Teams de verdade, escalabilidade SQL Server, auditoria de segurança, proteção CSRF conforme modelo de sessão, SLOs e observabilidade, testes de carga e E2E. A POC é enterprise-oriented, não um produto homologado para produção.
+
+
+## Revisão de estabilização posterior à implementação
+
+- A identidade antiga baseada em X-POC-Key não é mais injetada pelo launcher no backend normal; permanece apenas no modo explícito dos testes legados. O health/ready verifica contas locais provisionadas.
+- O rodízio usa timestamps UTC normalizados para evitar misturar datetime aware/naive durante reservas de múltiplos atendimentos.
+- Novos testes incluem despacho paralelo sem sobrealocação, FIFO, reset de senhas invalidando tokens, recusa/expiração e proibição de impersonação pelo ADMIN.
+- A Mesa do Operador mantém a sessão selecionada quando ativa a permissão de notificações e dá foco ao diálogo de nova oferta.
+- O chat ativo também se atualiza periodicamente, sem botão de recarga.
+- O Laboratório descreve corretamente a distribuição automática; operador autenticado não consegue criar mensagens fictícias como usuário.
+- A supervisão apresenta primeiro operadores realmente elegíveis, mantendo a ordem persistida de atendimento.
+
+Nenhuma aprovação local foi simulada: o gate final permanece a execução de start.cmd --check e a homologação real no VS Code do usuário.
