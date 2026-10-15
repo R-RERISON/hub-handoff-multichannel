@@ -129,9 +129,9 @@ def assert_access(factory, p: Principal, request: Request, payload: dict | None)
     oid = p.operator_id
     if method == "GET" and path == "/v1/queues":
         return
-    if method == "GET" and path == "/v1/operators/{}/work".format(oid):
+    if method == "GET" and path == f"/v1/operators/{oid}/work":
         return
-    if method == "PATCH" and path == "/v1/operators/{}/presence".format(oid):
+    if method == "PATCH" and path == f"/v1/operators/{oid}/presence":
         return
     close = re.fullmatch(r"/v1/operators/([^/]+)/handoffs/([^/]+)/close", path)
     if close and method == "POST":
@@ -170,9 +170,12 @@ def register_identity_endpoints(factory) -> APIRouter:
         with factory() as db:
             db.connection().exec_driver_sql("BEGIN IMMEDIATE")
             throttle = db.get(LoginThrottle, username)
-            if throttle is not None and throttle.locked_until is not None:
-                if throttle.locked_until > naive_utc():
-                    raise HTTPException(429, "Muitas tentativas. Tente novamente em 15 minutos")
+            if (
+                throttle is not None
+                and throttle.locked_until is not None
+                and throttle.locked_until > naive_utc()
+            ):
+                raise HTTPException(429, "Muitas tentativas. Tente novamente em 15 minutos")
             user = db.scalar(select(AuthUser).where(AuthUser.username == username))
             if user is None or not user.is_active or not password_matches(
                 body.password, user.password_hash
