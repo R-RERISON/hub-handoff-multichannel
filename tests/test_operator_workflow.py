@@ -185,3 +185,26 @@ def test_original_demo_dispatch_respects_pending_offers(tmp_path) -> None:
         assert c.post("/v1/dispatch/offer", headers=AUTH, json={}).json()["result"] == "offered"
         response = c.post("/v1/dispatch/next", headers=AUTH, json={}).json()
         assert response["result"] == "no_operator_available"
+
+
+def test_operator_scoped_close_requires_matching_assignee(tmp_path) -> None:
+    with TestClient(app_for(tmp_path)) as c:
+        c.post("/v1/demo/bootstrap", headers=AUTH)
+        handoff_id = create_handoff(c, 9)
+        offer = c.post("/v1/dispatch/offer", headers=AUTH, json={}).json()["offer"]
+        op_id = offer["operator_id"]
+        wrong = "op-bruno" if op_id == "op-ana" else "op-ana"
+        c.post(f"/v1/handoffs/{handoff_id}/accept", headers=AUTH,
+               json={"operator_id": op_id})
+        forbidden = c.post(
+            f"/v1/operators/{wrong}/handoffs/{handoff_id}/close", headers=AUTH
+        )
+        assert forbidden.status_code == 403
+        completed = c.post(
+            f"/v1/operators/{op_id}/handoffs/{handoff_id}/close", headers=AUTH
+        )
+        assert completed.status_code == 200
+        assert completed.json()["status"] == "CLOSED"
+        assert c.post(
+            f"/v1/operators/{op_id}/handoffs/{handoff_id}/close", headers=AUTH
+        ).status_code == 409
