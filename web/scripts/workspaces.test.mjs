@@ -83,14 +83,14 @@ test('supervisor route props match the page contracts', () => {
   const app = read('src/App.tsx')
   const history = read('src/workspaces/SupervisorConversations.tsx')
   const queues = read('src/workspaces/SupervisorQueues.tsx')
-  const historyRoute = app.match(/<SupervisorConversations\\b([\\s\\S]*?)\\/>/)
-  const queueRoute = app.match(/<SupervisorQueues\\b([\\s\\S]*?)\\/>/)
+  const historyRoute = app.match(/<SupervisorConversations\b([\s\S]*?)\/>/)
+  const queueRoute = app.match(/<SupervisorQueues\b([\s\S]*?)\/>/)
   assert.ok(historyRoute, 'missing read-only conversations route')
   assert.ok(queueRoute, 'missing queues route')
-  assert.doesNotMatch(historyRoute[1], /\\bonChanged\\s*=/,
+  assert.doesNotMatch(historyRoute[1], /\bonChanged\s*=/,
     'conversation page does not accept onChanged')
-  assert.match(queueRoute[1], /\\bonChanged\\s*=\\{refresh\\}/,
+  assert.match(queueRoute[1], /\bonChanged\s*=\{refresh\}/,
     'queue management requires refresh callback')
-  assert.match(history, /type Props = \\{tickets:Ticket\\[\\];api:Api\\}/)
-  assert.match(queues, /onChanged:\\(\\)=>Promise<void>/)
+  assert.match(history, /type Props = \{tickets:Ticket\[\];api:Api\}/)
+  assert.match(queues, /onChanged:\(\)=>Promise<void>/)
 })
