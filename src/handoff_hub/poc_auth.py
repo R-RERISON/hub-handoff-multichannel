@@ -99,6 +99,8 @@ def assert_access(factory, p: Principal, request: Request, payload: dict | None)
     if p.role == "ADMIN":
         return
     if p.role == "SUPERVISOR":
+        if method == "POST" and path in ("/v1/dispatch/offer", "/v1/dispatch/next"):
+            raise HTTPException(403, "Distribuição manual desativada; use o serviço automático")
         if re.fullmatch(r"/v1/operators/[^/]+/(work|handoffs/[^/]+/close)", path):
             raise HTTPException(403, "Mesa exclusiva do operador")
         if path.endswith(("/accept", "/decline", "/transfer")) or (
