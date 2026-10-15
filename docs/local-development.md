@@ -28,6 +28,24 @@ Se houver arquivos modificados, preserve-os antes de atualizar.
 
 A leitura de contexto foi consolidada em `GET /v1/dashboard`; o frontend agora consulta o snapshot com intervalo de 15 segundos quando a aba está visível. Os filtros de conversas são interativos e as respostas da outbox aparecem como sem envio externo. Homologar com `.\\start.cmd --check` e `.\\start.cmd`. Veja [UX-002](ux/UX-002-operations-review.md).
 
+## POC-003 — Operação humana
+
+A branch de homologação da nova Mesa do Operador é `feat/003-operator-workflow`. Execute:
+
+```powershell
+git status --short
+git switch --track origin/feat/003-operator-workflow
+git pull --ff-only origin feat/003-operator-workflow
+.\start.cmd --check
+.\start.cmd
+```
+
+Se a branch já existir localmente, utilize `git switch feat/003-operator-workflow`, sem `--track`. Na primeira atualização, use `git fetch origin` antes de criar a branch local, se necessário.
+
+A nova versão insere apenas as tabelas `handoff_offers` e `session_transfers` no SQLite. Para preservar estado de laboratório, encerre os serviços antes de copiar/arquivar seu arquivo SQLite.
+
+[Contrato completo e cenários de homologação](specs/POC-003-operator-workflow.md).
+
 ## Testes backend
 
 ```powershell
