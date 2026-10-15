@@ -32,6 +32,8 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
   const [alertOffer,setAlertOffer] = useState<Offer|null>(null)
   const [browserAlerts,setBrowserAlerts] = useState(false)
   const notified = useRef(new Set<string>())
+  const browserAlertsRef = useRef(false)
+  const acceptButtonRef = useRef<HTMLButtonElement|null>(null)
   const [work,setWork] = useState<Work|null>(null)
   const [selectedId,setSelectedId] = useState<string|null>(null)
   const [messages,setMessages] = useState<ChatMessage[]>([])
@@ -46,6 +48,8 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
   const queueTitle = (id:string) => queues.find(q=>q.id===id)?.name ?? id
 
   useEffect(()=>setOperatorId(preferredOperatorId),[preferredOperatorId])
+  useEffect(()=>{browserAlertsRef.current=browserAlerts},[browserAlerts])
+  useEffect(()=>{if(alertOffer)acceptButtonRef.current?.focus()},[alertOffer?.offer_id])
 
   const reload = useCallback(async () => {
     if (!operatorId) return
@@ -55,15 +59,18 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
     if(unseen){
       notified.current.add(unseen.offer_id)
       setAlertOffer(unseen)
-      if(browserAlerts && 'Notification' in window && Notification.permission==='granted'){
-        new Notification('Novo atendimento no Handoff Hub',{
-          body:unseen.subject+' · '+unseen.requester_label
-        })
+      if(browserAlertsRef.current && 'Notification' in window
+          && Notification.permission==='granted'){
+        try{
+          new Notification('Novo atendimento no Handoff Hub',{
+            body:unseen.subject+' · '+unseen.requester_label
+          })
+        }catch{ /* Some browsers do not support direct notifications. Modal still appears. */ }
       }
     }
     setAlertOffer(current=>current && !result.offers.some(o=>o.offer_id===current.offer_id)
       ? null : current)
-  },[operatorId,api,browserAlerts])
+  },[operatorId,api])
 
   useEffect(()=>{
     setSelectedId(null)
@@ -137,7 +144,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
             ()=>api('/v1/handoffs/'+alertOffer.session_id+'/decline','POST',{operator_id:operatorId}),
             'Oferta recusada; atendimento devolvido à fila.',null
           )}><XCircle size={16}/> Recusar</button>
-          <button className="primary" disabled={busy} onClick={()=>void execute(
+          <button ref={acceptButtonRef} className="primary" disabled={busy} onClick={()=>void execute(
             ()=>api('/v1/handoffs/'+alertOffer.session_id+'/accept','POST',{operator_id:operatorId}),
             'Atendimento aceito e iniciado.',alertOffer.session_id
           )}><CheckCircle2 size={16}/> Aceitar atendimento</button>
