@@ -137,6 +137,16 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
                 .where(HandoffSession.status == "QUEUED")
                 .group_by(HandoffSession.queue_id)
             ).all())
+            offered_by_queue = dict(db.execute(
+                select(HandoffSession.queue_id, func.count())
+                .where(HandoffSession.status == "OFFERED")
+                .group_by(HandoffSession.queue_id)
+            ).all())
+            active_by_queue = dict(db.execute(
+                select(HandoffSession.queue_id, func.count())
+                .where(HandoffSession.status == "ACTIVE")
+                .group_by(HandoffSession.queue_id)
+            ).all())
             active_by_operator = dict(db.execute(
                 select(HandoffSession.operator_id, func.count())
                 .where(HandoffSession.status == "ACTIVE")
@@ -153,7 +163,9 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
             return {
                 "handoffs": [as_handoff(h) for h in recent],
                 "queues": [{"id": q.id, "operation_id": q.operation_id, "name": q.name,
-                            "waiting": waiting_by_queue.get(q.id, 0)} for q in qs],
+                            "waiting": waiting_by_queue.get(q.id, 0),
+                            "offered": offered_by_queue.get(q.id, 0),
+                            "active": active_by_queue.get(q.id, 0)} for q in qs],
                 "operators": [{"id": o.id, "operation_id": o.operation_id,
                                "name": o.name, "presence": o.presence,
                                "capacity": o.capacity,
