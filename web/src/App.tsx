@@ -195,7 +195,7 @@ export default function App() {
     </section>
   </div>
 
-  const permitted=!!user && (user.role==='ADMIN' ||
+  const permitted=!!user && ((user.role==='ADMIN' && !operatorMode) ||
     (user.role==='OPERATOR' && operatorMode) ||
     (user.role==='SUPERVISOR' && (
       location.pathname.startsWith('/supervisao') || location.pathname==='/laboratorio')) ||
