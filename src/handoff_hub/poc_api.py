@@ -1,17 +1,26 @@
 """Local-only demonstration API. No Teams delivery, real users or production authentication."""
 from __future__ import annotations
 
+import asyncio
 import hmac
+import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
+from handoff_hub.auto_dispatch import run_dispatch_cycle
+from handoff_hub.poc_auth import (
+    Principal,
+    assert_access,
+    get_principal,
+    register_identity_endpoints,
+)
 from handoff_hub.operator_workflow import register_operator_workflow
 from handoff_hub.poc_db import (
     HandoffSession,
@@ -64,6 +73,7 @@ def as_handoff(h: HandoffSession) -> dict:
 def create_app(database_url: str | None = None, api_key: str | None = None) -> FastAPI:
     """Bind to 127.0.0.1: security is a local POC key, not operator/tenant RBAC."""
     database_url = database_url or os.getenv("HANDOFF_DB_URL", "sqlite:///./data/handoff-poc.db")
+    legacy_test_mode = api_key is not None or os.getenv("HANDOFF_ENABLE_LEGACY_ROUTES") == "1"
     api_key = api_key if api_key is not None else os.getenv("HANDOFF_POC_KEY", "")
     if database_url.startswith("sqlite:///./"):
         Path(database_url.removeprefix("sqlite:///./")).parent.mkdir(parents=True, exist_ok=True)
@@ -71,17 +81,53 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        yield
-        engine.dispose()
+        task = None
+        if not legacy_test_mode:
+            async def dispatch_loop():
+                while True:
+                    try:
+                        await asyncio.to_thread(run_dispatch_cycle, factory)
+                    except Exception:
+                        logging.getLogger("handoff.dispatch").exception("Falha no despacho")
+                    await asyncio.sleep(2)
 
-    app = FastAPI(title="Handoff Hub — SQLite POC", version="0.3.0-poc", lifespan=lifespan)
+            task = asyncio.create_task(dispatch_loop())
+        try:
+            yield
+        finally:
+            if task is not None:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+            engine.dispose()
+
+    app = FastAPI(title="Handoff Hub — SQLite POC", version="0.5.0-poc", lifespan=lifespan)
     app.add_middleware(CORSMiddleware, allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
                        allow_credentials=False, allow_methods=["GET", "POST", "PATCH"],
-                       allow_headers=["X-POC-Key", "Idempotency-Key", "Content-Type"])
+                       allow_headers=["X-POC-Key", "Idempotency-Key", "Content-Type", "Authorization"])
 
-    def authenticate(x_poc_key: str | None = Header(default=None)) -> None:
-        if not api_key or not x_poc_key or not hmac.compare_digest(api_key, x_poc_key):
-            raise HTTPException(401, "Chave local de demonstração inválida")
+    async def authenticate(
+        request: Request,
+        authorization: str | None = Header(default=None),
+        x_poc_key: str | None = Header(default=None),
+    ) -> Principal:
+        if (legacy_test_mode and api_key and x_poc_key
+                and hmac.compare_digest(api_key, x_poc_key)):
+            return Principal("legacy-tests", "ADMIN", "demo", None, "legacy")
+        principal = get_principal(factory, authorization)
+        body = None
+        if request.method in ("POST", "PATCH", "PUT"):
+            try:
+                parsed = await request.json()
+                body = parsed if isinstance(parsed, dict) else None
+            except ValueError:
+                body = None
+        assert_access(factory, principal, request, body)
+        return principal
+
+    app.include_router(register_identity_endpoints(factory))
 
     def exclusive_tx(db):
         """SQLite writer lock. Do not reuse this locking syntax in SQL Server."""
@@ -89,7 +135,7 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
 
     @app.get("/health/live")
     def live():
-        return {"status": "alive", "version": "0.3.0-poc"}
+        return {"status": "alive", "version": "0.5.0-poc"}
 
     @app.get("/health/ready")
     def ready(response: Response):
