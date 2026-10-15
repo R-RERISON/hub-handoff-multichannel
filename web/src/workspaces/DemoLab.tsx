@@ -14,7 +14,7 @@ export default function DemoLab({tickets,busy,onCreate}:Props) {
     </div><div className="banner-icon"><FlaskConical size={28}/></div></section>
     <section className="panel lab-onboarding">
       <div className="lab-stage"><span>01</span><b>Crie uma solicitação</b><p>Ela entrará na fila Suporte N1.</p></div>
-      <div className="lab-stage"><span>02</span><b>Ofereça em Filas</b><p>Reserve um operador livre e gere uma oferta.</p></div>
+      <div className="lab-stage"><span>02</span><b>Distribuição automática</b><p>O sistema identifica operadores online e disponíveis e envia a oferta.</p></div>
       <div className="lab-stage"><span>03</span><b>Atenda na Mesa</b><p>Aceite, converse, transfira ou encerre.</p></div>
       <div className="lab-stage"><span>04</span><b>Audite em Supervisão</b><p>Confira histórico e estado da sessão.</p></div>
     </section>
@@ -25,6 +25,6 @@ export default function DemoLab({tickets,busy,onCreate}:Props) {
     <section className="panel lab-cta"><div>
       <h3>Continuar a homologação</h3><p>{tickets.filter(t=>t.status==='QUEUED').length} solicitação(ões) aguardando distribuição.</p>
     </div><button className="outline" onClick={()=>navigate('/supervisao/filas')}>Abrir filas <ArrowRight size={16}/></button></section>
-    <p className="operational-note"><ShieldAlert size={15}/> A versão atual usa uma chave local compartilhada. A identidade dos operadores ainda é simulada e não há entrega real no Microsoft Teams.</p>
+    <p className="operational-note"><ShieldAlert size={15}/> Contas de laboratório com RBAC no backend. Sem identidade corporativa/SSO ou entrega real no Microsoft Teams.</p>
   </div>
 }
