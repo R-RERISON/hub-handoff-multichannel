@@ -196,3 +196,19 @@ footer{font-size:10px;color:#9eacb9;margin-top:20px}
   .desk-transfer label{grid-column:1}
   .record{flex-wrap:wrap}
 }
+
+/* Make an offered ticket visible as work in progress, not a missing queue item. */
+.queue-detail+.queue-detail{border-top:1px solid #e9eef5}
+.queue-detail .record{border-top:0}
+.queue-stats{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.queue-stats span{display:inline-flex;align-items:center;white-space:nowrap;border-radius:7px;padding:7px 9px;background:#eff3f8;color:#54708d;font-size:11px;font-weight:700}
+.queue-stats span:nth-child(2){background:#f0eaff;color:#7357a9}
+.queue-stats span:nth-child(3){background:#e4f5ed;color:#20795d}
+.queue-offer{display:flex;justify-content:space-between;align-items:center;gap:12px;background:#f7f2ff;border-top:1px solid #e5d8fa;padding:12px 22px;font-size:12px;color:#536680}
+.queue-offer strong{font-size:12px;color:#5f4597}
+.queue-offer small{display:block;margin-top:5px;font-size:11px;color:#74628a}
+@media(max-width:1100px){
+  .queue-detail .record{flex-wrap:wrap}
+  .queue-stats{order:2;flex-basis:100%}
+  .queue-offer{flex-wrap:wrap}
+}
