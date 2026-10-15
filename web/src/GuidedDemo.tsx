@@ -1,6 +1,6 @@
 import { ArrowRight, Check, CheckCheck, CircleHelp, MessageCircle, UserRoundCheck } from 'lucide-react'
 
-export type JourneyStage = 'create' | 'assign' | 'receive' | 'reply' | 'close' | 'done'
+export type JourneyStage = 'create' | 'assign' | 'pending' | 'receive' | 'reply' | 'close' | 'done'
 
 type GuidedDemoProps = {
   stage: JourneyStage
@@ -12,6 +12,7 @@ type GuidedDemoProps = {
   onSimulateUser: () => void
   onFocusReply: () => void
   onClose: () => void
+  onGoOperator: () => void
 }
 
 const steps = [
@@ -24,6 +25,7 @@ const steps = [
 const stepIndex: Record<JourneyStage, number> = {
   create: 0,
   assign: 1,
+  pending: 1,
   receive: 2,
   reply: 2,
   close: 3,
@@ -40,6 +42,7 @@ export default function GuidedDemo({
   onSimulateUser,
   onFocusReply,
   onClose,
+  onGoOperator,
 }: GuidedDemoProps) {
   const progress = stepIndex[stage]
   const guidance = {
@@ -56,6 +59,13 @@ export default function GuidedDemo({
       button: 'Distribuir próximo da fila',
       action: onAssign,
       blocked: !hasWaiting || availableOperators === 0,
+    },
+    pending: {
+      title: 'Aguardando o aceite do operador',
+      description: 'Uma oferta foi enviada. Abra a Mesa do Operador para aceitar ou recusar.',
+      button: 'Abrir Mesa do Operador',
+      action: onGoOperator,
+      blocked: false,
     },
     receive: {
       title: 'Simule uma mensagem do usuário',
