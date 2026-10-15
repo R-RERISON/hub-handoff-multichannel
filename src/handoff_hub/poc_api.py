@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
+from handoff_hub.operator_workflow import register_operator_workflow
 from handoff_hub.poc_db import (
     HandoffSession,
     Integration,
@@ -40,6 +41,7 @@ class MessageCreate(BaseModel):
     sender: Literal["USER", "OPERATOR"]
     content: str = Field(min_length=1, max_length=4000)
     external_message_id: str = Field(min_length=1, max_length=128)
+    operator_id: str | None = Field(default=None, max_length=60)
 
 
 class DispatchRequest(BaseModel):
@@ -72,7 +74,7 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
         yield
         engine.dispose()
 
-    app = FastAPI(title="Handoff Hub — SQLite POC", version="0.2.0-poc", lifespan=lifespan)
+    app = FastAPI(title="Handoff Hub — SQLite POC", version="0.3.0-poc", lifespan=lifespan)
     app.add_middleware(CORSMiddleware, allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
                        allow_credentials=False, allow_methods=["GET", "POST", "PATCH"],
                        allow_headers=["X-POC-Key", "Idempotency-Key", "Content-Type"])
@@ -87,7 +89,7 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
 
     @app.get("/health/live")
     def live():
-        return {"status": "alive", "version": "0.2.0-poc"}
+        return {"status": "alive", "version": "0.3.0-poc"}
 
     @app.get("/health/ready")
     def ready(response: Response):
@@ -136,6 +138,11 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
                 .where(HandoffSession.status == "ACTIVE")
                 .group_by(HandoffSession.operator_id)
             ).all())
+            offered_by_operator = dict(db.execute(
+                select(HandoffSession.operator_id, func.count())
+                .where(HandoffSession.status == "OFFERED")
+                .group_by(HandoffSession.operator_id)
+            ).all())
             outbox_by_status = dict(db.execute(
                 select(OutboxEvent.status, func.count()).group_by(OutboxEvent.status)
             ).all())
@@ -146,7 +153,8 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
                 "operators": [{"id": o.id, "operation_id": o.operation_id,
                                "name": o.name, "presence": o.presence,
                                "capacity": o.capacity,
-                               "active": active_by_operator.get(o.id, 0)} for o in ops],
+                               "active": active_by_operator.get(o.id, 0),
+                               "offered": offered_by_operator.get(o.id, 0)} for o in ops],
                 "outbox": {
                     "total": sum(outbox_by_status.values()),
                     "pending": outbox_by_status.get("PENDING_ADAPTER", 0),
@@ -168,7 +176,9 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
             return [{"id": o.id, "operation_id": o.operation_id, "name": o.name,
                      "presence": o.presence, "capacity": o.capacity,
                      "active": db.scalar(select(func.count()).select_from(HandoffSession).where(
-                         HandoffSession.operator_id == o.id, HandoffSession.status == "ACTIVE")) or 0} for o in ops]
+                         HandoffSession.operator_id == o.id, HandoffSession.status == "ACTIVE")) or 0,
+                     "offered": db.scalar(select(func.count()).select_from(HandoffSession).where(
+                         HandoffSession.operator_id == o.id, HandoffSession.status == "OFFERED")) or 0} for o in ops]
 
     @app.patch("/v1/operators/{operator_id}/presence", dependencies=[Depends(authenticate)])
     def update_presence(operator_id: str, body: PresenceUpdate):
@@ -231,7 +241,8 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
                     Operator.id.in_(operator_ids), Operator.operation_id == body.operation_id,
                     Operator.presence == "AVAILABLE").order_by(Operator.id)).all():
                 active_count = db.scalar(select(func.count()).select_from(HandoffSession).where(
-                    HandoffSession.operator_id == op.id, HandoffSession.status == "ACTIVE")) or 0
+                    HandoffSession.operator_id == op.id,
+                    HandoffSession.status.in_(("ACTIVE", "OFFERED")))) or 0
                 if active_count < op.capacity:
                     waiting.operator_id = op.id
                     waiting.status = "ACTIVE"
@@ -259,10 +270,13 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
             h = db.get(HandoffSession, handoff_id)
             if h is None:
                 raise HTTPException(404, "Atendimento não encontrado")
-            if h.status not in {"QUEUED", "ACTIVE"}:
+            if h.status not in {"QUEUED", "OFFERED", "ACTIVE"}:
                 raise HTTPException(409, "Sessão não aceita mensagens")
             if body.sender == "OPERATOR" and h.status != "ACTIVE":
                 raise HTTPException(409, "Operador ainda não atribuído")
+            if (body.sender == "OPERATOR" and body.operator_id is not None
+                    and body.operator_id != h.operator_id):
+                raise HTTPException(403, "Operador não é responsável pelo atendimento")
             existing = db.scalar(select(Message).where(
                 Message.session_id == handoff_id,
                 Message.external_message_id == body.external_message_id))
@@ -270,7 +284,7 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
                 if existing.sender != body.sender or existing.content != body.content:
                     raise HTTPException(409, "Mensagem repetida com conteúdo diferente")
                 return {"id": existing.id, "status": "duplicate"}
-            m = Message(session_id=handoff_id, **body.model_dump())
+            m = Message(session_id=handoff_id, **body.model_dump(exclude={"operator_id"}))
             db.add(m)
             db.flush()
             if body.sender == "OPERATOR":
@@ -307,4 +321,5 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
             db.commit()
             return as_handoff(h)
 
+    app.include_router(register_operator_workflow(factory, authenticate, exclusive_tx, as_handoff))
     return app
