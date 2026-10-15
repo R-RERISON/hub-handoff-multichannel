@@ -61,8 +61,9 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
         })
       }
     }
-    if(!result.offers.some(o=>o.offer_id===alertOffer?.offer_id))setAlertOffer(null)
-  },[operatorId,api,browserAlerts,alertOffer?.offer_id])
+    setAlertOffer(current=>current && !result.offers.some(o=>o.offer_id===current.offer_id)
+      ? null : current)
+  },[operatorId,api,browserAlerts])
 
   useEffect(()=>{
     setSelectedId(null)
