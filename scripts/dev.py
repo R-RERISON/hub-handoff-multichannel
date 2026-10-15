@@ -229,9 +229,10 @@ def main(argv: list[str] | None = None) -> int:
                 raise LauncherError(f"Porta {port} ocupada ({name}). Encerre a instancia anterior e tente novamente.")
         # POC accounts and random passwords live ONLY in ignored local data.
         run_command([python, "-m", "handoff_hub.seed_demo_auth"])
-        key = local_key()
+        # Runtime logins now use per-user sessions; the shared legacy key is
+        # deliberately absent from the launched services.
         env = dict(os.environ)
-        env["HANDOFF_POC_KEY"] = key
+        env.pop("HANDOFF_POC_KEY", None)
         env["PYTHONUNBUFFERED"] = "1"
         report("Iniciando API e interface no mesmo terminal...")
         children.append(("API", spawn("API", [python, "-m", "uvicorn", "handoff_hub.main:app",
