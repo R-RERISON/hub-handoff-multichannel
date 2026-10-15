@@ -33,3 +33,13 @@ Antes de qualquer desenvolvimento, leia CONSTITUTION.md, docs/architecture/overv
 
 ## Inicializador local (padrão vigente)
 Usar `start.cmd` (na raiz) como entrada única para Python/FastAPI e React/Vite. `start.cmd --check` executa testes e build. Registrar instruções no `docs/setup-one-command.md`. Não utilizar GitHub Actions.
+
+
+## POC-004 — Contrato definitivo de workspaces
+
+- Workspaces de Operador, Supervisão e Administração possuem **URLs e shells independentes**. Não reintroduzir operações de resposta/transferência nos painéis de supervisão.
+- Laboratório possui rota própria; não distribuir botões de simulação entre páginas operacionais.
+- `web/src/App.tsx` coordena os snapshots, autenticação de laboratório e roteamento; funcionalidades das páginas ficam em `web/src/workspaces/` ou no componente específico da Mesa do Operador.
+- Novo fluxo: autenticação local → escolha de portal → navegação contextual. Isso **não substitui RBAC**.
+- Testes obrigatórios via `.\start.cmd --check`: Pytest, Ruff, `npm run test:architecture`, TypeScript e Vite. Não usar GitHub Actions.
+- Workspace novo não pode esconder comandos essenciais abaixo do viewport. Validar múltiplas resoluções e acesso por teclado.
