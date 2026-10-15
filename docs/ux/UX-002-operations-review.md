@@ -20,6 +20,7 @@ Data: 2026-10-15 | Origem: capturas das telas Conversas, Filas e Operadores e lo
 6. Alertas de sucesso são descartados ao trocar de página.
 7. Criar/atribuir atendimento seleciona a conversa pertinente mesmo que o filtro anterior a escondesse.
 8. Teste automatizado: GET /v1/dashboard sem chave retorna 401; abertura, fila, atribuição, resposta, fechamento e contagem de outbox.
+9. Histórico da conversa rola automaticamente para a mensagem mais recente após selecionar conversa ou receber nova mensagem; refresh sem novos itens não reposiciona o scroll.
 
 ## Limites preservados
 
