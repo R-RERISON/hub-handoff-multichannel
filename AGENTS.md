@@ -30,3 +30,6 @@ Antes de qualquer desenvolvimento, leia CONSTITUTION.md, docs/architecture/overv
 - Para cada entrega, informar branch, mudanças, comandos de atualização, execução e testes locais, com resultados reais e pendências.
 - Não utilizar GitHub Actions. Não substituir Git por pacotes ZIP como forma principal de entrega.
 - Instruções completas em `docs/local-development.md`.
+
+## Inicializador local (padrão vigente)
+Usar `start.cmd` (na raiz) como entrada única para Python/FastAPI e React/Vite. `start.cmd --check` executa testes e build. Registrar instruções no `docs/setup-one-command.md`. Não utilizar GitHub Actions.
