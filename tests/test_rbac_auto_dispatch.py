@@ -216,3 +216,65 @@ def test_automatic_n1_to_n2_transfer_requires_online_bruno(tmp_path) -> None:
             assert h.queue_id == "n2"
             assert h.operator_id == "op-bruno"
         assert c.get("/v1/operators/op-bruno/work", headers=bruno).json()["offers"]
+
+
+def test_fifo_and_capacity_under_parallel_cycle(tmp_path) -> None:
+    """A second simultaneous writer must not double-offer a reserved seat."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    app, factory, passwords = setup_poc(tmp_path)
+    with TestClient(app) as c:
+        login(c, passwords, "ana.demo")
+        login(c, passwords, "bruno.demo")
+        ids = [create_ticket(c, 300 + i) for i in range(3)]
+
+        def dispatch(_):
+            return run_dispatch_cycle(factory)
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            list(pool.map(dispatch, range(2)))
+        with factory() as db:
+            rows = [db.get(HandoffSession, hid) for hid in ids]
+            assert [h.status for h in rows] == ["OFFERED", "OFFERED", "QUEUED"]
+            assert {h.operator_id for h in rows[:2]} == {"op-ana", "op-bruno"}
+            assert rows[-1].operator_id is None
+
+
+def test_reset_credentials_revokes_tokens(tmp_path) -> None:
+    app, factory, passwords = setup_poc(tmp_path)
+    path = tmp_path / "secrets.txt"
+    with TestClient(app) as c:
+        old_token = login(c, passwords, "ana.demo")
+        assert c.get("/v1/auth/me", headers=auth(old_token)).status_code == 200
+        provision(factory, path, reset=True)
+        assert c.get("/v1/auth/me", headers=auth(old_token)).status_code == 401
+        old_login = c.post("/v1/auth/login", json={
+            "username": "ana.demo", "password": passwords["ana.demo"],
+        })
+        assert old_login.status_code == 401
+
+
+def test_expired_offer_reenters_queue_without_duplicate_reservations(tmp_path) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import text
+
+    app, factory, passwords = setup_poc(tmp_path)
+    with TestClient(app) as c:
+        login(c, passwords, "ana.demo")
+        hid = create_ticket(c, 400)
+        assert run_dispatch_cycle(factory)["offered"] == 1
+        with factory.begin() as db:
+            db.execute(
+                text("UPDATE handoff_offers SET expires_at=:expiry WHERE session_id=:sid"),
+                {"expiry": (datetime.now(UTC) - timedelta(minutes=5)).replace(
+                    tzinfo=None
+                ).isoformat(sep=" "), "sid": hid},
+            )
+        result = run_dispatch_cycle(factory)
+        assert result["expired"] == 1
+        assert result["offered"] == 0  # cooldown prevents immediate reoffer to Ana
+        with factory() as db:
+            h = db.get(HandoffSession, hid)
+            assert h.status == "QUEUED"
+            assert h.operator_id is None
