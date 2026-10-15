@@ -4,8 +4,6 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
-
 from handoff_hub.auto_dispatch import run_dispatch_cycle
 from handoff_hub.poc_api import create_app
 from handoff_hub.poc_db import HandoffSession, make_session_factory
