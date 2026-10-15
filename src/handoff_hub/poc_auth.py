@@ -12,7 +12,7 @@ from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from handoff_hub.poc_db import AuthSession, AuthUser, HandoffSession, utc_now
+from handoff_hub.poc_db import AuthSession, AuthUser, HandoffSession, LoginThrottle, utc_now
 
 PBKDF2_ITERATIONS = 600_000
 HEARTBEAT_MAX_AGE = 40
@@ -166,12 +166,28 @@ def register_identity_endpoints(factory) -> APIRouter:
     router = APIRouter(prefix="/v1/auth", tags=["Identidade local"])
     @router.post("/login")
     def login(body: LoginInput):
+        username = body.username.strip().lower()
         with factory() as db:
-            user = db.scalar(select(AuthUser).where(AuthUser.username == body.username.lower()))
+            db.connection().exec_driver_sql("BEGIN IMMEDIATE")
+            throttle = db.get(LoginThrottle, username)
+            if throttle is not None and throttle.locked_until is not None:
+                if throttle.locked_until > naive_utc():
+                    raise HTTPException(429, "Muitas tentativas. Tente novamente em 15 minutos")
+            user = db.scalar(select(AuthUser).where(AuthUser.username == username))
             if user is None or not user.is_active or not password_matches(
                 body.password, user.password_hash
             ):
+                if throttle is None:
+                    throttle = LoginThrottle(username=username, failed_attempts=0)
+                    db.add(throttle)
+                throttle.failed_attempts += 1
+                if throttle.failed_attempts >= 5:
+                    throttle.locked_until = utc_now() + timedelta(minutes=15)
+                db.commit()
                 raise HTTPException(401, "Usuário ou senha inválidos")
+            if throttle is not None:
+                throttle.failed_attempts = 0
+                throttle.locked_until = None
             token = secrets.token_urlsafe(48)
             db.add(AuthSession(
                 user_id=user.id, token_hash=token_digest(token),
