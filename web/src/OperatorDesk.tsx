@@ -18,6 +18,7 @@ type Api = (path: string, method?: string, body?: object, extra?: Record<string,
 type Props = {
   operators: Operator[]
   queues: Queue[]
+  preferredOperatorId: string
   api: Api
   onChanged: ()=>Promise<void>
   onGoQueues: ()=>void
@@ -25,8 +26,8 @@ type Props = {
 
 const labelTime=(value:string)=>new Date(value).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})
 
-export default function OperatorDesk({operators,queues,api,onChanged,onGoQueues}:Props) {
-  const [operatorId,setOperatorId] = useState('op-ana')
+export default function OperatorDesk({operators,queues,preferredOperatorId,api,onChanged,onGoQueues}:Props) {
+  const [operatorId,setOperatorId] = useState(preferredOperatorId)
   const [work,setWork] = useState<Work|null>(null)
   const [selectedId,setSelectedId] = useState<string|null>(null)
   const [messages,setMessages] = useState<ChatMessage[]>([])
@@ -39,6 +40,8 @@ export default function OperatorDesk({operators,queues,api,onChanged,onGoQueues}
   const [timeline,setTimeline] = useState<string[]>([])
   const selected = work?.active.find(h=>h.id===selectedId) ?? null
   const queueTitle = (id:string) => queues.find(q=>q.id===id)?.name ?? id
+
+  useEffect(()=>setOperatorId(preferredOperatorId),[preferredOperatorId])
 
   const reload = useCallback(async () => {
     if (!operatorId) return
