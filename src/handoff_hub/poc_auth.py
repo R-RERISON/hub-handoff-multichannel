@@ -97,6 +97,14 @@ def require_owner(factory, handoff_id: str, operator_id: str) -> None:
 def assert_access(factory, p: Principal, request: Request, payload: dict | None) -> None:
     path, method = request.url.path, request.method
     if p.role == "ADMIN":
+        if method == "POST" and (
+            path in ("/v1/dispatch/next", "/v1/dispatch/offer")
+            or path.endswith(("/accept", "/decline", "/transfer", "/messages"))
+            or re.fullmatch(r"/v1/operators/[^/]+/handoffs/[^/]+/close", path)
+        ):
+            raise HTTPException(403, "Ações do operador exigem login do próprio operador")
+        if re.fullmatch(r"/v1/operators/[^/]+/work", path):
+            raise HTTPException(403, "A caixa pessoal exige conta de operador")
         return
     if p.role == "SUPERVISOR":
         if method == "POST" and path in ("/v1/dispatch/offer", "/v1/dispatch/next"):
