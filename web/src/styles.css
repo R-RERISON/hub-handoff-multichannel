@@ -511,3 +511,40 @@ body{background:var(--hub-bg)}
   .workspace-home__cards{grid-template-columns:1fr}
   .workspace-home__card{min-height:185px;padding:21px}
 }
+
+/* POC-005 — role login, supervisor rotation, operator offer popup. */
+.login-panel label{margin-top:14px}
+.login-panel input{margin-bottom:7px}
+.login-panel .full{margin-top:12px}
+.desk-presence-editor{display:flex;flex-direction:column;gap:5px;margin-top:12px}
+.desk-presence-editor select{border:1px solid #cbdce9;border-radius:8px;background:#f9fbfd;padding:9px;color:#35546f}
+.desk-identity>strong{font-size:14px;color:#244863}
+.desk-alert-controls{display:flex;justify-content:space-between;align-items:center;gap:14px;
+  border:1px solid #c6e4d8;border-radius:9px;padding:10px 15px;background:#f1fbf5;color:#527b6b;font-size:12px}
+.offer-overlay{position:fixed;inset:0;background:#081526a8;z-index:300;display:grid;place-items:center;padding:18px}
+.offer-dialog{width:min(510px,100%);border-radius:18px;background:#fff;padding:32px;
+  box-shadow:0 34px 110px #0005;border:1px solid #d8e5ee}
+.offer-dialog h2{font:800 23px Manrope,sans-serif;color:#193c5f;margin:14px 0}
+.offer-dialog>p{font-size:13px;color:#536c82;line-height:1.6}
+.offer-dialog #offer-dialog-text{display:flex;flex-direction:column;gap:7px;padding:16px;
+  background:#eff7ff;border:1px solid #d8e9fb;border-radius:9px}
+.offer-dialog #offer-dialog-text strong{font-size:16px;color:#244c75}
+.offer-dialog__hint{padding-top:14px;font-size:12px!important;color:#7a90a4!important}
+.offer-dialog__buttons{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
+.offer-dialog__buttons button{font-size:13px;padding:12px 16px}
+.rotation-panel{padding:14px 24px 19px;border-top:1px solid #e5edf4;background:#fcfdff}
+.rotation-panel h4{font-size:12px;color:#51718d;margin-bottom:12px}
+.rotation-member{display:flex;align-items:center;gap:12px;padding:11px 12px;border:1px solid #e5ebf3;
+  border-radius:8px;background:#fff;margin:6px 0}
+.rotation-member strong{flex:1;color:#3a5874;font-size:12px}
+.rotation-member small{font-size:10px;color:#8297a9}
+.rotation-rank{display:grid;place-items:center;background:#e7f1fc;color:#3276af;font-size:11px;
+  font-weight:800;width:25px;height:25px;border-radius:50%}
+@media(max-width:700px){
+  .rotation-member{flex-wrap:wrap}
+  .rotation-member strong{flex-basis:65%}
+  .rotation-member small{width:100%}
+  .offer-dialog__buttons{flex-direction:column}
+  .offer-dialog__buttons button{width:100%}
+  .desk-alert-controls{flex-wrap:wrap}
+}
