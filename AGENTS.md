@@ -24,3 +24,9 @@ Antes de qualquer desenvolvimento, leia CONSTITUTION.md, docs/architecture/overv
 - Não declarar integração Teams funcional sem adapter e teste E2E.
 - Não apresentar schema create_all como estratégia de migração versionada.
 - O frontend deve sinalizar claramente que mensagens são simulações.
+
+## Entregas com Git e VS Code
+- Fonte oficial: branch do GitHub, com atualização por `git pull --ff-only`.
+- Para cada entrega, informar branch, mudanças, comandos de atualização, execução e testes locais, com resultados reais e pendências.
+- Não utilizar GitHub Actions. Não substituir Git por pacotes ZIP como forma principal de entrega.
+- Instruções completas em `docs/local-development.md`.
