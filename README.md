@@ -1,3 +1,37 @@
+# Handoff Hub Multichannel — POC 0.5 / RBAC + filas automáticas
+
+**Nova etapa:** login individual com autorização por perfil no backend, fila FIFO com rodízio durável por operador e notificação modal de novas ofertas. As telas de Operador, Supervisão e Administração continuam independentes. O SQLite recebe somente novas tabelas.
+
+## Usuários de laboratório
+
+| Perfil | Usuário |
+|---|---|
+| Administrador | admin.demo |
+| Supervisor | supervisor.demo |
+| Auditor | auditor.demo |
+| Operador N1 | ana.demo |
+| Operador N1/N2 | bruno.demo |
+
+As senhas **não estão no código**: são geradas aleatoriamente no primeiro start.cmd e gravadas em data/demo-credentials.txt (ignorado pelo Git). Visualizar no PowerShell com Get-Content .\data\demo-credentials.txt. Para rotacionar senhas e invalidar sessões, parar o servidor e executar .\start.cmd --reset-users.
+
+### Nova homologação Windows
+
+    git status --short
+    git fetch origin
+    git switch --track origin/feat/005-rbac-auto-dispatch
+    git pull --ff-only origin feat/005-rbac-auto-dispatch
+    .\start.cmd --check
+    .\start.cmd
+
+Se a branch existir, usar git switch feat/005-rbac-auto-dispatch.
+
+Para testes: login Supervisor em um navegador, login Ana e Bruno em navegadores/perfis separados, manter operadores Disponíveis e gerar solicitação sintética. A oferta aparecerá automaticamente na Mesa correta e abrirá um diálogo de aceite/recusa. Supervisão → Filas mostra ordem de distribuição e permite gerenciar membros; Supervisão → Equipe define capacidades.
+
+**Não é produção enterprise ainda:** faltam Entra ID/OIDC, isolamento de operações, Alembic, workers externos e Teams real. Não expor esta POC fora do localhost e nunca utilizar dados de atendimento reais.
+
+Detalhamento: [SPEC-005](docs/specs/POC-005-rbac-auto-dispatch.md).
+
+
 # Handoff Hub Multichannel — POC 0.4 (workspaces separados)
 
 ## Navegação atual
