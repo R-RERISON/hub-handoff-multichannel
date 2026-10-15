@@ -12,6 +12,7 @@ import SupervisorConversations from './workspaces/SupervisorConversations'
 import SupervisorOverview from './workspaces/SupervisorOverview'
 import SupervisorQueues from './workspaces/SupervisorQueues'
 import SupervisorTeam from './workspaces/SupervisorTeam'
+import WorkspaceHome from './workspaces/WorkspaceHome'
 import type { Api, DashboardSnapshot } from './workspaces/types'
 
 const API_URL = 'http://127.0.0.1:8000'
@@ -45,6 +46,7 @@ export default function App() {
   const [busy,setBusy] = useState(false)
   const [error,setError] = useState('')
   const [notice,setNotice] = useState('')
+  const homeMode = location.pathname==='/' || location.pathname==='/inicio'
   const operatorMode = location.pathname.startsWith('/operador')
   const adminMode = location.pathname.startsWith('/administracao')
   const offered = snapshot.handoffs.filter(t=>t.status==='OFFERED').length
@@ -92,7 +94,7 @@ export default function App() {
       await api('/v1/demo/bootstrap','POST')
       const data:DashboardSnapshot=await api('/v1/dashboard')
       setSnapshot(data);setConnected(true)
-      if(location.pathname==='/')navigate('/supervisao',{replace:true})
+      if(location.pathname==='/')navigate('/inicio',{replace:true})
     }catch(e){setError((e as Error).message)}
     finally{setBusy(false)}
   }
@@ -165,6 +167,8 @@ export default function App() {
     </section>
   </div>
 
+  if(homeMode)return <WorkspaceHome/>
+
   if(operatorMode)return <div className="operator-portal">
     <header className="operator-portal__header">
       <Logo/>
@@ -172,8 +176,8 @@ export default function App() {
         <span>Workspace dedicado</span></div>
       <div className="operator-portal__actions">
         <span className="local-tag"><ShieldCheck size={15}/> SIMULAÇÃO LOCAL</span>
-        <button className="outline" onClick={()=>navigate('/supervisao')}>
-          <ArrowLeftRight size={16}/> Ir para Supervisão
+        <button className="outline" onClick={()=>navigate('/inicio')}>
+          <ArrowLeftRight size={16}/> Trocar espaço
         </button>
       </div>
     </header>
@@ -203,8 +207,8 @@ export default function App() {
     </aside>
     <main className="admin-portal__main">
       <header className="portal-topbar"><span>Administração / POC 0.4</span>
-        <button className="outline" onClick={()=>navigate('/supervisao')}>
-          <ArrowLeftRight size={15}/> Voltar à Supervisão
+        <button className="outline" onClick={()=>navigate('/inicio')}>
+          <ArrowLeftRight size={15}/> Trocar espaço
         </button></header>
       <Routes><Route path="/administracao" element={<AdminLanding/>}/>
         <Route path="*" element={<Navigate to="/administracao" replace/>}/></Routes>
@@ -224,6 +228,7 @@ export default function App() {
       <ActiveLink to="/laboratorio" icon={<FlaskConical size={18}/>} label="Laboratório"/>
       <div className="sidebar-separator"/>
       <span className="sidebar-title">OUTROS ESPAÇOS</span>
+      <NavLink className="nav nav--external" to="/inicio"><ArrowLeftRight size={18}/><span>Escolher espaço</span><ArrowRight size={14}/></NavLink>
       <NavLink className="nav nav--external" to="/operador"><Headset size={18}/><span>Mesa do Operador</span><ArrowRight size={14}/></NavLink>
       <NavLink className="nav nav--external" to="/administracao"><Settings2 size={18}/><span>Administração</span><ArrowRight size={14}/></NavLink>
       <div className="sidebar-bottom"><span className="online-dot"/> API local · SQLite
