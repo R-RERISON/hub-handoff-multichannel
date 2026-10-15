@@ -137,7 +137,8 @@ def run_dispatch_cycle(factory) -> dict:
                     )
                     db.add(turn)
                     turns[op.id] = turn
-                turn.last_offered_at = utc_now()
+                # Normalize SQLite timestamps: do not sort aware and naive datetimes.
+                turn.last_offered_at = naive_utc()
                 turn.total_offers += 1
                 db.flush()
                 result["offered"] += 1
