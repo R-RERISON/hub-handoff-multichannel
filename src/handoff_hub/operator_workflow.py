@@ -6,8 +6,8 @@ simulated identity, NOT authenticated impersonation; do not expose publicly.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from typing import Callable
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
