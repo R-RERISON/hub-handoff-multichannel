@@ -484,3 +484,30 @@ body{background:var(--hub-bg)}
   .operator-portal__main .desk-transfer{grid-template-columns:1fr}
   .operator-portal__main .desk-transfer label{grid-column:1}
 }
+
+/* Distinct portal selection screen; no sidebar and no operational controls. */
+.workspace-home{min-height:100dvh;padding:clamp(30px,8vh,92px) 24px 60px;
+  background:radial-gradient(ellipse at 18% 10%,#e7f1fd,transparent 45%),#f2f6fb}
+.workspace-home__intro{max-width:1000px;margin:0 auto 35px}
+.workspace-home__intro h1{font:800 clamp(27px,4vw,40px) Manrope,sans-serif;color:#193450;letter-spacing:-1.1px;margin:12px 0}
+.workspace-home__intro p{font-size:14px;color:#708aa1;line-height:1.75;max-width:730px}
+.workspace-home__warning{display:inline-block;background:#ecf3fc;color:#507ca8;border-radius:7px;
+  padding:8px 12px;font-size:11px;font-weight:700;margin-top:20px}
+.workspace-home__cards{max-width:1000px;margin:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:17px}
+.workspace-home__card{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:12px;
+  background:#fff;border:1px solid #dbe7f0;border-radius:15px;padding:27px;min-height:230px;
+  box-shadow:0 8px 34px #2541600a;transition:border-color .15s,transform .15s,box-shadow .15s}
+.workspace-home__card:hover{border-color:#7cb7ef;box-shadow:0 14px 35px #264d7818;transform:translateY(-2px)}
+.workspace-home__card:focus-visible{outline:3px solid #308bec;outline-offset:3px}
+.workspace-home__icon{display:grid;place-items:center;width:47px;height:47px;border-radius:12px;background:#e7f1ff;color:#357dbf}
+.workspace-home__card--operator .workspace-home__icon{background:#dff5ee;color:#178369}
+.workspace-home__card--admin .workspace-home__icon{background:#f1ebfc;color:#8060b6}
+.workspace-home__card--lab .workspace-home__icon{background:#fff2e5;color:#af7732}
+.workspace-home__status{font-size:10px;font-weight:800;color:#6b95b8;text-transform:uppercase;letter-spacing:.4px}
+.workspace-home__card strong{font-size:17px;font-family:Manrope,Arial,sans-serif;color:#203f5b}
+.workspace-home__description{font-size:12px;color:#8298ab;line-height:1.6}
+.workspace-home__open{display:inline-flex;align-items:center;gap:7px;margin-top:auto;font-size:12px;font-weight:800;color:#2b76bc}
+@media(max-width:680px){
+  .workspace-home__cards{grid-template-columns:1fr}
+  .workspace-home__card{min-height:185px;padding:21px}
+}
