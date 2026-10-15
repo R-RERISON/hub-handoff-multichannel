@@ -161,6 +161,46 @@ class SessionTransfer(Base):
 
 
 
+
+class AuthUser(Base):
+    """Local POC identity, never reused as the Teams bot credential."""
+
+    __tablename__ = "auth_users"
+    id: Mapped[str] = mapped_column(String(40), primary_key=True, default=make_id)
+    username: Mapped[str] = mapped_column(String(80), nullable=False, unique=True)
+    password_hash: Mapped[str] = mapped_column(String(256), nullable=False)
+    role: Mapped[str] = mapped_column(String(24), nullable=False)
+    operation_id: Mapped[str] = mapped_column(ForeignKey("operations.id"), nullable=False)
+    operator_id: Mapped[str | None] = mapped_column(ForeignKey("operators.id"))
+    is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
+
+
+class AuthSession(Base):
+    """Opaque bearer token is SHA-256 hashed; no plaintext tokens in SQLite."""
+
+    __tablename__ = "auth_sessions"
+    id: Mapped[str] = mapped_column(String(40), primary_key=True, default=make_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("auth_users.id"), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    revoked: Mapped[bool] = mapped_column(default=False, nullable=False)
+    __table_args__ = (
+        Index("ix_auth_sessions_user", "user_id", "expires_at"),
+        Index("ix_auth_sessions_heartbeat", "last_seen", "revoked"),
+    )
+
+
+class DispatchTurn(Base):
+    """Queue-scoped round-robin position, durable across service restarts."""
+
+    __tablename__ = "dispatch_turns"
+    queue_id: Mapped[str] = mapped_column(ForeignKey("queues.id"), primary_key=True)
+    operator_id: Mapped[str] = mapped_column(ForeignKey("operators.id"), primary_key=True)
+    last_offered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    total_offers: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+
 def make_session_factory(database_url: str):
     """SQLite single-node POC: SQLite serializes writers; SQL Server needs another strategy."""
     engine = create_engine(database_url, connect_args={"timeout": 10}, future=True)
