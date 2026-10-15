@@ -5,6 +5,7 @@ import asyncio
 import hmac
 import logging
 import os
+from datetime import timedelta
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
@@ -19,10 +20,14 @@ from handoff_hub.poc_auth import (
     Principal,
     assert_access,
     get_principal,
+    naive_utc,
     register_identity_endpoints,
 )
 from handoff_hub.operator_workflow import register_operator_workflow
 from handoff_hub.poc_db import (
+    AuthSession,
+    AuthUser,
+    DispatchTurn,
     HandoffSession,
     Integration,
     Message,
@@ -230,6 +235,56 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
             return [{"id": q.id, "operation_id": q.operation_id, "name": q.name,
                      "waiting": db.scalar(select(func.count()).select_from(HandoffSession).where(
                          HandoffSession.queue_id == q.id, HandoffSession.status == "QUEUED")) or 0} for q in qs]
+
+    @app.get("/v1/queues/{queue_id}/rotation", dependencies=[Depends(authenticate)])
+    def rotation(queue_id: str):
+        """Read-only order and eligibility per queue for the supervisor."""
+        with factory() as db:
+            q = db.get(Queue, queue_id)
+            if not q:
+                raise HTTPException(404, "Fila inexistente")
+            ids = db.scalars(select(QueueMembership.operator_id).where(
+                QueueMembership.queue_id == queue_id
+            )).all()
+            turns = {
+                turn.operator_id: turn for turn in db.scalars(
+                    select(DispatchTurn).where(DispatchTurn.queue_id == queue_id)
+                ).all()
+            }
+            cutoff = naive_utc() - timedelta(seconds=40)
+            live = set(db.scalars(
+                select(AuthUser.operator_id)
+                .join(AuthSession, AuthSession.user_id == AuthUser.id)
+                .where(AuthUser.role == "OPERATOR", AuthUser.is_active.is_(True),
+                       AuthSession.revoked.is_(False), AuthSession.expires_at > naive_utc(),
+                       AuthSession.last_seen > cutoff)
+            ).all())
+            members = []
+            for oid in ids:
+                op = db.get(Operator, oid)
+                if not op:
+                    continue
+                occupied = db.scalar(
+                    select(func.count()).select_from(HandoffSession).where(
+                        HandoffSession.operator_id == oid,
+                        HandoffSession.status.in_(("ACTIVE", "OFFERED")))
+                ) or 0
+                turn = turns.get(oid)
+                members.append({
+                    "operator_id": oid, "name": op.name,
+                    "online": oid in live, "presence": op.presence,
+                    "occupied": occupied, "capacity": op.capacity,
+                    "eligible": oid in live and op.presence == "AVAILABLE"
+                    and occupied < op.capacity,
+                    "last_offered_at": turn.last_offered_at.isoformat()
+                    if turn and turn.last_offered_at else None,
+                    "total_offers": turn.total_offers if turn else 0,
+                })
+            members.sort(key=lambda op: (
+                op["last_offered_at"] is not None,
+                op["last_offered_at"] or "", op["operator_id"]
+            ))
+            return {"queue_id": q.id, "operators": members}
 
     @app.get("/v1/operators", dependencies=[Depends(authenticate)])
     def operators():
