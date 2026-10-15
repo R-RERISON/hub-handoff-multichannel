@@ -193,7 +193,7 @@ export default function OperatorDesk({operators,queues,api,onChanged,onGoQueues}
               )}><ArrowRightLeft size={14}/> Transferir</button>
           </div>
           <button className="primary small" disabled={busy} onClick={()=>void execute(
-            ()=>api('/v1/handoffs/'+selected.id+'/close','POST'),
+            ()=>api('/v1/operators/'+operatorId+'/handoffs/'+selected.id+'/close','POST'),
             'Atendimento concluído e capacidade liberada.',null
           )}><CheckCircle2 size={14}/> Encerrar atendimento</button>
         </div>
