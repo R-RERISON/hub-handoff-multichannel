@@ -100,6 +100,19 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
     return ()=>{cancelled=true}
   },[selectedId,api])
 
+  // Keep the active conversation fresh independently of offer notifications.
+  useEffect(()=>{
+    if(!selectedId)return
+    let cancelled=false
+    const refreshMessages=()=>{
+      void api('/v1/handoffs/'+selectedId+'/messages').then((items:ChatMessage[])=>{
+        if(!cancelled)setMessages(items)
+      }).catch(e=>{if(!cancelled)setError((e as Error).message)})
+    }
+    const interval=window.setInterval(refreshMessages,3000)
+    return ()=>{cancelled=true;window.clearInterval(interval)}
+  },[selectedId,api])
+
   async function execute(action:()=>Promise<any>,success:string,select?:string|null) {
     setBusy(true);setError('');setNotice('')
     try{
