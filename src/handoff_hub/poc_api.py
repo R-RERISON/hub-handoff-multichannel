@@ -294,8 +294,9 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
                     if turn and turn.last_offered_at else None,
                     "total_offers": turn.total_offers if turn else 0,
                 })
+            # Show actually eligible members first, then their fair turn order.
             members.sort(key=lambda op: (
-                op["last_offered_at"] is not None,
+                not op["eligible"], op["last_offered_at"] is not None,
                 op["last_offered_at"] or "", op["operator_id"]
             ))
             return {"queue_id": q.id, "operators": members}
