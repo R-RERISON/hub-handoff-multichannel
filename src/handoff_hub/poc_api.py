@@ -66,6 +66,13 @@ class DispatchRequest(BaseModel):
 class PresenceUpdate(BaseModel):
     presence: Literal["AVAILABLE", "AWAY", "OFFLINE"]
 
+class QueueMemberUpdate(BaseModel):
+    enabled: bool
+
+
+class CapacityUpdate(BaseModel):
+    capacity: int = Field(ge=1, le=5)
+
 
 def as_handoff(h: HandoffSession) -> dict:
     return {"id": h.id, "operation_id": h.operation_id, "integration_id": h.integration_id,
@@ -285,6 +292,50 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
                 op["last_offered_at"] or "", op["operator_id"]
             ))
             return {"queue_id": q.id, "operators": members}
+
+
+    @app.patch("/v1/queues/{queue_id}/members/{operator_id}",
+               dependencies=[Depends(authenticate)])
+    def update_queue_member(queue_id: str, operator_id: str, body: QueueMemberUpdate):
+        with factory() as db:
+            exclusive_tx(db)
+            q = db.get(Queue, queue_id)
+            op = db.get(Operator, operator_id)
+            if not q or not op or q.operation_id != op.operation_id:
+                raise HTTPException(422, "Fila ou operador incompatível")
+            member = db.get(QueueMembership, (queue_id, operator_id))
+            if body.enabled and member is None:
+                db.add(QueueMembership(queue_id=queue_id, operator_id=operator_id))
+            elif not body.enabled and member is not None:
+                busy = db.scalar(select(func.count()).select_from(HandoffSession).where(
+                    HandoffSession.queue_id == queue_id,
+                    HandoffSession.operator_id == operator_id,
+                    HandoffSession.status.in_(("OFFERED", "ACTIVE")),
+                )) or 0
+                if busy:
+                    raise HTTPException(409, "Operador possui atendimento ou oferta nessa fila")
+                db.delete(member)
+            db.commit()
+            return {"queue_id": queue_id, "operator_id": operator_id,
+                    "enabled": body.enabled}
+
+    @app.patch("/v1/operators/{operator_id}/capacity",
+               dependencies=[Depends(authenticate)])
+    def update_capacity(operator_id: str, body: CapacityUpdate):
+        with factory() as db:
+            exclusive_tx(db)
+            op = db.get(Operator, operator_id)
+            if not op:
+                raise HTTPException(404, "Operador inexistente")
+            occupied = db.scalar(select(func.count()).select_from(HandoffSession).where(
+                HandoffSession.operator_id == operator_id,
+                HandoffSession.status.in_(("OFFERED", "ACTIVE")),
+            )) or 0
+            if occupied > body.capacity:
+                raise HTTPException(409, "Capacidade menor que a ocupação já reservada")
+            op.capacity = body.capacity
+            db.commit()
+            return {"operator_id": operator_id, "capacity": op.capacity}
 
     @app.get("/v1/operators", dependencies=[Depends(authenticate)])
     def operators():
