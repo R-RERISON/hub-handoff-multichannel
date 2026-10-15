@@ -155,3 +155,64 @@ def test_login_lockout_is_persistent_and_revokes_access(tmp_path) -> None:
         }).status_code == 429
         # Accounts not involved in the failures remain accessible.
         assert login(c, passwords, "bruno.demo")
+
+
+def test_supervisor_manages_membership_and_capacity_safely(tmp_path) -> None:
+    app, factory, passwords = setup_poc(tmp_path)
+    with TestClient(app) as c:
+        supervisor = auth(login(c, passwords, "supervisor.demo"))
+        ana = auth(login(c, passwords, "ana.demo"))
+        unauthorized = c.patch("/v1/operators/op-bruno/capacity",
+                               headers=ana, json={"capacity": 2})
+        assert unauthorized.status_code == 403
+        update = c.patch("/v1/operators/op-ana/capacity",
+                         headers=supervisor, json={"capacity": 2})
+        assert update.status_code == 200
+        assert update.json()["capacity"] == 2
+        assert c.patch("/v1/operators/op-ana/capacity",
+                       headers=supervisor, json={"capacity": 0}).status_code == 422
+        # N2 has Bruno only. A supervisor may enable Ana.
+        added = c.patch("/v1/queues/n2/members/op-ana",
+                        headers=supervisor, json={"enabled": True})
+        assert added.status_code == 200
+        order = c.get("/v1/queues/n2/rotation", headers=supervisor).json()
+        assert {op["operator_id"] for op in order["operators"]} == {
+            "op-ana", "op-bruno"
+        }
+        # Existing queue members are never removed while reserved.
+        hid = create_ticket(c, 122)
+        assert run_dispatch_cycle(factory)["offered"] == 1
+        reject = c.patch("/v1/queues/n1/members/op-ana", headers=supervisor,
+                         json={"enabled": False})
+        assert reject.status_code == 409
+        assert c.patch("/v1/queues/n2/members/op-ana", headers=supervisor,
+                       json={"enabled": False}).status_code == 200
+
+
+def test_automatic_n1_to_n2_transfer_requires_online_bruno(tmp_path) -> None:
+    app, factory, passwords = setup_poc(tmp_path)
+    with TestClient(app) as c:
+        ana = auth(login(c, passwords, "ana.demo"))
+        handoff = create_ticket(c, 123)
+        assert run_dispatch_cycle(factory)["offered"] == 1
+        accepted = c.post("/v1/handoffs/{}/accept".format(handoff),
+                          headers=ana, json={"operator_id": "op-ana"})
+        assert accepted.status_code == 200
+        transfer = c.post("/v1/handoffs/{}/transfer".format(handoff),
+                          headers=ana, json={
+                              "operator_id": "op-ana", "queue_id": "n2",
+                              "reason": "Exige suporte especializado N2"
+                          })
+        assert transfer.status_code == 200
+        # Bruno is not logged in; queue cannot auto-offer to him.
+        assert run_dispatch_cycle(factory)["offered"] == 0
+        with factory() as db:
+            assert db.get(HandoffSession, handoff).status == "QUEUED"
+        bruno = auth(login(c, passwords, "bruno.demo"))
+        assert run_dispatch_cycle(factory)["offered"] == 1
+        with factory() as db:
+            h = db.get(HandoffSession, handoff)
+            assert h.status == "OFFERED"
+            assert h.queue_id == "n2"
+            assert h.operator_id == "op-bruno"
+        assert c.get("/v1/operators/op-bruno/work", headers=bruno).json()["offers"]
