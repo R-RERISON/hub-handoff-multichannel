@@ -141,3 +141,17 @@ def test_one_available_operator_can_receive_again_after_close(tmp_path) -> None:
                 headers=auth(ana), json={"operator_id": "op-ana"}).status_code == 200
             assert c.post("/v1/operators/op-ana/handoffs/{}/close".format(hid),
                 headers=auth(ana)).status_code == 200
+
+
+def test_login_lockout_is_persistent_and_revokes_access(tmp_path) -> None:
+    app, _, passwords = setup_poc(tmp_path)
+    with TestClient(app) as c:
+        for _ in range(5):
+            assert c.post("/v1/auth/login", json={
+                "username": "ana.demo", "password": "incorrect-password"
+            }).status_code == 401
+        assert c.post("/v1/auth/login", json={
+            "username": "ana.demo", "password": passwords["ana.demo"]
+        }).status_code == 429
+        # Accounts not involved in the failures remain accessible.
+        assert login(c, passwords, "bruno.demo")
