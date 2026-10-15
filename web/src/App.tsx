@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import {
-  Activity, ArrowLeftRight, ArrowRight, Bot, ChartNoAxesCombined,
-  CheckCircle2, FlaskConical, Headset, Layers, Lock, LogOut,
+  ArrowLeftRight, ArrowRight, ChartNoAxesCombined,
+  CheckCircle2, FlaskConical, Headset, Layers, Lock,
   MessageSquareText, RefreshCw, Settings2, ShieldCheck, Users
 } from 'lucide-react'
 import OperatorDesk from './OperatorDesk'
@@ -27,7 +27,7 @@ function Logo() {
 }
 
 function ActiveLink({to,icon,label,count}:{
-  to:string;icon:React.ReactNode;label:string;count?:number
+  to:string;icon:ReactNode;label:string;count?:number
 }) {
   return <NavLink to={to} className={({isActive})=>'nav '+(isActive?'active':'')}>
     {icon}<span>{label}</span>
