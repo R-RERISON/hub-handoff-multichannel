@@ -24,6 +24,10 @@ git pull --ff-only origin feat/002-sqlite-poc
 
 Se houver arquivos modificados, preserve-os antes de atualizar.
 
+## Revisão da POC (UX-002)
+
+A leitura de contexto foi consolidada em `GET /v1/dashboard`; o frontend agora consulta o snapshot com intervalo de 15 segundos quando a aba está visível. Os filtros de conversas são interativos e as respostas da outbox aparecem como sem envio externo. Homologar com `.\\start.cmd --check` e `.\\start.cmd`. Veja [UX-002](ux/UX-002-operations-review.md).
+
 ## Testes backend
 
 ```powershell
