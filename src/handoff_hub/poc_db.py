@@ -191,6 +191,17 @@ class AuthSession(Base):
     )
 
 
+
+class LoginThrottle(Base):
+    """Persistence-backed local login lockout; external IAM replaces this in production."""
+
+    __tablename__ = "login_throttles"
+    username: Mapped[str] = mapped_column(String(80), primary_key=True)
+    failed_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+
 class DispatchTurn(Base):
     """Queue-scoped round-robin position, durable across service restarts."""
 
