@@ -74,7 +74,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
   },[reload])
 
   useEffect(()=>{
-    const poll=()=>{if(document.visibilityState==='visible')void reload().catch(e=>setError((e as Error).message))}
+    const poll=()=>{void reload().catch(e=>setError((e as Error).message))}
     const id=window.setInterval(poll,3000)
     return ()=>window.clearInterval(id)
   },[reload])
