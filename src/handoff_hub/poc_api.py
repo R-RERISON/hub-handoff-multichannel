@@ -151,10 +151,17 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
 
     @app.get("/health/ready")
     def ready(response: Response):
-        if not api_key:
+        if legacy_test_mode:
+            if not api_key:
+                response.status_code = 503
+                return {"status": "not_ready", "reason": "legacy_test_key_not_set"}
+            return {"status": "poc_ready", "scope": "local_test"}
+        with factory() as db:
+            count = db.scalar(select(func.count()).select_from(AuthUser)) or 0
+        if count == 0:
             response.status_code = 503
-            return {"status": "not_ready", "reason": "HANDOFF_POC_KEY_not_set"}
-        return {"status": "poc_ready", "scope": "local_only"}
+            return {"status": "not_ready", "reason": "no_local_accounts"}
+        return {"status": "poc_ready", "scope": "rbac_local_only"}
 
     @app.post("/v1/demo/bootstrap", dependencies=[Depends(authenticate)])
     def bootstrap():
