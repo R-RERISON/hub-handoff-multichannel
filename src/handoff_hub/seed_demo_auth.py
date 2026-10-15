@@ -10,6 +10,7 @@ from sqlalchemy import select
 
 from handoff_hub.poc_auth import password_hash
 from handoff_hub.poc_db import (
+    AuthSession,
     AuthUser,
     Integration,
     Operation,
@@ -60,6 +61,12 @@ def provision(factory, credential_file: Path, reset: bool = False) -> list[str]:
                                    operator_id=operator_id, password_hash=password_hash(password))
                 db.add(account)
             else:
+                # Rotating credentials revokes all existing bearer sessions.
+                sessions = db.scalars(select(AuthSession).where(
+                    AuthSession.user_id == account.id
+                )).all()
+                for session in sessions:
+                    session.revoked = True
                 account.password_hash = password_hash(password)
                 account.role = role
                 account.operator_id = operator_id
