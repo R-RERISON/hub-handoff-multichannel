@@ -7,9 +7,10 @@ type RotationMember = {
   occupied:number; capacity:number; eligible:boolean
   last_offered_at:string|null; total_offers:number
 }
-type Props = { queues:Queue[]; operators:Operator[]; tickets:Ticket[]; api:Api }
+type Props = { queues:Queue[]; operators:Operator[]; tickets:Ticket[]; api:Api; onChanged:()=>Promise<void> }
 
-export default function SupervisorQueues({queues,operators,tickets,api}:Props){
+export default function SupervisorQueues({queues,operators,tickets,api,onChanged}:Props){
+  const [saving,setSaving] = useState(false)
   const [rotation,setRotation] = useState<Record<string,RotationMember[]>>({})
   const [error,setError] = useState('')
   const load=useCallback(async()=>{
@@ -26,6 +27,14 @@ export default function SupervisorQueues({queues,operators,tickets,api}:Props){
     },10000)
     return ()=>window.clearInterval(interval)
   },[load])
+  async function membership(queueId:string,operatorId:string,enabled:boolean){
+    setSaving(true);setError('')
+    try{
+      await api('/v1/queues/'+queueId+'/members/'+operatorId,'PATCH',{enabled})
+      await Promise.all([load(),onChanged()])
+    }catch(e){setError((e as Error).message)}
+    finally{setSaving(false)}
+  }
   return <div className="section-stack">
     <section className="intro-banner"><div>
       <span className="eyebrow">SUPERVISÃO / ROTEAMENTO AUTOMÁTICO</span>
@@ -55,6 +64,20 @@ export default function SupervisorQueues({queues,operators,tickets,api}:Props){
             </span><small>{m.occupied}/{m.capacity} ocupado(s) · {m.total_offers} oferta(s) históricas</small>
           </div>)}
           {!rotation[q.id]?.length&&<p className="queue-empty">Não há operadores associados a esta fila.</p>}
+        </div>
+        <div className="queue-membership">
+          <h4>Equipe vinculada à fila</h4>
+          <p>Vínculos determinam quais operadores podem receber ofertas desta fila.</p>
+          {operators.map(op=>{
+            const exists=(rotation[q.id]??[]).some(member=>member.operator_id===op.id)
+            return <div className="queue-member" key={op.id}>
+              <span>{op.name}</span>
+              <button className="outline small" disabled={saving}
+                onClick={()=>void membership(q.id,op.id,!exists)}>
+                {exists?'Remover da fila':'Adicionar à fila'}
+              </button>
+            </div>
+          })}
         </div>
         {pending.map(t=><div className="queue-request" key={t.id}>
           <div><strong>{t.requester_label}</strong><small>{t.subject} · Aguardando disponibilidade</small></div>
