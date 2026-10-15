@@ -201,12 +201,20 @@ def stop_children(children: list[tuple[str, subprocess.Popen[str]]]) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Gerenciador local do Handoff Hub POC")
     parser.add_argument("--setup-only", action="store_true", help="Instala dependencias e sai")
+    parser.add_argument("--setup-users", action="store_true", help="Provisiona usuarios locais e sai")
+    parser.add_argument("--reset-users", action="store_true", help="Rotaciona senhas locais")
     parser.add_argument("--check", action="store_true", help="Executa pytest, Ruff e build do frontend")
     parser.add_argument("--no-browser", action="store_true", help="Nao abre navegador automaticamente")
     args = parser.parse_args(argv)
     children: list[tuple[str, subprocess.Popen[str]]] = []
     try:
         python, npm = ensure_dependencies()
+        if args.setup_users or args.reset_users:
+            cmd = [python, "-m", "handoff_hub.seed_demo_auth"]
+            if args.reset_users:
+                cmd.append("--reset-users")
+            run_command(cmd)
+            return 0
         if args.check:
             run_command([python, "-m", "pytest", "-q"])
             run_command([python, "-m", "ruff", "check", "src", "tests"])
@@ -219,6 +227,8 @@ def main(argv: list[str] | None = None) -> int:
         for name, port in [("FastAPI", 8000), ("Vite", 5173)]:
             if port_in_use(port):
                 raise LauncherError(f"Porta {port} ocupada ({name}). Encerre a instancia anterior e tente novamente.")
+        # POC accounts and random passwords live ONLY in ignored local data.
+        run_command([python, "-m", "handoff_hub.seed_demo_auth"])
         key = local_key()
         env = dict(os.environ)
         env["HANDOFF_POC_KEY"] = key
@@ -231,7 +241,8 @@ def main(argv: list[str] | None = None) -> int:
         report("Servicos iniciados:")
         report("  Web: " + FRONTEND_URL)
         report("  API: " + BACKEND_URL + "/docs")
-        report("  Chave para login da POC: " + key)
+        report("  Login individual: admin.demo, supervisor.demo, auditor.demo, ana.demo, bruno.demo")
+        report("  Senhas locais em data/demo-credentials.txt (arquivo fora do Git)")
         report("Use Ctrl+C para encerrar os dois servicos.")
         if not args.no_browser:
             webbrowser.open(FRONTEND_URL)
