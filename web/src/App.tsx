@@ -127,10 +127,12 @@ export default function App() {
   async function send(sender:'USER'|'OPERATOR') {
     if (!selected || (sender==='OPERATOR'&&!draft.trim())) return
     const content=sender==='USER'?'Olá! Poderia me auxiliar com meu acesso?':draft.trim()
+    const handoffId=selected.id
     await run(async () => {
-      await api('/v1/handoffs/'+selected.id+'/messages','POST',{
+      await api('/v1/handoffs/'+handoffId+'/messages','POST',{
         sender,content,external_message_id:crypto.randomUUID()
       })
+      setMessages(await api('/v1/handoffs/'+handoffId+'/messages'))
       if (sender==='OPERATOR') {
         setDraft('')
         setNotice('Resposta registrada na outbox. Nenhuma mensagem foi enviada ao Teams.')
@@ -138,7 +140,6 @@ export default function App() {
         setNotice('Mensagem fictícia recebida. Responda como operador.')
       }
     })
-    setMessages(await api('/v1/handoffs/'+selected.id+'/messages'))
   }
 
   if (!connected) return <div className="login-wrap"><section className="login-panel">
