@@ -24,6 +24,14 @@ A interface de Conversas possui uma jornada guiada para a POC: **Criar solicita�
 
 Após atualizar pelo Git, execute ` .\\start.cmd --check ` para validar backend/frontend e ` .\\start.cmd ` para abrir o ambiente. Ver [roteiro completo da UX-001](docs/ux/UX-001-guided-handoff.md).
 
+## Revisão pós-homologação — UX-002
+
+A POC conta com um **snapshot** `GET /v1/dashboard` que consolida as leituras de filas, operadores, atendimentos e contagem da outbox em uma requisição. O frontend atualiza o contexto a cada 15 segundos quando a aba está visível, reduzindo o excesso de polling no console. Os filtros Conversas (Todas, Em atendimento, Na fila e Encerradas) são funcionais.
+
+**Sem envio externo** é uma informação operacional: as respostas ficam registradas em `PENDING_ADAPTER` até existir um conector Teams. Encerrar o atendimento não marca essas respostas como entregues.
+
+Validação local: `.\\start.cmd --check`; inicialização: `.\\start.cmd`. Roteiro detalhado: [UX-002](docs/ux/UX-002-operations-review.md). Não houve alteração de esquema SQLite nem conexão com Teams.
+
 ## Stack escolhida
 - **Backend:** Python 3.12+, FastAPI, SQLAlchemy 2.
 - **Banco POC:** SQLite em arquivo, WAL e BEGIN IMMEDIATE para despacho.
