@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+
 from handoff_hub.auto_dispatch import run_dispatch_cycle
 from handoff_hub.poc_api import create_app
 from handoff_hub.poc_db import HandoffSession, make_session_factory
@@ -40,10 +41,10 @@ def auth(token: str) -> dict[str, str]:
 def create_ticket(c: TestClient, index: int):
     r = c.post("/v1/handoffs",
         headers={"X-POC-Key": "legacy-test-key",
-                 "Idempotency-Key": "test-auto-{}".format(index)},
+                 "Idempotency-Key": f"test-auto-{index}"},
         json={
-            "external_conversation_id": "test-{}".format(index),
-            "requester_label": "Teste {}".format(index),
+            "external_conversation_id": f"test-{index}",
+            "requester_label": f"Teste {index}",
             "subject": "Distribuição justa",
         })
     assert r.status_code == 201, r.text
@@ -97,11 +98,11 @@ def test_round_robin_requires_online_operator_and_persists_turn(tmp_path) -> Non
                 assert current.status == "OFFERED"
                 sequence.append(current.operator_id)
             choice = ana if sequence[-1] == "op-ana" else bruno
-            accepted = c.post("/v1/handoffs/{}/accept".format(hid),
+            accepted = c.post(f"/v1/handoffs/{hid}/accept",
                 headers=auth(choice), json={"operator_id": sequence[-1]})
             assert accepted.status_code == 200
             closed = c.post(
-                "/v1/operators/{}/handoffs/{}/close".format(sequence[-1], hid),
+                f"/v1/operators/{sequence[-1]}/handoffs/{hid}/close",
                 headers=auth(choice),
             )
             assert closed.status_code == 200
@@ -141,9 +142,9 @@ def test_one_available_operator_can_receive_again_after_close(tmp_path) -> None:
             assert run_dispatch_cycle(factory)["offered"] == 1
             with factory() as db:
                 assert db.get(HandoffSession, hid).operator_id == "op-ana"
-            assert c.post("/v1/handoffs/{}/accept".format(hid),
+            assert c.post(f"/v1/handoffs/{hid}/accept",
                 headers=auth(ana), json={"operator_id": "op-ana"}).status_code == 200
-            assert c.post("/v1/operators/op-ana/handoffs/{}/close".format(hid),
+            assert c.post(f"/v1/operators/op-ana/handoffs/{hid}/close",
                 headers=auth(ana)).status_code == 200
 
 
@@ -184,7 +185,7 @@ def test_supervisor_manages_membership_and_capacity_safely(tmp_path) -> None:
             "op-ana", "op-bruno"
         }
         # Existing queue members are never removed while reserved.
-        hid = create_ticket(c, 122)
+        create_ticket(c, 122)
         assert run_dispatch_cycle(factory)["offered"] == 1
         reject = c.patch("/v1/queues/n1/members/op-ana", headers=supervisor,
                          json={"enabled": False})
@@ -199,10 +200,10 @@ def test_automatic_n1_to_n2_transfer_requires_online_bruno(tmp_path) -> None:
         ana = auth(login(c, passwords, "ana.demo"))
         handoff = create_ticket(c, 123)
         assert run_dispatch_cycle(factory)["offered"] == 1
-        accepted = c.post("/v1/handoffs/{}/accept".format(handoff),
+        accepted = c.post(f"/v1/handoffs/{handoff}/accept",
                           headers=ana, json={"operator_id": "op-ana"})
         assert accepted.status_code == 200
-        transfer = c.post("/v1/handoffs/{}/transfer".format(handoff),
+        transfer = c.post(f"/v1/handoffs/{handoff}/transfer",
                           headers=ana, json={
                               "operator_id": "op-ana", "queue_id": "n2",
                               "reason": "Exige suporte especializado N2"
