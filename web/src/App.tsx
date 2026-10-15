@@ -164,6 +164,16 @@ export default function App() {
     finally{setBusy(false)}
   }
 
+  async function changeCapacity(operator:string,capacity:number){
+    setBusy(true);setError('')
+    try{
+      await api('/v1/operators/'+operator+'/capacity','PATCH',{capacity})
+      await refresh()
+      setNotice('Capacidade do operador atualizada.')
+    }catch(e){setError((e as Error).message)}
+    finally{setBusy(false)}
+  }
+
   async function changePresence(operator:string,presence:string){
     setBusy(true);setError('')
     try{
@@ -295,12 +305,13 @@ export default function App() {
         <Route path="/" element={<Navigate to="/supervisao" replace/>}/>
         <Route path="/supervisao" element={<SupervisorOverview snapshot={snapshot}/>}/>
         <Route path="/supervisao/conversas" element={<SupervisorConversations
-          tickets={snapshot.handoffs} api={api}/>}/>
+          tickets={snapshot.handoffs} api={api} onChanged={refresh}/>}/>
         <Route path="/supervisao/filas" element={<SupervisorQueues
           queues={snapshot.queues} operators={snapshot.operators}
           tickets={snapshot.handoffs} api={api}/>}/>
         <Route path="/supervisao/equipe" element={<SupervisorTeam
-          operators={snapshot.operators} busy={busy} onPresence={changePresence}/>}/>
+          operators={snapshot.operators} busy={busy} onPresence={changePresence}
+          onCapacity={changeCapacity}/>}/>
         <Route path="/laboratorio" element={<DemoLab
           tickets={snapshot.handoffs} busy={busy} onCreate={createTicket}/>}/>
         <Route path="*" element={<Navigate to="/supervisao" replace/>}/>
