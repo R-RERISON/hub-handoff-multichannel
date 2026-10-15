@@ -87,3 +87,40 @@ No navegador: Conversas → Nova solicitação → Filas → Ofertar próximo (N
 - Revalidação manual no navegador e observação dos estados no SQLite.
 
 **Nota:** a implementação está publicada para testes; nenhum gate da nova etapa será reportado como aprovado até confirmação de execução.
+
+
+## Correção pós-homologação — N1 → N2 (UX-003.1)
+
+### Evidência recebida
+
+No log da POC, `POST /transfer` devolveu HTTP 200 e em seguida `POST /dispatch/offer` também devolveu HTTP 200. Entretanto, todas as consultas subsequentes da Mesa do Operador foram feitas a `/v1/operators/op-ana/work`. No seed demonstrativo, **apenas op-bruno pertence à fila N2**. A resposta HTTP 200 do dispatcher não assegura `result=offered`; pode ser `empty_queue` ou `no_operator_available`.
+
+### Regra
+
+Após transferir N1 → N2, a sessão muda para **QUEUED, queue_id=n2**. Quando a supervisão cria uma oferta para N2, ela passa a **OFFERED, queue_id=n2, operator_id=op-bruno**. A quantidade `waiting` fica zero nesse instante, porque a oferta já saiu da espera. O ticket não deve desaparecer dos indicadores nem exigir que o supervisor adivinhe quem foi selecionado.
+
+### Alterações
+
+- `GET /v1/dashboard`: cada fila apresenta contadores distintos de `waiting`, `offered` e `active`.
+- Tela Filas: apresenta os três estados, com listagem das sessões oferecidas e identidade destinatária.
+- Ao clicar **Ofertar próximo**, o frontend navega automaticamente à Mesa do Operador correto (no N2: Bruno).
+- O botão **Abrir mesa de Bruno** permite retornar à oferta diretamente pela fila.
+- Mesa do Operador respeita a identidade recebida pelo roteamento; não volta sempre para Ana.
+- Filtro Conversas inclui estado `Ofertadas`.
+- Novo teste de regressão `test_n1_to_n2_queue_counters_and_bruno_inbox` verifica fila N2 aguardando, depois N2 ofertada, visibilidade exclusiva na inbox de Bruno e vínculo correto da sessão.
+- Correção Ruff `UP035`: `collections.abc.Callable`.
+
+### Reproduzir no VS Code
+
+Pare `start.cmd` com Ctrl+C. Faça `git fetch origin` e `git pull --ff-only origin feat/003-operator-workflow`. Execute `.\start.cmd --check`, depois `.\start.cmd`.
+
+1. Abra ticket N1, oferte e aceite com Ana.
+2. Transfira para N2. Na aba Filas, N2 mostra **1 na fila**.
+3. Clique **Ofertar próximo** na N2.
+4. O sistema deve abrir automaticamente Mesa do Operador com **Bruno** selecionado e a oferta visível.
+5. Na aba Filas, N2 mostra **0 na fila, 1 ofertado** até o aceite.
+6. Bruno aceita, a sessão fica ACTIVE em N2 e mantém histórico de transferência.
+
+Se não houver capacidade em N2, a sessão deve continuar em `QUEUED` e a interface informar `no_operator_available`.
+
+**Validação desta correção ainda depende de `start.cmd --check` e da inspeção visual no Windows.**
