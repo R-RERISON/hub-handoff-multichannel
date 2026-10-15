@@ -124,6 +124,43 @@ class OutboxEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
+
+class HandoffOffer(Base):
+    """Durable operator offers; existing SQLite files gain this table via create_all."""
+
+    __tablename__ = "handoff_offers"
+    id: Mapped[str] = mapped_column(String(40), primary_key=True, default=make_id)
+    session_id: Mapped[str] = mapped_column(
+        ForeignKey("handoff_sessions.id"), nullable=False
+    )
+    operator_id: Mapped[str] = mapped_column(ForeignKey("operators.id"), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="PENDING")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        Index("ix_offers_operator_status", "operator_id", "status"),
+        Index("ix_offers_session_status", "session_id", "status"),
+    )
+
+
+class SessionTransfer(Base):
+    """Transfer provenance without overwriting the original operator and queue."""
+
+    __tablename__ = "session_transfers"
+    id: Mapped[str] = mapped_column(String(40), primary_key=True, default=make_id)
+    session_id: Mapped[str] = mapped_column(
+        ForeignKey("handoff_sessions.id"), nullable=False
+    )
+    from_queue_id: Mapped[str] = mapped_column(ForeignKey("queues.id"), nullable=False)
+    to_queue_id: Mapped[str] = mapped_column(ForeignKey("queues.id"), nullable=False)
+    from_operator_id: Mapped[str] = mapped_column(ForeignKey("operators.id"), nullable=False)
+    reason: Mapped[str] = mapped_column(String(300), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    __table_args__ = (Index("ix_transfers_session", "session_id", "created_at"),)
+
+
+
 def make_session_factory(database_url: str):
     """SQLite single-node POC: SQLite serializes writers; SQL Server needs another strategy."""
     engine = create_engine(database_url, connect_args={"timeout": 10}, future=True)
