@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from handoff_hub.auto_dispatch import run_dispatch_cycle
+from handoff_hub.operator_workflow import register_operator_workflow
 from handoff_hub.poc_auth import (
     Principal,
     assert_access,
@@ -23,7 +24,6 @@ from handoff_hub.poc_auth import (
     naive_utc,
     register_identity_endpoints,
 )
-from handoff_hub.operator_workflow import register_operator_workflow
 from handoff_hub.poc_db import (
     AuthSession,
     AuthUser,
