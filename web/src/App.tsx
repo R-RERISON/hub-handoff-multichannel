@@ -36,6 +36,7 @@ export default function App() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const replyRef = useRef<HTMLTextAreaElement>(null)
+  const chatListRef = useRef<HTMLDivElement>(null)
   const [busy, setBusy] = useState(false)
   const [view, setView] = useState<'inbox'|'queues'|'operators'>('inbox')
   const selected = tickets.find(t => t.id === selectedId)
@@ -82,6 +83,11 @@ export default function App() {
     if (!connected || !selectedId) {setMessages([]);return}
     void api('/v1/handoffs/'+selectedId+'/messages').then(setMessages).catch(e => setError(e.message))
   },[connected,selectedId,api])
+
+  useEffect(() => {
+    if (view!=='inbox' || !chatListRef.current) return
+    chatListRef.current.scrollTop = chatListRef.current.scrollHeight
+  }, [messages.length,selectedId,view])
 
   async function run(fn:()=>Promise<unknown>) {
     setBusy(true);setError('');setNotice('')
@@ -238,7 +244,7 @@ export default function App() {
               <button className="primary small" disabled={busy} onClick={()=>void send('USER')}>Receber mensagem de teste <ArrowRight size={14}/></button>
             </>:selected.status==='CLOSED'?<div><strong>Atendimento encerrado</strong><p>O operador está livre para receber outra solicitação.</p></div>:null}
           </div>
-          <div className="chat-list"><div className="chat-notice">SIMULAÇÃO LOCAL · NÃO ENVIADA AO TEAMS</div>
+          <div className="chat-list" ref={chatListRef}><div className="chat-notice">SIMULAÇÃO LOCAL · NÃO ENVIADA AO TEAMS</div>
             {!messages.length&&<div className="empty">Nenhuma mensagem nesta conversa.</div>}
             {messages.map(m=><div key={m.id} className={'bubble-row '+(m.sender==='OPERATOR'?'right':'')}><div className="bubble"><b>{m.sender==='OPERATOR'?'Operador':'Usuário simulado'}</b><p>{m.content}</p><small>{time(m.created_at)}</small></div></div>)}
           </div><div className="composer"><div className="composer-hint">Sua resposta como operador será registrada na outbox, sem envio ao Teams.</div><textarea ref={replyRef} aria-label="Resposta do operador" value={draft} onChange={e=>setDraft(e.target.value)}
