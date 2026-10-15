@@ -1,6 +1,8 @@
 """API and SQLite concurrency gates: local only, no GitHub Actions."""
 from concurrent.futures import ThreadPoolExecutor
+
 from fastapi.testclient import TestClient
+
 from handoff_hub.poc_api import create_app
 
 
