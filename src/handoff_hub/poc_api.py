@@ -78,7 +78,7 @@ def as_handoff(h: HandoffSession) -> dict:
 def create_app(database_url: str | None = None, api_key: str | None = None) -> FastAPI:
     """Bind to 127.0.0.1: security is a local POC key, not operator/tenant RBAC."""
     database_url = database_url or os.getenv("HANDOFF_DB_URL", "sqlite:///./data/handoff-poc.db")
-    legacy_test_mode = api_key is not None or os.getenv("HANDOFF_ENABLE_LEGACY_ROUTES") == "1"
+    legacy_test_mode = api_key is not None  # explicit in legacy tests only, not environment
     api_key = api_key if api_key is not None else os.getenv("HANDOFF_POC_KEY", "")
     if database_url.startswith("sqlite:///./"):
         Path(database_url.removeprefix("sqlite:///./")).parent.mkdir(parents=True, exist_ok=True)
