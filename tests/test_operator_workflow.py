@@ -87,7 +87,14 @@ def test_offer_accept_transfer_reoffer_and_close(tmp_path) -> None:
 
         timeline = c.get(f"/v1/handoffs/{handoff_id}/timeline", headers=AUTH).json()
         assert timeline["transfers"][0]["reason"] == "Especialidade do suporte N2"
+        assert timeline["transfers"][0]["from_operator_name"] == "Ana (demonstração)"
+        assert timeline["transfers"][0]["from_queue_name"] == "Suporte N1"
+        assert timeline["transfers"][0]["to_queue_name"] == "Suporte N2"
         assert "TRANSFERRED" in {e["type"] for e in timeline["events"]}
+        # Private transfer instructions must not be mixed with user-facing messages.
+        transcript = c.get(f"/v1/handoffs/{handoff_id}/messages", headers=AUTH).json()
+        assert all("Especialidade do suporte N2" not in m["content"]
+                   for m in transcript)
 
         n2 = c.post("/v1/dispatch/offer", headers=AUTH, json={"queue_id": "n2"})
         assert n2.json()["result"] == "offered"
