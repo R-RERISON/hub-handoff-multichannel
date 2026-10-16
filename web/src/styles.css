@@ -737,3 +737,29 @@ body{background:var(--hub-bg)}
   .desk-layout--compact .desk-worklist-head{padding:8px 12px}
   .desk-layout--compact .desk-compose{padding:7px 9px}
 }
+
+
+/* POC-006A.1 — transfer notes are internal handoff context, never chat messages */
+.offer-dialog__transfer-note,
+.desk-handoff-note{
+  border:1px solid #bfdbf4;border-left:3px solid #448ce0;
+  background:#f2f8ff;color:#345575;border-radius:9px;
+  padding:10px 13px;display:flex;flex-direction:column;gap:5px;
+  min-width:0;white-space:normal
+}
+.offer-dialog__transfer-note{margin-top:12px;max-height:170px;overflow:auto}
+.offer-dialog__transfer-note strong,
+.desk-handoff-note strong{display:flex;align-items:center;gap:7px;font-size:11px;color:#22598a}
+.offer-dialog__transfer-note small,
+.desk-handoff-note small{font-size:10px;color:#6686a5}
+.offer-dialog__transfer-note p,
+.desk-handoff-note p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;
+  font-size:12px;margin:2px 0;color:#36516d}
+.desk-handoff-note span{font-size:9px;color:#728da6;font-weight:600}
+.desk-layout--compact .desk-handoff-note{margin:8px 0 14px}
+.desk-layout--compact .desk-audit-panel{flex-wrap:wrap;max-height:150px;overflow:auto}
+.desk-layout--compact .desk-audit-transfers{width:100%;max-height:92px;overflow-y:auto;
+  scrollbar-width:thin;border-top:1px solid #d9e5ef;padding-top:5px}
+.desk-layout--compact .desk-audit-transfers p{font-size:11px;color:#557491;
+  line-height:1.45;margin:5px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.desk-layout--compact .desk-audit-transfers strong{color:#2c5880}
