@@ -9,7 +9,14 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from handoff_hub.poc_db import AuthUser, HandoffSession, Queue, QueueRoleGrant
+from handoff_hub.poc_db import (
+    AuthUser,
+    HandoffSession,
+    Queue,
+    QueueMembership,
+    QueueRoleGrant,
+    SessionTransfer,
+)
 
 SCOPED_ROLES = frozenset({"SUPERVISOR", "AUDITOR"})
 
@@ -20,7 +27,16 @@ def granted_queues(db: Session, principal) -> set[str]:
             select(Queue.id).where(Queue.operation_id == principal.operation_id)
         ).all())
     if principal.role == "OPERATOR":
-        return set()
+        if not principal.operator_id:
+            return set()
+        return set(db.scalars(
+            select(QueueMembership.queue_id)
+            .join(Queue, Queue.id == QueueMembership.queue_id)
+            .where(
+                QueueMembership.operator_id == principal.operator_id,
+                Queue.operation_id == principal.operation_id,
+            )
+        ).all())
     return set(db.scalars(
         select(QueueRoleGrant.queue_id)
         .join(Queue, Queue.id == QueueRoleGrant.queue_id)
@@ -51,8 +67,6 @@ def require_handoff(db: Session, principal, handoff_id: str) -> HandoffSession:
     if principal.role in SCOPED_ROLES:
         require_queue(db, principal, handoff.queue_id)
         # Fail closed on cross-queue history until message-level segments exist.
-        from handoff_hub.poc_db import SessionTransfer
-
         if db.scalar(select(SessionTransfer.id).where(
             SessionTransfer.session_id == handoff_id
         ).limit(1)) is not None:
