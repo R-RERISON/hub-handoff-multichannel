@@ -158,6 +158,17 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
                 queue_id = path.split("/")[3]
             if path in ("/v1/dispatch/next", "/v1/dispatch/offer"):
                 queue_id = (body or {}).get("queue_id")
+            if path == "/v1/handoffs" and request.method == "POST":
+                queue_id = (body or {}).get("queue_id", DEFAULT_INTAKE_QUEUE_ID)
+            if path == "/v1/operators" and request.method != "GET":
+                raise HTTPException(403, "Cadastro de operadores reservado à administração")
+            if path.startswith("/v1/operators/") and path.endswith("/capacity"):
+                if principal.role != "ADMIN":
+                    raise HTTPException(403, "Capacidade global requer administrador")
+            if path == "/v1/demo/bootstrap" and principal.role != "ADMIN":
+                raise HTTPException(403, "Bootstrap demonstrativo requer administrador")
+            if queue_id and principal.role in ("SUPERVISOR", "AUDITOR"):
+                require_queue(db, principal, queue_id, manage=request.method != "GET")
             if path.startswith("/v1/queues/") and queue_id:
                 require_queue(db, principal, queue_id, manage=request.method != "GET")
             if path.startswith("/v1/handoffs/"):
