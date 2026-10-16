@@ -1,4 +1,5 @@
 """POC intake policy: default N1, explicit queue routing and safe legacy seed."""
+
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -98,7 +99,7 @@ def test_bruno_online_cannot_take_generic_n1_but_can_take_explicit_n2(tmp_path) 
 
 
 def test_existing_demo_migrates_offered_and_preserves_active_and_custom_changes(tmp_path) -> None:
-    app, factory, creds = environment(tmp_path)
+    _, factory, creds = environment(tmp_path)
     with factory.begin() as db:
         # Reconstruct the older POC baseline in a populated database.
         db.delete(db.get(DemoSeedRevision, DEMO_ROUTING_REVISION))
