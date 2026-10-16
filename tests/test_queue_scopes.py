@@ -6,7 +6,15 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from handoff_hub.poc_api import create_app
-from handoff_hub.poc_db import AuthUser, QueueRoleGrant, SessionTransfer, make_session_factory
+from handoff_hub.poc_db import (
+    AuthUser,
+    HandoffSession,
+    Operation,
+    Queue,
+    QueueRoleGrant,
+    SessionTransfer,
+    make_session_factory,
+)
 from handoff_hub.seed_demo_auth import provision
 
 
@@ -166,3 +174,76 @@ def test_scoped_operator_counts_do_not_include_other_queues(tmp_path):
         assert {o["id"] for o in dash["operators"]} == {"op-ana"}
         assert all(q["id"] != "n2" for q in dash["queues"])
         assert all(h["id"] != n2.json()["id"] for h in dash["handoffs"])
+
+
+def test_operator_can_transfer_to_n2_without_being_member_of_n2(tmp_path):
+    """Dispatch membership is NOT destination authorization."""
+    app, factory, passwords = setup(tmp_path)
+    with TestClient(app) as c:
+        admin = login(c, passwords, "admin.demo")
+        ana = login(c, passwords, "ana.demo")
+        bruno = login(c, passwords, "bruno.demo")
+        supervisor = login(c, passwords, "supervisor.demo")
+        auditor = login(c, passwords, "auditor.demo")
+        handoff = ticket(c, admin, "operator-transfer-targets", "n1")
+        assert handoff.status_code == 201
+        hid = handoff.json()["id"]
+        with factory.begin() as db:
+            session = db.get(HandoffSession, hid)
+            session.status = "ACTIVE"
+            session.operator_id = "op-ana"
+
+        assert {q["id"] for q in c.get("/v1/queues", headers=ana).json()} == {"n1"}
+        discovered = c.get(f"/v1/handoffs/{hid}/transfer-targets", headers=ana)
+        assert discovered.status_code == 200, discovered.text
+        assert discovered.json()["source_queue_id"] == "n1"
+        assert discovered.json()["destinations"] == [{"id": "n2", "name": "Suporte N2"}]
+
+        for unauthorized in (bruno, auditor, supervisor, admin):
+            response = c.get(f"/v1/handoffs/{hid}/transfer-targets",
+                             headers=unauthorized)
+            assert response.status_code == 403, response.text
+
+        same_queue = c.post(f"/v1/handoffs/{hid}/transfer", headers=ana, json={
+            "operator_id": "op-ana", "queue_id": "n1", "reason": "Nao permite auto-transferir"
+        })
+        assert same_queue.status_code == 422
+
+        transferred = c.post(f"/v1/handoffs/{hid}/transfer", headers=ana, json={
+            "operator_id": "op-ana", "queue_id": "n2", "reason": "Escalonamento para N2"
+        })
+        assert transferred.status_code == 200, transferred.text
+        assert transferred.json()["queue_id"] == "n2"
+        assert transferred.json()["operator_id"] is None
+        assert transferred.json()["status"] == "QUEUED"
+
+        inactive = c.get(f"/v1/handoffs/{hid}/transfer-targets", headers=ana)
+        assert inactive.status_code == 403
+
+
+def test_transfer_destinations_do_not_expose_other_operations(tmp_path):
+    app, factory, passwords = setup(tmp_path)
+    with factory.begin() as db:
+        db.add(Operation(id="other-operation", name="Outra operação"))
+        db.flush()
+        db.add(Queue(id="external-queue", operation_id="other-operation",
+                     name="Fila de outra operação"))
+    with TestClient(app) as c:
+        admin = login(c, passwords, "admin.demo")
+        ana = login(c, passwords, "ana.demo")
+        handoff = ticket(c, admin, "transfer-operation-scope", "n1")
+        assert handoff.status_code == 201
+        hid = handoff.json()["id"]
+        with factory.begin() as db:
+            session = db.get(HandoffSession, hid)
+            session.status = "ACTIVE"
+            session.operator_id = "op-ana"
+        response = c.get(f"/v1/handoffs/{hid}/transfer-targets", headers=ana)
+        assert response.status_code == 200
+        assert {q["id"] for q in response.json()["destinations"]} == {"n2"}
+        forbidden = c.post(f"/v1/handoffs/{hid}/transfer", headers=ana, json={
+            "operator_id": "op-ana", "queue_id": "external-queue",
+            "reason": "Destino de outra operação"
+        })
+        assert forbidden.status_code == 422
+        assert c.get("/v1/queues", headers=ana).json()[0]["id"] == "n1"
