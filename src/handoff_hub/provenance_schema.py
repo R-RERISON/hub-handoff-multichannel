@@ -2,7 +2,8 @@
 
 The deliberate separate metadata avoids Base.metadata.create_all() silently
 creating migration-owned tables during an ordinary start.cmd launch.
-This module defines schema validation only. No runtime data writer exists yet.
+This module supplies schema validation and Core table objects to the guarded
+runtime recorder. It is intentionally NOT part of Base.metadata.create_all().
 """
 from sqlalchemy import (
     Column,
