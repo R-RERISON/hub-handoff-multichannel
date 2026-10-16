@@ -8,7 +8,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import insert, select, text, update
 
 from handoff_hub.audit_schema import HISTORY_ACCESS_AUDIT
-from handoff_hub.security_schema import SECURITY_DECISIONS
 from handoff_hub.poc_api import create_app
 from handoff_hub.poc_db import (
     AuthUser,
@@ -29,6 +28,7 @@ from handoff_hub.schema_admin import (
     create_new,
     verify_database,
 )
+from handoff_hub.security_schema import SECURITY_DECISIONS
 from handoff_hub.seed_demo_auth import provision
 
 KEY = {"X-POC-Key": "local-test-only"}
