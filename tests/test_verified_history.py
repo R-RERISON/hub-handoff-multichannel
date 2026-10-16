@@ -253,3 +253,144 @@ def test_versioned_legacy_ticket_without_segment_is_not_reconstructed(tmp_path):
         assert history(client, hid, "n1", auditor).status_code == 404
         assert history(client, hid, "n2", supervisor).status_code == 404
         assert client.get(f"{BASE}/{hid}/messages", headers=supervisor).status_code == 403
+
+
+def verified_listing(client, queue, headers, **options):
+    return client.get(
+        "/v1/history/verified-sessions",
+        params={"queue_id": queue, **options},
+        headers=headers,
+    )
+
+
+def test_verified_discovery_is_authorized_and_does_not_expose_other_queue(tmp_path):
+    app, factory, passwords = environment(tmp_path)
+    with TestClient(app) as client:
+        auditor = bearer(client, passwords, "auditor.demo")
+        supervisor = bearer(client, passwords, "supervisor.demo")
+        admin = bearer(client, passwords, "admin.demo")
+        ana = bearer(client, passwords, "ana.demo")
+        transferred = new_ticket(client, "discover-transferred")
+        user_message(client, transferred, "Conteúdo exclusivo N1")
+        transfer(client, factory, transferred)
+        user_message(client, transferred, "Conteúdo exclusivo N2")
+        n1_only = new_ticket(client, "discover-n1-only")
+        user_message(client, n1_only, "Outra N1")
+
+        n1 = verified_listing(client, "n1", auditor)
+        assert n1.status_code == 200, n1.text
+        assert n1.json()["schema_ready"] is True
+        assert n1.json()["partial_history"] is True
+        assert {row["session_id"] for row in n1.json()["tickets"]} == {
+            transferred, n1_only,
+        }
+        assert all(set(row) == {"session_id", "segment_started_at"}
+                   for row in n1.json()["tickets"])
+        assert "Conteúdo exclusivo N2" not in n1.text
+        assert "requester_label" not in n1.text
+        assert "subject" not in n1.text
+        assert "current_queue" not in n1.text
+        assert "reason" not in n1.text
+
+        n2 = verified_listing(client, "n2", supervisor)
+        assert n2.status_code == 200, n2.text
+        assert [row["session_id"] for row in n2.json()["tickets"]] == [transferred]
+        assert verified_listing(client, "n2", auditor).status_code == 404
+        assert verified_listing(client, "n1", admin).status_code == 403
+        assert verified_listing(client, "n1", ana).status_code == 403
+        assert verified_listing(client, "n1", {}).status_code == 401
+        assert verified_listing(client, "missing", auditor).status_code == 404
+
+
+def test_verified_discovery_pages_and_grant_revocation(tmp_path):
+    app, factory, passwords = environment(tmp_path)
+    with TestClient(app) as client:
+        admin = bearer(client, passwords, "admin.demo")
+        auditor = bearer(client, passwords, "auditor.demo")
+        ids = []
+        for suffix in ("page-a", "page-b", "page-c"):
+            hid = new_ticket(client, suffix)
+            user_message(client, hid, suffix)
+            ids.append(hid)
+
+        found = []
+        for page in (1, 2, 3):
+            result = verified_listing(
+                client, "n1", auditor, page=page, page_size=1,
+            )
+            assert result.status_code == 200, result.text
+            assert result.json()["page"] == page
+            found.extend(row["session_id"] for row in result.json()["tickets"])
+            assert result.json()["next_page"] == (page + 1 if page < 3 else None)
+        assert set(found) == set(ids)
+        assert verified_listing(client, "n1", auditor, page_size=0).status_code == 422
+        assert verified_listing(client, "n1", auditor, page_size=51).status_code == 422
+
+        with factory() as db:
+            uid = db.scalar(select(AuthUser.id).where(
+                AuthUser.username == "auditor.demo",
+            ))
+        revoke = client.patch("/v1/admin/queue-grants", headers=admin, json={
+            "user_id": uid, "queue_id": "n1",
+            "role": "AUDITOR", "enabled": False,
+        })
+        assert revoke.status_code == 200
+        assert verified_listing(client, "n1", auditor).status_code == 404
+
+
+def test_discovery_excludes_unproven_legacy_and_untrusted_records(tmp_path):
+    app, factory, passwords = environment(tmp_path)
+    with TestClient(app) as client:
+        auditor = bearer(client, passwords, "auditor.demo")
+        good = new_ticket(client, "discovery-good")
+        user_message(client, good, "Bom")
+        untrusted = new_ticket(client, "discovery-untrusted")
+        message_id = user_message(client, untrusted, "Confiança inválida")
+        with factory.begin() as db:
+            event_id = db.scalar(select(SessionEvent.id).where(
+                SessionEvent.session_id == untrusted,
+                SessionEvent.event_type == "QUEUED",
+            ))
+            db.execute(
+                update(MESSAGE_QUEUE_PROVENANCE)
+                .where(MESSAGE_QUEUE_PROVENANCE.c.message_id == message_id)
+                .values(confidence="UNDETERMINED")
+            )
+            db.execute(
+                update(SESSION_EVENT_QUEUE_PROVENANCE)
+                .where(SESSION_EVENT_QUEUE_PROVENANCE.c.event_id == event_id)
+                .values(confidence="UNDETERMINED")
+            )
+            legacy = HandoffSession(
+                operation_id="demo", integration_id="demo-bot", queue_id="n1",
+                external_conversation_id="legacy-discovery",
+                requester_label="Legado", subject="Sem prova",
+                idempotency_key="legacy-discovery-only", status="QUEUED",
+            )
+            db.add(legacy)
+            db.flush()
+            legacy_id = legacy.id
+        result = verified_listing(client, "n1", auditor)
+        assert result.status_code == 200, result.text
+        assert [r["session_id"] for r in result.json()["tickets"]] == [good]
+        assert untrusted not in result.text
+        assert legacy_id not in result.text
+
+
+def test_unversioned_verified_discovery_reports_explicit_unavailability(tmp_path):
+    app, factory, passwords = environment(tmp_path, versioned=False)
+    with TestClient(app) as client:
+        auditor = bearer(client, passwords, "auditor.demo")
+        hid = new_ticket(client, "unversioned-list")
+        user_message(client, hid, "POC sem migração")
+        result = verified_listing(client, "n1", auditor)
+        assert result.status_code == 200, result.text
+        assert result.json()["schema_ready"] is False
+        assert result.json()["tickets"] == []
+        assert result.json()["partial_history"] is True
+        assert hid not in result.text
+    with factory() as db:
+        tables = set(db.scalars(text(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        )).all())
+        assert len(tables) == 17

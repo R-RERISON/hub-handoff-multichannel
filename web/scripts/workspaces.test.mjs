@@ -98,7 +98,7 @@ test('supervisor route props match the page contracts', () => {
     'conversation page does not accept onChanged')
   assert.match(queueRoute[1], /\bonChanged\s*=\{refresh\}/,
     'queue management requires refresh callback')
-  assert.match(history, /type Props = \{tickets:Ticket\[\];api:Api\}/)
+  assert.match(history, /type Props = \{tickets:Ticket\[\];api:Api;showVerified\?:boolean\}/)
   assert.match(queues, /onChanged:\(\)=>Promise<void>/)
 })
 
@@ -130,4 +130,22 @@ test('private transfer reason follows the handoff without entering user chat', (
   assert.match(desk, /Orientação interna recebida/)
   assert.match(desk, /Nota de transferência — não enviada ao usuário final/)
   assert.match(css, /\.desk-layout--compact \.desk-handoff-note/)
+})
+
+test('verified segment history is read-only, separate, and transparent about partial data', () => {
+  const app = read('src/App.tsx')
+  const history = read('src/workspaces/SupervisorConversations.tsx')
+  const verified = read('src/workspaces/ScopedVerifiedHistory.tsx')
+  const api = read('../src/handoff_hub/verified_history.py')
+  assert.match(app, /showVerified=\{user\?\.role==='SUPERVISOR'\|\|user\?\.role==='AUDITOR'\}/)
+  assert.match(history, /<ScopedVerifiedHistory api=\{api\}/)
+  assert.match(history, /Segmentos verificados/)
+  assert.match(verified, /\/v1\/me\/queues/)
+  assert.match(verified, /\/v1\/history\/verified-sessions/)
+  assert.match(verified, /\/verified-history\?queue_id=/)
+  assert.match(verified, /Visualização parcial/)
+  assert.match(verified, /schema_ready/)
+  assert.match(api, /assigned_by == "RUNTIME"/)
+  assert.doesNotMatch(verified, /'POST'|"POST"/)
+  assert.doesNotMatch(verified, /transfer\.reason|\.requester_label|\.subject/)
 })

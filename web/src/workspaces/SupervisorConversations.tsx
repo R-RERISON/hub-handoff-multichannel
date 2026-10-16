@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
-import { MessageSquareText, Search } from 'lucide-react'
+import { MessageSquareText, Search, ShieldCheck } from 'lucide-react'
+import ScopedVerifiedHistory from './ScopedVerifiedHistory'
 import type { Api, ChatMessage, Ticket } from './types'
 import { formatTime } from './types'
 
-type Props = {tickets:Ticket[];api:Api}
+type Props = {tickets:Ticket[];api:Api;showVerified?:boolean}
 type Timeline = { events: {type:string;actor:string;at:string}[]; transfers: {reason:string;from_queue_id:string;to_queue_id:string}[] }
 
-export default function SupervisorConversations({tickets,api}:Props) {
+export default function SupervisorConversations({tickets,api,showVerified=false}:Props) {
+  const [mode,setMode] = useState<'current'|'verified'>('current')
   const [selectedId,setSelectedId] = useState<string|null>(null)
   const [filter,setFilter] = useState('all')
   const [search,setSearch] = useState('')
@@ -44,7 +46,17 @@ export default function SupervisorConversations({tickets,api}:Props) {
       </div>
       <div className="banner-icon"><MessageSquareText size={28}/></div>
     </section>
-    <div className="history-layout">
+    {showVerified&&<nav className="history-mode-tabs" aria-label="Tipo de consulta histórica">
+      <button type="button" className={mode==='current'?'active':''}
+        aria-pressed={mode==='current'} onClick={()=>setMode('current')}>
+        <MessageSquareText size={16}/> Conversas correntes
+      </button>
+      <button type="button" className={mode==='verified'?'active':''}
+        aria-pressed={mode==='verified'} onClick={()=>setMode('verified')}>
+        <ShieldCheck size={16}/> Segmentos verificados
+      </button>
+    </nav>}
+    {showVerified&&mode==='verified'?<ScopedVerifiedHistory api={api}/>:<div className="history-layout">
       <section className="panel history-sidebar">
         <div className="history-filter">
           <label className="search-field"><Search size={15}/><input value={search}
@@ -87,6 +99,6 @@ export default function SupervisorConversations({tickets,api}:Props) {
             <h3>Selecione uma sessão</h3><p>Consulte as mensagens e o histórico sem interferir no atendimento.</p>
           </div>}
       </section>
-    </div>
+    </div>}
   </div>
 }
