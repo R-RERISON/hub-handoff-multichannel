@@ -42,6 +42,7 @@ from handoff_hub.poc_db import (
     make_session_factory,
     utc_now,
 )
+from handoff_hub.provenance_writer import ProvenanceRecorder
 from handoff_hub.queue_authorization import (
     change_grant,
     granted_queues,
@@ -105,6 +106,7 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
     if database_url.startswith("sqlite:///./"):
         Path(database_url.removeprefix("sqlite:///./")).parent.mkdir(parents=True, exist_ok=True)
     factory, engine = make_session_factory(database_url)
+    provenance = ProvenanceRecorder(engine)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -503,7 +505,13 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
             h = HandoffSession(**body.model_dump(), idempotency_key=idempotency_key, status="QUEUED")
             db.add(h)
             db.flush()
-            db.add(SessionEvent(session_id=h.id, event_type="QUEUED", actor=body.integration_id))
+            segment_id = provenance.intake(db, h)
+            queued_event = SessionEvent(
+                session_id=h.id, event_type="QUEUED", actor=body.integration_id
+            )
+            db.add(queued_event)
+            db.flush()
+            provenance.event(db, queued_event, segment_id)
             db.commit()
             return as_handoff(h)
 
@@ -586,6 +594,7 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
             m = Message(session_id=handoff_id, **body.model_dump(exclude={"operator_id"}))
             db.add(m)
             db.flush()
+            provenance.message(db, h, m)
             if body.sender == "OPERATOR":
                 db.add(OutboxEvent(session_id=handoff_id, message_id=m.id,
                                    destination_integration_id=h.integration_id, status="PENDING_ADAPTER"))
@@ -620,5 +629,7 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
             db.commit()
             return as_handoff(h)
 
-    app.include_router(register_operator_workflow(factory, authenticate, exclusive_tx, as_handoff))
+    app.include_router(register_operator_workflow(
+        factory, authenticate, exclusive_tx, as_handoff, provenance
+    ))
     return app

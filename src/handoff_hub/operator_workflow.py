@@ -25,6 +25,7 @@ from handoff_hub.poc_db import (
     SessionTransfer,
     utc_now,
 )
+from handoff_hub.provenance_writer import ProvenanceRecorder
 
 OFFER_SECONDS = 120
 DECLINE_COOLDOWN_SECONDS = 120
@@ -71,6 +72,7 @@ def register_operator_workflow(
     authenticate: Callable,
     exclusive_tx: Callable,
     as_handoff: Callable,
+    provenance: ProvenanceRecorder,
 ) -> APIRouter:
     router = APIRouter(prefix="/v1", dependencies=[Depends(authenticate)])
 
@@ -319,14 +321,24 @@ def register_operator_workflow(
                 raise HTTPException(422, "Escolha uma fila de destino diferente da atual")
             assert_transition(HandoffStatus.ACTIVE, HandoffStatus.TRANSFER_PENDING)
             assert_transition(HandoffStatus.TRANSFER_PENDING, HandoffStatus.QUEUED)
-            db.add(SessionTransfer(
+            transfer = SessionTransfer(
                 session_id=handoff.id,
                 from_queue_id=handoff.queue_id,
                 to_queue_id=queue.id,
                 from_operator_id=body.operator_id,
                 reason=body.reason,
-            ))
-            event(db, handoff.id, "TRANSFERRED", body.operator_id)
+            )
+            db.add(transfer)
+            db.flush()
+            source_segment_id = provenance.transfer(db, handoff, transfer)
+            transfer_event = SessionEvent(
+                session_id=handoff.id,
+                event_type="TRANSFERRED",
+                actor=body.operator_id,
+            )
+            db.add(transfer_event)
+            db.flush()
+            provenance.event(db, transfer_event, source_segment_id)
             handoff.queue_id = queue.id
             handoff.operator_id = None
             handoff.status = "QUEUED"
