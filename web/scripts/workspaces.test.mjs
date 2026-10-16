@@ -115,3 +115,19 @@ test('transfer choices are independent from operator queue membership', () => {
   assert.match(api,/Queue\.id != handoff\.queue_id/)
   assert.match(auth,/transfer-targets/)
 })
+
+
+test('private transfer reason follows the handoff without entering user chat', () => {
+  const desk = read('src/OperatorDesk.tsx')
+  const workflow = read('../src/handoff_hub/operator_workflow.py')
+  const css = read('src/styles.css')
+  assert.match(workflow, /"reason": t\.reason/)
+  assert.match(workflow, /"from_operator_name"/)
+  assert.match(workflow, /"from_queue_name"/)
+  assert.match(desk, /history\.transfers/)
+  assert.match(desk, /offer-dialog__transfer-note/)
+  assert.match(desk, /desk-handoff-note/)
+  assert.match(desk, /Orientação interna recebida/)
+  assert.match(desk, /Nota de transferência — não enviada ao usuário final/)
+  assert.match(css, /\.desk-layout--compact \.desk-handoff-note/)
+})
