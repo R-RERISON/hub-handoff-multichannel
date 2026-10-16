@@ -37,12 +37,14 @@ from handoff_hub.poc_db import (
     OutboxEvent,
     Queue,
     QueueMembership,
+    QueueRoleGrant,
     SessionEvent,
     SessionTransfer,
     make_session_factory,
     utc_now,
 )
 from handoff_hub.provenance_writer import ProvenanceRecorder
+from handoff_hub.security_writer import record_security_decision
 from handoff_hub.queue_authorization import (
     change_grant,
     granted_queues,
@@ -347,10 +349,23 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
 
     @app.patch("/v1/admin/queue-grants", dependencies=[Depends(authenticate)])
     def update_queue_grant(request: Request, body: QueueGrantUpdate):
+        # Same transaction for grant and journal: a failed audit INSERT rolls
+        # back the authorization change before HTTP success is returned.
         with factory.begin() as db:
-            return change_grant(db, request.state.principal,
-                                body.user_id, body.queue_id,
-                                body.role, body.enabled)
+            principal = request.state.principal
+            before = db.get(
+                QueueRoleGrant, (body.user_id, body.queue_id, body.role),
+            ) is not None
+            outcome = change_grant(db, principal, body.user_id, body.queue_id,
+                                   body.role, body.enabled)
+            if before != body.enabled and provenance.security_audit_enabled:
+                record_security_decision(
+                    db, principal,
+                    action="GRANT_ENABLED" if body.enabled else "GRANT_REVOKED",
+                    outcome="APPLIED", queue_id=body.queue_id,
+                    target_user_id=body.user_id,
+                )
+            return outcome
 
     @app.get("/v1/queues", dependencies=[Depends(authenticate)])
     def queues(request: Request):
