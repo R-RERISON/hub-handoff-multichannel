@@ -382,6 +382,18 @@ def register_operator_workflow(
                 "transfers": [
                     {"from_queue_id": t.from_queue_id, "to_queue_id": t.to_queue_id,
                      "operator_id": t.from_operator_id, "reason": t.reason,
+                     "from_operator_name": (
+                         op.name if (op := db.get(Operator, t.from_operator_id))
+                         else t.from_operator_id
+                     ),
+                     "from_queue_name": (
+                         source.name if (source := db.get(Queue, t.from_queue_id))
+                         else t.from_queue_id
+                     ),
+                     "to_queue_name": (
+                         target.name if (target := db.get(Queue, t.to_queue_id))
+                         else t.to_queue_id
+                     ),
                      "at": t.created_at.isoformat()}
                     for t in transfers
                 ],
