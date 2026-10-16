@@ -15,11 +15,13 @@ from handoff_hub.schema_admin import (
     BASELINE_REVISION,
     LATEST_REVISION,
     PROVENANCE_REVISION,
+    SECURITY_REVISION,
     SchemaSafetyError,
     adopt_existing,
     create_new,
     upgrade_audit_existing,
     upgrade_existing,
+    upgrade_security_existing,
     verified_backup,
     verify_database,
 )
@@ -114,6 +116,7 @@ def test_create_fresh_versioned_sqlite_and_preserve_normal_seed(tmp_path):
     assert result["row_counts"]["message_queue_provenance"] == 0
     assert result["row_counts"]["session_event_queue_provenance"] == 0
     assert result["row_counts"]["history_access_audit"] == 0
+    assert result["row_counts"]["security_decisions"] == 0
     with pytest.raises(SchemaSafetyError, match="overwrite"):
         create_new(path, confirmed=True)
     factory, engine = make_session_factory(f"sqlite:///{path.as_posix()}")
@@ -224,7 +227,7 @@ def test_versioned_006b2_backup_is_independently_inspectable(tmp_path):
     create_new(path, confirmed=True)
     backup_path, checksum = verified_backup(path, tmp_path / "backups")
     assert len(checksum) == 64
-    assert verify_database(backup_path)["revision"] == AUDIT_REVISION
+    assert verify_database(backup_path)["revision"] == SECURITY_REVISION
     assert verify_database(path) == verify_database(backup_path)
 
 
@@ -239,6 +242,7 @@ def test_poc_startup_does_not_create_migration_owned_tables(tmp_path):
         assert "session_event_queue_provenance" not in created
         assert "alembic_version" not in created
         assert "history_access_audit" not in created
+        assert "security_decisions" not in created
         assert verify_database(database)["revision"] is None
     finally:
         engine.dispose()
