@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from handoff_hub.poc_api import create_app
-from handoff_hub.poc_db import AuthUser, QueueRoleGrant, make_session_factory
+from handoff_hub.poc_db import AuthUser, QueueRoleGrant, SessionTransfer, make_session_factory
 from handoff_hub.seed_demo_auth import provision
 
 
@@ -114,3 +114,55 @@ def test_roles_cannot_cross_operations_using_queue_grants(tmp_path):
         assert c.get("/v1/queues/missing/rotation", headers=auditor).status_code == 404
         assert c.get("/v1/me/queues", headers=admin).status_code == 200
         assert c.get("/v1/me/queues", headers=auditor).status_code == 200
+
+
+def test_transferred_conversation_does_not_leak_full_history(tmp_path):
+    """Until segments exist, deny full transcript to scoped human viewers."""
+    app, factory, passwords = setup(tmp_path)
+    with TestClient(app) as c:
+        admin = login(c, passwords, "admin.demo")
+        supervisor = login(c, passwords, "supervisor.demo")
+        handoff = ticket(c, admin, "transfer-guard", "n2")
+        assert handoff.status_code == 201
+        hid = handoff.json()["id"]
+        with factory.begin() as db:
+            db.add(SessionTransfer(
+                session_id=hid, from_queue_id="n1", to_queue_id="n2",
+                from_operator_id="op-ana", reason="Escalonamento técnico"
+            ))
+        assert c.get(f"/v1/handoffs/{hid}/messages",
+                     headers=supervisor).status_code == 403
+        assert c.get(f"/v1/handoffs/{hid}/timeline",
+                     headers=supervisor).status_code == 403
+        listed = c.get("/v1/handoffs", headers=supervisor).json()
+        assert all(h["id"] != hid for h in listed)
+        dashboard = c.get("/v1/dashboard", headers=supervisor).json()
+        assert all(h["id"] != hid for h in dashboard["handoffs"])
+        assert c.get(f"/v1/handoffs/{hid}/messages", headers=admin).status_code == 200
+
+
+def test_scoped_operator_counts_do_not_include_other_queues(tmp_path):
+    app, factory, passwords = setup(tmp_path)
+    with TestClient(app) as c:
+        admin = login(c, passwords, "admin.demo")
+        supervisor = login(c, passwords, "supervisor.demo")
+        with factory() as db:
+            uid = db.scalar(select(AuthUser).where(
+                AuthUser.username == "supervisor.demo"
+            )).id
+        r = c.patch("/v1/admin/queue-grants", headers=admin, json={
+            "user_id": uid, "queue_id": "n2",
+            "role": "SUPERVISOR", "enabled": False,
+        })
+        assert r.status_code == 200
+        n2 = ticket(c, admin, "hidden-queue", "n2")
+        assert n2.status_code == 201
+        with factory.begin() as db:
+            from handoff_hub.poc_db import HandoffSession
+            row = db.get(HandoffSession, n2.json()["id"])
+            row.operator_id = "op-bruno"
+            row.status = "ACTIVE"
+        dash = c.get("/v1/dashboard", headers=supervisor).json()
+        assert {o["id"] for o in dash["operators"]} == {"op-ana"}
+        assert all(q["id"] != "n2" for q in dash["queues"])
+        assert all(h["id"] != n2.json()["id"] for h in dash["handoffs"])
