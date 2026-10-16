@@ -175,6 +175,24 @@ class AuthUser(Base):
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
 
 
+
+class QueueRoleGrant(Base):
+    """Authorization by queue, independent of dispatch membership.
+
+    A principal can hold grants in several queues. Grants are checked against
+    live database state at every request; a UI filter is never authoritative.
+    """
+
+    __tablename__ = "queue_role_grants"
+    user_id: Mapped[str] = mapped_column(ForeignKey("auth_users.id"), primary_key=True)
+    queue_id: Mapped[str] = mapped_column(ForeignKey("queues.id"), primary_key=True)
+    role: Mapped[str] = mapped_column(String(24), primary_key=True)
+    granted_by: Mapped[str] = mapped_column(String(80), nullable=False, default="system")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    __table_args__ = (Index("ix_queue_role_grants_queue_role", "queue_id", "role"),)
+
+
+
 class AuthSession(Base):
     """Opaque bearer token is SHA-256 hashed; no plaintext tokens in SQLite."""
 
@@ -223,7 +241,12 @@ class DispatchTurn(Base):
 
 
 def make_session_factory(database_url: str):
-    """SQLite single-node POC: SQLite serializes writers; SQL Server needs another strategy."""
+    """Initialize versioned SQLite schema; preserve nonpersistent in-memory tests."""
+    if database_url.startswith("sqlite") and ":memory:" not in database_url:
+        # Import lazily so migration metadata can import this ORM module safely.
+        from handoff_hub.db_migrations import upgrade_database
+
+        upgrade_database(database_url)
     engine = create_engine(database_url, connect_args={"timeout": 10}, future=True)
     if database_url.startswith("sqlite"):
         @event.listens_for(engine, "connect")
@@ -233,5 +256,6 @@ def make_session_factory(database_url: str):
             cursor.execute("PRAGMA busy_timeout=10000")
             cursor.execute("PRAGMA journal_mode=WAL")
             cursor.close()
-    Base.metadata.create_all(engine)
+    if ":memory:" in database_url:
+        Base.metadata.create_all(engine)
     return sessionmaker(bind=engine, autoflush=False, expire_on_commit=False), engine
