@@ -305,7 +305,8 @@ export default function App() {
         <Route path="/" element={<Navigate to="/supervisao" replace/>}/>
         <Route path="/supervisao" element={<SupervisorOverview snapshot={snapshot}/>}/>
         <Route path="/supervisao/conversas" element={<SupervisorConversations
-          tickets={snapshot.handoffs} api={api}/>}/>
+          tickets={snapshot.handoffs} api={api}
+          showVerified={user?.role==='SUPERVISOR'||user?.role==='AUDITOR'}/>}/>
         <Route path="/supervisao/filas" element={<SupervisorQueues
           queues={snapshot.queues} operators={snapshot.operators}
           tickets={snapshot.handoffs} api={api} onChanged={refresh}/>}/>
