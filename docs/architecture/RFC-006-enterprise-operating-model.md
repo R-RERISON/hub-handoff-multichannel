@@ -46,7 +46,7 @@
 | Administrador do Hub | `/administracao/*` | Plataforma / operação autorizada | CRUD de filas, conectores, integrações, políticas, usuários/grants; acesso excepcional auditado ao conteúdo |
 | Supervisor | `/supervisao/filas/:queueId/*` | Conjunto de filas designadas (1..N) | Gerenciar operadores/membership, capacidade e políticas **delegadas**; dashboard e relatórios da própria fila; não enviar mensagens como operador |
 | Auditor | `/auditoria/*` | Filas designadas e períodos aplicáveis | Consultar/exportar evidências autorizadas, leituras registradas; sem gestão nem resposta |
-| Monitor | `/monitoria/*` | Filas designadas, sessões ativas permitidas | Monitorar em leitura, enviar recomendações privadas ao operador, acompanhar ACK/decisão; sem escrever no chat do usuário |
+| Monitor | `/monitoria/*` | Filas designadas, sessões ativas permitidas | Acompanhar sessões, **receber e assumir pedidos de auxílio iniciados pelo operador**, orientar privadamente, registrar ACK/decisão; nunca escrever ao usuário |
 | Operador | `/operador` | Apenas atendimentos próprios e memberships | Presença, ofertas, resposta, transferência, encerramento, feedback sobre recomendações |
 | Usuário final | Canal do bot/app de origem | A própria conversa | Iniciar, enviar textos/anexos, receber respostas/estado; não faz login no portal de operadores |
 | Integração (não-humana) | API/vínculo de canal | `integration_id` + `operation_id` autorizados | Ingerir solicitações e mensagens; receber eventos/delivery e confirmar ACK. Não tem privilégios de pessoas |
@@ -57,7 +57,7 @@ Perfis **não são hierarquias implícitas**: Supervisor não herda Monitor, Aud
 
 Modelo recomendado:
 - `users`: identidade; `operators`: perfil operacional separado.
-- `role_definitions` e `permissions` são catálogo versionado de capacidades, ex.: `queue.read`, `queue.configure`, `queue.members.manage`, `conversation.read_live`, `conversation.read_audit`, `coaching.create`, `coaching.ack`, `message.send_operator`, `media.download`, `integration.manage`.
+- `role_definitions` e `permissions` são catálogo versionado de capacidades, ex.: `queue.read`, `queue.configure`, `queue.members.manage`, `conversation.read_live`, `conversation.read_audit`, `assistance.request`, `assistance.queue.read`, `assistance.claim`, `assistance.reply`, `assistance.read_own`, `coaching.create`, `coaching.ack`, `message.send_operator`, `media.download`, `integration.manage`.
 - `role_assignments`: `user_id`, `role_id`, `scope_type` (PLATFORM|OPERATION|QUEUE), `scope_id`, validade opcional, concedido_por, motivo, revogação.
 - `queue_memberships` continua sendo critério de **despacho**; `role_assignments` governa **permissões**. Não misturar.
 - `queue_policy` define supervisor delegado e limites de edição; alterações sensíveis (ex.: política de retenção e acesso ao histórico) pertencem ao admin/segurança.
@@ -102,6 +102,21 @@ Monitor com grant `conversation.read_live` abre workspace próprio:
 - audit trail de monitor, decisão, tempo de resposta e sessão;
 - anti-spam/rate limit por monitor/sessão, limite de urgência, dedupe, expiração, política contra interferência;
 - monitor **não** aceita, encerra, transfere nem envia mensagens de usuário, e não pode disparar comandos via conteúdo de recomendação.
+
+### Assistência reativa iniciada pelo operador
+
+O operador autenticado, responsável por uma sessão ACTIVE, aciona **Solicitar auxílio** em sua própria Mesa. Informa motivo (dúvida técnica, procedimento, comunicação, incidente, outro), resumo, prioridade e dados mínimos para a triagem; a conversa do usuário **não muda de fila nem de operador**.
+
+- O pedido gera `assistance_requests` e eventos imutáveis, não `messages`, `handoff_offers` ou `outbox_events`.
+- O Hub mantém **inbox de auxílios por fila**, consumida apenas por monitores com grant atual para a fila/segmento. Um monitor assume atomicamente a solicitação; múltiplos monitores não podem apropriar-se dela simultaneamente.
+- O operador acompanha status de pedido: aguardando, assumido, em andamento, escalonado, resolvido ou cancelado. O drawer é não bloqueante e preserva o rascunho do chat.
+- Sem monitor online, o pedido **permanece em espera**, com aging, prazo e escalonamento de política à supervisão responsável. Não se encaminha automaticamente ao N2 de atendimento.
+- O monitor troca **orientações internas** com o operador por um canal isolado; só o operador decide se transfere um texto sugerido para o rascunho e posteriormente o envia ao usuário por uma ação distinta.
+- Transferências de sessão e mudanças de fila exigem reavaliar grants e responsabilidade do auxílio; um monitor N1 não herda acesso a mensagens exclusivas de N2.
+- Auditoria registra solicitante, motivo, quem assumiu, recomendações, tempos, estado e decisões. Princípio de minimização dos dados compartilhados.
+- Pedido reativo e recomendação proativa compartilham o subsistema interno de coaching, mas são **entidades diferentes**. Uma recomendação proativa não exige abertura artificial de pedido pelo operador.
+
+**Contrato detalhado:** [SPEC-010 — Monitoria Assistida Bidirecional](../specs/SPEC-010-bidirectional-assisted-monitoring.md), incluindo APIs candidatas, estados, concorrência, notificações e testes negativos.
 
 Evoluções opcionais futuras: checklist de qualidade em andamento, escalonamento supervisionado com justificativa, link de artigo KB, alertas de silêncio prolongado/SLA. Sem automação por IA antes de métricas e política.
 
