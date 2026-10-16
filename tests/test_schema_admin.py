@@ -295,3 +295,48 @@ def test_audit_schema_validator_detects_missing_index(tmp_path):
         conn.commit()
     with pytest.raises(SchemaSafetyError, match="Index mismatch"):
         verify_database(path)
+
+
+def test_security_upgrade_requires_versioned_audit_database_and_verified_backup(tmp_path):
+    path = tmp_path / "security-upgrade.db"
+    create_new(path, confirmed=True)
+    assert verify_database(path)["revision"] == SECURITY_REVISION
+    # Downgrade only the newly created, empty disposable database.
+    from alembic import command
+    from handoff_hub.schema_admin import AUDIT_REVISION, _config
+
+    command.downgrade(_config(path), AUDIT_REVISION)
+    before = verify_database(path)
+    assert before["revision"] == AUDIT_REVISION
+    backup_dir = tmp_path / "security-backups"
+    with pytest.raises(SchemaSafetyError, match="confirm-offline"):
+        upgrade_security_existing(path, backup_dir, confirmed=False)
+    assert not backup_dir.exists()
+    upgraded = upgrade_security_existing(path, backup_dir, confirmed=True)
+    after = verify_database(path)
+    assert upgraded["revision"] == SECURITY_REVISION
+    assert upgraded["security_table_empty"] is True
+    assert after["table_count"] == before["table_count"] + 1
+    assert after["row_counts"]["security_decisions"] == 0
+    assert all(after["row_counts"][name] == count
+               for name, count in before["row_counts"].items())
+    assert len(upgraded["backup_sha256"]) == 64
+    with pytest.raises(SchemaSafetyError, match="requires verified"):
+        upgrade_security_existing(path, backup_dir, confirmed=True)
+
+
+def test_security_revision_rejects_missing_index_and_legacy_schema_stays_closed(tmp_path):
+    path = tmp_path / "security-index.db"
+    create_new(path, confirmed=True)
+    with sqlite3.connect(path) as db:
+        db.execute("DROP INDEX ix_security_decisions_actor_time")
+        db.commit()
+    with pytest.raises(SchemaSafetyError, match="Index mismatch"):
+        verify_database(path)
+    legacy = legacy_database(tmp_path)
+    original = verify_database(legacy)
+    with pytest.raises(SchemaSafetyError, match="requires verified"):
+        upgrade_security_existing(legacy, tmp_path / "no-backups", confirmed=True)
+    assert verify_database(legacy) == original
+    assert original["revision"] is None
+    assert original["table_count"] == 17
