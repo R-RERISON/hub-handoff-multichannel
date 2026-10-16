@@ -273,6 +273,35 @@ def register_operator_workflow(
             db.commit()
             return as_handoff(handoff)
 
+    @router.get("/handoffs/{handoff_id}/transfer-targets")
+    def transfer_targets(handoff_id: str):
+        """Offer transfer destinations, independent of dispatch membership.
+
+        Authentication/ownership is enforced by the shared router dependency;
+        this endpoint additionally requires an ACTIVE session before disclosing
+        destinations. The POC has no queue lifecycle/routing policy yet, so all
+        other queues from the same operation are valid destinations.
+        """
+        with factory() as db:
+            handoff = db.get(HandoffSession, handoff_id)
+            if handoff is None:
+                raise HTTPException(404, "Atendimento inexistente")
+            if handoff.status != "ACTIVE" or handoff.operator_id is None:
+                raise HTTPException(409, "Transferência exige atendimento ativo")
+            destinations = db.scalars(
+                select(Queue)
+                .where(
+                    Queue.operation_id == handoff.operation_id,
+                    Queue.id != handoff.queue_id,
+                )
+                .order_by(Queue.name, Queue.id)
+            ).all()
+            return {
+                "session_id": handoff.id,
+                "source_queue_id": handoff.queue_id,
+                "destinations": [{"id": q.id, "name": q.name} for q in destinations],
+            }
+
     @router.post("/handoffs/{handoff_id}/transfer")
     def transfer_handoff(handoff_id: str, body: TransferRequest):
         """Transfer to queue, release current capacity and preserve original owner."""
@@ -286,6 +315,8 @@ def register_operator_workflow(
             queue = db.get(Queue, body.queue_id)
             if queue is None or queue.operation_id != handoff.operation_id:
                 raise HTTPException(422, "Fila destino inexistente ou de outra operação")
+            if queue.id == handoff.queue_id:
+                raise HTTPException(422, "Escolha uma fila de destino diferente da atual")
             assert_transition(HandoffStatus.ACTIVE, HandoffStatus.TRANSFER_PENDING)
             assert_transition(HandoffStatus.TRANSFER_PENDING, HandoffStatus.QUEUED)
             db.add(SessionTransfer(
