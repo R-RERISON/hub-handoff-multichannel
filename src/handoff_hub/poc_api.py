@@ -44,6 +44,7 @@ from handoff_hub.poc_db import (
     Queue,
     QueueMembership,
     SessionEvent,
+    SessionTransfer,
     make_session_factory,
     utc_now,
 )
@@ -267,12 +268,14 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
             ops = db.scalars(select(Operator).where(
                 Operator.id.in_(member_ids)
             ).order_by(Operator.name)).all()
-            recent = db.scalars(
-                select(HandoffSession)
-                .where(HandoffSession.queue_id.in_(allowed))
-                .order_by(HandoffSession.created_at.desc(), HandoffSession.id.desc())
-                .limit(200)
-            ).all()
+            query = select(HandoffSession).where(HandoffSession.queue_id.in_(allowed))
+            if principal.role in ("SUPERVISOR", "AUDITOR"):
+                query = query.where(
+                    ~HandoffSession.id.in_(select(SessionTransfer.session_id))
+                )
+            recent = db.scalars(query.order_by(
+                HandoffSession.created_at.desc(), HandoffSession.id.desc()
+            ).limit(200)).all()
             waiting_by_queue = dict(db.execute(
                 select(HandoffSession.queue_id, func.count())
                 .where(HandoffSession.status == "QUEUED")
@@ -290,12 +293,14 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
             ).all())
             active_by_operator = dict(db.execute(
                 select(HandoffSession.operator_id, func.count())
-                .where(HandoffSession.status == "ACTIVE")
+                .where(HandoffSession.status == "ACTIVE",
+                       HandoffSession.queue_id.in_(allowed))
                 .group_by(HandoffSession.operator_id)
             ).all())
             offered_by_operator = dict(db.execute(
                 select(HandoffSession.operator_id, func.count())
-                .where(HandoffSession.status == "OFFERED")
+                .where(HandoffSession.status == "OFFERED",
+                       HandoffSession.queue_id.in_(allowed))
                 .group_by(HandoffSession.operator_id)
             ).all())
             outbox_by_status = dict(db.execute(
@@ -457,9 +462,11 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
             return [{"id": o.id, "operation_id": o.operation_id, "name": o.name,
                      "presence": o.presence, "capacity": o.capacity,
                      "active": db.scalar(select(func.count()).select_from(HandoffSession).where(
-                         HandoffSession.operator_id == o.id, HandoffSession.status == "ACTIVE")) or 0,
+                         HandoffSession.operator_id == o.id, HandoffSession.status == "ACTIVE",
+                         HandoffSession.queue_id.in_(allowed))) or 0,
                      "offered": db.scalar(select(func.count()).select_from(HandoffSession).where(
-                         HandoffSession.operator_id == o.id, HandoffSession.status == "OFFERED")) or 0} for o in ops]
+                         HandoffSession.operator_id == o.id, HandoffSession.status == "OFFERED",
+                         HandoffSession.queue_id.in_(allowed))) or 0} for o in ops]
 
     @app.patch("/v1/operators/{operator_id}/presence", dependencies=[Depends(authenticate)])
     def update_presence(operator_id: str, body: PresenceUpdate):
@@ -501,9 +508,13 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
     def handoffs(request: Request):
         with factory() as db:
             allowed = granted_queues(db, request.state.principal)
+            query = select(HandoffSession).where(HandoffSession.queue_id.in_(allowed))
+            if request.state.principal.role in ("SUPERVISOR", "AUDITOR"):
+                query = query.where(
+                    ~HandoffSession.id.in_(select(SessionTransfer.session_id))
+                )
             return [as_handoff(h) for h in db.scalars(
-                select(HandoffSession).where(HandoffSession.queue_id.in_(allowed))
-                .order_by(HandoffSession.created_at.desc(), HandoffSession.id.desc())
+                query.order_by(HandoffSession.created_at.desc(), HandoffSession.id.desc())
                 .limit(200)
             ).all()]
 
