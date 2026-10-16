@@ -143,3 +143,41 @@ def test_chain_analyzer_does_not_accept_message_timestamps_before_intake(tmp_pat
     assert report["message_assessment"]["review_candidate"] == 1
     assert report["message_assessment"]["boundary_ambiguous"] == 1
     assert report["message_assessment"]["not_assessed"] == 1
+
+
+def test_transfer_event_actor_mismatch_is_not_trusted(tmp_path):
+    database = example_database(tmp_path)
+    factory, engine = make_session_factory(f"sqlite:///{database.as_posix()}")
+    with factory.begin() as db:
+        event = next(
+            row for row in db.query(SessionEvent).all()
+            if row.event_type == "TRANSFERRED"
+        )
+        event.actor = "op-bruno"
+    engine.dispose()
+    report = dry_run_report(database)
+    assert report["session_assessment"]["missing_transfer_event_evidence"] == 1
+    assert report["message_assessment"]["not_assessed"] == 3
+
+
+def test_current_queue_disagreement_blocks_historical_candidate(tmp_path):
+    database = example_database(tmp_path)
+    factory, engine = make_session_factory(f"sqlite:///{database.as_posix()}")
+    with factory.begin() as db:
+        db.get(HandoffSession, "case-dry-run").queue_id = "n1"
+    engine.dispose()
+    report = dry_run_report(database)
+    assert report["session_assessment"]["current_queue_mismatch"] == 1
+    assert report["message_assessment"]["review_candidate"] == 0
+
+
+def test_transfer_before_session_creation_is_blocked(tmp_path):
+    database = example_database(tmp_path)
+    factory, engine = make_session_factory(f"sqlite:///{database.as_posix()}")
+    with factory.begin() as db:
+        transfer = db.query(SessionTransfer).one()
+        transfer.created_at = START - timedelta(minutes=1)
+    engine.dispose()
+    report = dry_run_report(database)
+    assert report["session_assessment"]["invalid_timestamps"] == 1
+    assert report["message_assessment"]["not_assessed"] == 3
