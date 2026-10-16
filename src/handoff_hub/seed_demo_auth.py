@@ -13,10 +13,12 @@ from handoff_hub.poc_auth import password_hash
 from handoff_hub.poc_db import (
     AuthSession,
     AuthUser,
+    DemoSeedRevision,
     Integration,
     Operation,
     Operator,
     Queue,
+    QueueRoleGrant,
     make_session_factory,
 )
 
@@ -69,6 +71,19 @@ def provision(factory, credential_file: Path, reset: bool = False) -> list[str]:
                 account.role = role
                 account.operator_id = operator_id
             generated.append((username, role, password))
+        revision = "demo_queue_grants_v1"
+        if db.get(DemoSeedRevision, revision) is None:
+            db.flush()
+            for username in ("supervisor.demo", "auditor.demo"):
+                user = db.scalar(select(AuthUser).where(AuthUser.username == username))
+                if user is None:
+                    raise RuntimeError("Demo user was not provisioned")
+                for queue_id in ("n1", "n2"):
+                    db.add(QueueRoleGrant(
+                        user_id=user.id, queue_id=queue_id, role=user.role,
+                        granted_by="demo-seed",
+                    ))
+            db.add(DemoSeedRevision(id=revision))
     if generated:
         # File only on the developer's machine, excluded from version control.
         if credential_file.exists() and not reset:
