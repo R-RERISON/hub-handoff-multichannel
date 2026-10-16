@@ -212,6 +212,20 @@ class DemoSeedRevision(Base):
 
 
 
+
+class QueueRoleGrant(Base):
+    """Explicit queue scope, separate from operator dispatch memberships."""
+
+    __tablename__ = "queue_role_grants"
+    user_id: Mapped[str] = mapped_column(ForeignKey("auth_users.id"), primary_key=True)
+    queue_id: Mapped[str] = mapped_column(ForeignKey("queues.id"), primary_key=True)
+    role: Mapped[str] = mapped_column(String(24), primary_key=True)
+    granted_by: Mapped[str] = mapped_column(String(80), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    __table_args__ = (Index("ix_queue_role_grants_role_queue", "role", "queue_id"),)
+
+
+
 class DispatchTurn(Base):
     """Queue-scoped round-robin position, durable across service restarts."""
 
