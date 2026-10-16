@@ -2,6 +2,7 @@
 import sqlite3
 
 import pytest
+from alembic import command
 from sqlalchemy import inspect, select
 
 from handoff_hub.poc_db import (
@@ -17,6 +18,7 @@ from handoff_hub.schema_admin import (
     PROVENANCE_REVISION,
     SECURITY_REVISION,
     SchemaSafetyError,
+    _config,
     adopt_existing,
     create_new,
     upgrade_audit_existing,
@@ -302,9 +304,6 @@ def test_security_upgrade_requires_versioned_audit_database_and_verified_backup(
     create_new(path, confirmed=True)
     assert verify_database(path)["revision"] == SECURITY_REVISION
     # Downgrade only the newly created, empty disposable database.
-    from alembic import command
-    from handoff_hub.schema_admin import AUDIT_REVISION, _config
-
     command.downgrade(_config(path), AUDIT_REVISION)
     before = verify_database(path)
     assert before["revision"] == AUDIT_REVISION
