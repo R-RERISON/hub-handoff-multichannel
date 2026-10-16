@@ -51,6 +51,8 @@ def verify_database(path: Path) -> dict:
         integrity = db.execute("PRAGMA integrity_check").fetchone()
         if not integrity or integrity[0] != "ok":
             raise SchemaSafetyError("SQLite integrity_check failed")
+        if db.execute("PRAGMA foreign_key_check").fetchone() is not None:
+            raise SchemaSafetyError("SQLite foreign_key_check found orphaned references")
         actual_tables = {
             row[0] for row in db.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' "
@@ -129,7 +131,7 @@ def verify_database(path: Path) -> dict:
 
 def verified_backup(source: Path, backup_dir: Path) -> tuple[Path, str]:
     """Consistent SQLite snapshot using sqlite3.backup, including WAL contents."""
-    verify_database(source)
+    before = verify_database(source)
     if backup_dir.resolve() == source.resolve():
         raise SchemaSafetyError("Backup directory cannot be the database")
     backup_dir.mkdir(parents=True, exist_ok=True)
@@ -143,8 +145,13 @@ def verified_backup(source: Path, backup_dir: Path) -> tuple[Path, str]:
                 origin.backup(destination, pages=100)
                 destination.commit()
         backup = verify_database(backup_path)
-        if backup["revision"] != verify_database(source)["revision"]:
-            raise SchemaSafetyError("Backup version differs from source; stop writers")
+        after = verify_database(source)
+        if (backup["revision"] != before["revision"]
+                or backup["row_counts"] != before["row_counts"]
+                or after["row_counts"] != before["row_counts"]):
+            raise SchemaSafetyError(
+                "Database changed during backup or snapshot mismatch; stop writers"
+            )
         with backup_path.open("rb") as handle:
             sha256 = hashlib.file_digest(handle, "sha256").hexdigest()
         return backup_path, sha256
