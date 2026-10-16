@@ -2,7 +2,7 @@
 import sqlite3
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import inspect, select
 
 from handoff_hub.poc_db import (
     HandoffSession,
@@ -223,3 +223,30 @@ def test_versioned_006b2_backup_is_independently_inspectable(tmp_path):
     assert len(checksum) == 64
     assert verify_database(backup_path)["revision"] == PROVENANCE_REVISION
     assert verify_database(path) == verify_database(backup_path)
+
+
+def test_poc_startup_does_not_create_migration_owned_tables(tmp_path):
+    """The POC launcher must not silently install 006B-2 DDL."""
+    from handoff_hub.poc_db import make_session_factory
+
+    database = tmp_path / "unversioned-startup.db"
+    _, engine = make_session_factory(f"sqlite:///{database.as_posix()}")
+    try:
+        created = set(inspect(engine).get_table_names())
+        assert "session_queue_segments" not in created
+        assert "message_queue_provenance" not in created
+        assert "session_event_queue_provenance" not in created
+        assert "alembic_version" not in created
+        assert verify_database(database)["revision"] is None
+    finally:
+        engine.dispose()
+
+
+def test_new_schema_validator_detects_missing_provenance_index(tmp_path):
+    database = tmp_path / "tampered-006b2.db"
+    create_new(database, confirmed=True)
+    with sqlite3.connect(database) as db:
+        db.execute("DROP INDEX ix_segments_queue_started")
+        db.commit()
+    with pytest.raises(SchemaSafetyError, match="Index mismatch"):
+        verify_database(database)
