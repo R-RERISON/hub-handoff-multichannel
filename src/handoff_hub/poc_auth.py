@@ -96,6 +96,10 @@ def require_owner(factory, handoff_id: str, operator_id: str) -> None:
 
 def assert_access(factory, p: Principal, request: Request, payload: dict | None) -> None:
     path, method = request.url.path, request.method
+    # Transfer destination discovery belongs to the currently assigned operator.
+    # Supervisory queue read grants must not imply permission to impersonate an operator.
+    if path.endswith("/transfer-targets") and p.role != "OPERATOR":
+        raise HTTPException(403, "Destinos de transferência exigem operador responsável")
     if p.role == "ADMIN":
         if method == "POST" and (
             path in ("/v1/dispatch/next", "/v1/dispatch/offer")
@@ -140,7 +144,7 @@ def assert_access(factory, p: Principal, request: Request, payload: dict | None)
         require_owner(factory, close.group(2), oid)
         return
     action = re.fullmatch(
-        r"/v1/handoffs/([^/]+)/(accept|decline|transfer|messages|timeline)", path
+        r"/v1/handoffs/([^/]+)/(accept|decline|transfer|transfer-targets|messages|timeline)", path
     )
     if action:
         hid, suffix = action.groups()
@@ -155,7 +159,7 @@ def assert_access(factory, p: Principal, request: Request, payload: dict | None)
                 or (payload or {}).get("operator_id") != oid
             ):
                 raise HTTPException(403, "Respostas apenas como operador responsável")
-        elif suffix == "timeline" and method != "GET":
+        elif suffix in ("timeline", "transfer-targets") and method != "GET":
             raise HTTPException(403, "Método não permitido")
         require_owner(factory, hid, oid)
         return
