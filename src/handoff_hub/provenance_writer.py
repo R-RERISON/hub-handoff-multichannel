@@ -135,6 +135,25 @@ class ProvenanceRecorder:
             confidence="VERIFIED" if segment_id else "UNDETERMINED",
         ))
 
+    def event_for_handoff(self, db: Session, handoff: HandoffSession,
+                          event: SessionEvent) -> None:
+        """Attribute a NEW operational event only to a matching open segment.
+
+        Legacy/unproven sessions receive UNDETERMINED, never current-queue
+        inference. This executes inside the caller's existing transaction.
+        """
+        if not self.enabled:
+            return
+        db.flush()
+        current = self._current(db, handoff.id)
+        segment_id = (
+            current["id"]
+            if current and current["queue_id"] == handoff.queue_id
+            and current["provenance_state"] == "VERIFIED"
+            else None
+        )
+        self.event(db, event, segment_id)
+
     def event(self, db: Session, event: SessionEvent,
               verified_segment_id: str | None) -> None:
         """Do not guess which queue owns unclassified historical or transition events."""
