@@ -115,7 +115,7 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
             async def dispatch_loop():
                 while True:
                     try:
-                        await asyncio.to_thread(run_dispatch_cycle, factory)
+                        await asyncio.to_thread(run_dispatch_cycle, factory, provenance)
                     except Exception:
                         logging.getLogger("handoff.dispatch").exception("Falha no despacho")
                     await asyncio.sleep(2)
@@ -554,7 +554,11 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
                     waiting.operator_id = op.id
                     waiting.status = "ACTIVE"
                     waiting.updated_at = utc_now()
-                    db.add(SessionEvent(session_id=waiting.id, event_type="ACTIVE", actor=op.id))
+                    row = SessionEvent(
+                        session_id=waiting.id, event_type="ACTIVE", actor=op.id
+                    )
+                    db.add(row)
+                    provenance.event_for_handoff(db, waiting, row)
                     db.commit()
                     return {"result": "assigned", "session": as_handoff(waiting)}
             db.commit()
@@ -625,7 +629,11 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
                 raise HTTPException(409, "Somente atendimento ativo pode ser concluído")
             h.status = "CLOSED"
             h.updated_at = utc_now()
-            db.add(SessionEvent(session_id=h.id, event_type="CLOSED", actor=h.operator_id or "system"))
+            row = SessionEvent(
+                session_id=h.id, event_type="CLOSED", actor=h.operator_id or "system"
+            )
+            db.add(row)
+            provenance.event_for_handoff(db, h, row)
             db.commit()
             return as_handoff(h)
 
