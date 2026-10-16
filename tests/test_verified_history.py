@@ -9,8 +9,8 @@ from handoff_hub.poc_api import create_app
 from handoff_hub.poc_db import (
     AuthUser,
     HandoffSession,
-    SessionTransfer,
     SessionEvent,
+    SessionTransfer,
     make_session_factory,
 )
 from handoff_hub.provenance_schema import (
