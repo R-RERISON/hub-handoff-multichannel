@@ -373,6 +373,7 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
     @app.get("/v1/operators", dependencies=[Depends(authenticate)])
     def operators(principal: Principal = Depends(authenticate)):
         with factory() as db:
+            allowed = permitted_queues(db, principal)
             ids = visible_operator_ids(db, principal)
             ops = db.scalars(select(Operator).where(
                 Operator.operation_id == principal.operation_id,
@@ -381,9 +382,11 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
             return [{"id": o.id, "operation_id": o.operation_id, "name": o.name,
                      "presence": o.presence, "capacity": o.capacity,
                      "active": db.scalar(select(func.count()).select_from(HandoffSession).where(
-                         HandoffSession.operator_id == o.id, HandoffSession.status == "ACTIVE")) or 0,
+                         HandoffSession.operator_id == o.id, HandoffSession.status == "ACTIVE",
+                         HandoffSession.queue_id.in_(allowed))) or 0,
                      "offered": db.scalar(select(func.count()).select_from(HandoffSession).where(
-                         HandoffSession.operator_id == o.id, HandoffSession.status == "OFFERED")) or 0} for o in ops]
+                         HandoffSession.operator_id == o.id, HandoffSession.status == "OFFERED",
+                         HandoffSession.queue_id.in_(allowed))) or 0} for o in ops]
 
     @app.patch("/v1/operators/{operator_id}/presence", dependencies=[Depends(authenticate)])
     def update_presence(operator_id: str, body: PresenceUpdate):
