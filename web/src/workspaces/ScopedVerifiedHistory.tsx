@@ -16,6 +16,11 @@ type VerifiedDetails = {
   messages:ChatMessage[]
   events:{type:string;actor:string;at:string}[]
   partial_history:true
+  message_page:number
+  event_page:number
+  message_next_page:number|null
+  event_next_page:number|null
+  page_size:number
 }
 
 export default function ScopedVerifiedHistory({api}:{api:Api}) {
@@ -24,6 +29,8 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
   const [page,setPage] = useState(1)
   const [listing,setListing] = useState<Listing|null>(null)
   const [selectedId,setSelectedId] = useState<string|null>(null)
+  const [messagePage,setMessagePage] = useState(1)
+  const [eventPage,setEventPage] = useState(1)
   const [detail,setDetail] = useState<VerifiedDetails|null>(null)
   const [loading,setLoading] = useState(false)
   const [detailLoading,setDetailLoading] = useState(false)
@@ -76,14 +83,15 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
     setDetailLoading(true)
     setError('')
     api('/v1/handoffs/'+encodeURIComponent(selectedId)+
-      '/verified-history?queue_id='+encodeURIComponent(queueId))
+      '/verified-history?queue_id='+encodeURIComponent(queueId)+
+      '&message_page='+messagePage+'&event_page='+eventPage)
       .then(data=>{if(!cancelled)setDetail(data as VerifiedDetails)})
       .catch(()=>{
         if(!cancelled)setError('O acesso ao segmento foi negado ou a concessão mudou.')
       })
       .finally(()=>{if(!cancelled)setDetailLoading(false)})
     return ()=>{cancelled=true}
-  },[api,queueId,selectedId,refreshKey])
+  },[api,queueId,selectedId,messagePage,eventPage,refreshKey])
 
   return <div className="section-stack">
     <section className="panel verified-history-intro">
@@ -99,13 +107,14 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
       <select id="verified-history-queue" value={queueId}
         onChange={e=>{
           setQueueId(e.target.value);setPage(1)
-          setSelectedId(null);setDetail(null)
+          setSelectedId(null);setDetail(null);setMessagePage(1);setEventPage(1)
         }}>
         {queues.length===0&&<option value="">Nenhuma fila autorizada</option>}
         {queues.map(q=><option value={q.id} key={q.id}>{q.name}</option>)}
       </select>
       <button className="outline" type="button" onClick={()=>{
-        setPage(1);setSelectedId(null);setDetail(null);setRefreshKey(v=>v+1)
+        setPage(1);setSelectedId(null);setDetail(null)
+        setMessagePage(1);setEventPage(1);setRefreshKey(v=>v+1)
       }}><RefreshCw size={15}/> Atualizar permissões</button>
     </section>
     {error&&<div className="alert" role="alert">{error}</div>}
@@ -128,7 +137,10 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
         <div className="history-list">
           {listing.tickets.map(t=><button key={t.session_id} type="button"
             className={'history-ticket '+(selectedId===t.session_id?'selected':'')}
-            onClick={()=>{setSelectedId(t.session_id);setDetail(null)}}>
+            onClick={()=>{
+              setMessagePage(1);setEventPage(1)
+              setSelectedId(t.session_id);setDetail(null)
+            }}>
             <strong>Sessão {t.session_id.slice(0,8)}…</strong>
             <small>Início do segmento: {formatTime(t.segment_started_at)}</small>
           </button>)}
@@ -139,9 +151,13 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
         <div className="verified-history-pagination">
           <button type="button" className="outline" disabled={page<=1} onClick={()=>{
             setPage(v=>v-1);setSelectedId(null);setDetail(null)
+            setMessagePage(1);setEventPage(1)
           }}>Anterior</button>
           <button type="button" className="outline" disabled={listing.next_page===null}
-            onClick={()=>{setPage(v=>v+1);setSelectedId(null);setDetail(null)}}>
+            onClick={()=>{
+              setPage(v=>v+1);setSelectedId(null);setDetail(null)
+              setMessagePage(1);setEventPage(1)
+            }}>
             Próxima
           </button>
         </div>
@@ -165,12 +181,36 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
               <p>{m.content}</p><small>{formatTime(m.created_at)}</small></div>
           </div>)}
           {detail.messages.length===0&&<p className="empty-state">
-            Nenhuma mensagem comprovada neste segmento.
+            Nenhuma mensagem comprovada nesta página do segmento.
           </p>}
-        </div><div className="history-events"><b>Eventos comprovados</b>
+        </div>
+        <div className="verified-history-detail-pages" aria-label="Paginação de mensagens verificadas">
+          <strong>Mensagens · página {detail.message_page}</strong>
+          <button type="button" className="outline"
+            aria-label="Página anterior de mensagens" disabled={detailLoading||messagePage<=1}
+            onClick={()=>setMessagePage(v=>v-1)}>Anterior</button>
+          <button type="button" className="outline"
+            aria-label="Próxima página de mensagens"
+            disabled={detailLoading||detail.message_next_page===null}
+            onClick={()=>setMessagePage(v=>v+1)}>Próxima</button>
+        </div>
+        <div className="history-events"><b>Eventos comprovados</b>
           {detail.events.map((e,i)=><span key={i}>
             {e.type} · {e.actor} · {formatTime(e.at)}
           </span>)}
+          {detail.events.length===0&&<p className="empty-state">
+            Nenhum evento comprovado nesta página.
+          </p>}
+        </div>
+        <div className="verified-history-detail-pages" aria-label="Paginação de eventos verificados">
+          <strong>Eventos · página {detail.event_page}</strong>
+          <button type="button" className="outline"
+            aria-label="Página anterior de eventos" disabled={detailLoading||eventPage<=1}
+            onClick={()=>setEventPage(v=>v-1)}>Anterior</button>
+          <button type="button" className="outline"
+            aria-label="Próxima página de eventos"
+            disabled={detailLoading||detail.event_next_page===null}
+            onClick={()=>setEventPage(v=>v+1)}>Próxima</button>
         </div></>}
         </>}
       </section>
