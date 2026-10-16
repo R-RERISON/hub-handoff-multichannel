@@ -8,6 +8,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 
+from handoff_hub.demo_routing import configure_demo_routing
 from handoff_hub.poc_auth import password_hash
 from handoff_hub.poc_db import (
     AuthSession,
@@ -16,7 +17,6 @@ from handoff_hub.poc_db import (
     Operation,
     Operator,
     Queue,
-    QueueMembership,
     make_session_factory,
 )
 
@@ -47,10 +47,8 @@ def provision(factory, credential_file: Path, reset: bool = False) -> list[str]:
             if not db.get(Operator, oid):
                 db.add(Operator(id=oid, operation_id="demo", name=name,
                                 presence="AVAILABLE", capacity=1))
-        for qid, oid in (("n1", "op-ana"), ("n1", "op-bruno"), ("n2", "op-bruno")):
-            if not db.get(QueueMembership, (qid, oid)):
-                db.add(QueueMembership(queue_id=qid, operator_id=oid))
         db.flush()
+        configure_demo_routing(db)
         for username, role, operator_id in DEMO_USERS:
             account = db.scalar(select(AuthUser).where(AuthUser.username == username))
             if account is not None and not reset:
