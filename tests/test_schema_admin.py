@@ -18,8 +18,8 @@ from handoff_hub.schema_admin import (
     SchemaSafetyError,
     adopt_existing,
     create_new,
-    upgrade_existing,
     upgrade_audit_existing,
+    upgrade_existing,
     verified_backup,
     verify_database,
 )
