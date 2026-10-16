@@ -87,6 +87,9 @@ def test_round_robin_requires_online_operator_and_persists_turn(tmp_path) -> Non
     with TestClient(app) as c:
         ana = login(c, passwords, "ana.demo")
         bruno = login(c, passwords, "bruno.demo")
+        supervisor = login(c, passwords, "supervisor.demo")
+        assert c.patch("/v1/queues/n1/members/op-bruno", headers=auth(supervisor),
+                       json={"enabled": True}).status_code == 200
         assert c.post("/v1/auth/heartbeat", headers=auth(ana)).status_code == 200
         assert c.post("/v1/auth/heartbeat", headers=auth(bruno)).status_code == 200
         sequence=[]
@@ -117,6 +120,9 @@ def test_operator_logout_removes_eligibility_and_requeues_offer(tmp_path) -> Non
     app, factory, passwords = setup_poc(tmp_path)
     with TestClient(app) as c:
         ana = login(c, passwords, "ana.demo")
+        supervisor = login(c, passwords, "supervisor.demo")
+        assert c.patch("/v1/queues/n1/members/op-bruno", headers=auth(supervisor),
+                       json={"enabled": True}).status_code == 200
         hid = create_ticket(c, 88)
         assert run_dispatch_cycle(factory)["offered"] == 1
         with factory() as db:
@@ -231,6 +237,9 @@ def test_fifo_and_capacity_under_parallel_cycle(tmp_path) -> None:
     with TestClient(app) as c:
         login(c, passwords, "ana.demo")
         login(c, passwords, "bruno.demo")
+        supervisor = login(c, passwords, "supervisor.demo")
+        assert c.patch("/v1/queues/n1/members/op-bruno", headers=auth(supervisor),
+                       json={"enabled": True}).status_code == 200
         ids = [create_ticket(c, 300 + i) for i in range(3)]
 
         def dispatch(_):
