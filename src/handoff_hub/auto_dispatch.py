@@ -21,13 +21,16 @@ from handoff_hub.poc_db import (
     SessionEvent,
     utc_now,
 )
+from handoff_hub.provenance_writer import ProvenanceRecorder
 
 OFFER_SECONDS = 120
 DECLINE_COOLDOWN_SECONDS = 120
 
 
-def run_dispatch_cycle(factory) -> dict:
+def run_dispatch_cycle(factory, provenance: ProvenanceRecorder | None = None) -> dict:
     """Atomic offer reservations; run periodically in one local backend instance."""
+    if provenance is None:
+        provenance = ProvenanceRecorder(factory.kw["bind"])
     result = {"offered": 0, "expired": 0}
     with factory() as db:
         db.connection().exec_driver_sql("BEGIN IMMEDIATE")
@@ -61,8 +64,11 @@ def run_dispatch_cycle(factory) -> dict:
                 h.operator_id = None
                 h.status = "QUEUED"
                 h.updated_at = utc_now()
-                db.add(SessionEvent(session_id=h.id, event_type="OFFER_EXPIRED",
-                                    actor="auto-dispatch"))
+                event = SessionEvent(
+                    session_id=h.id, event_type="OFFER_EXPIRED", actor="auto-dispatch"
+                )
+                db.add(event)
+                provenance.event_for_handoff(db, h, event)
                 result["expired"] += 1
         db.flush()
 
@@ -127,9 +133,11 @@ def run_dispatch_cycle(factory) -> dict:
                     session_id=handoff.id, operator_id=op.id, status="PENDING",
                     expires_at=utc_now() + timedelta(seconds=OFFER_SECONDS),
                 ))
-                db.add(SessionEvent(
+                event = SessionEvent(
                     session_id=handoff.id, event_type="OFFERED_AUTO", actor=op.id
-                ))
+                )
+                db.add(event)
+                provenance.event_for_handoff(db, handoff, event)
                 turn = turns.get(op.id)
                 if turn is None:
                     turn = DispatchTurn(
