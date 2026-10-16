@@ -25,7 +25,7 @@
 | **007 — Administração** | CRUD de operações/filas/pessoas/identidades/papéis e ciclo de vida; módulo integrações em configuração | SPEC-006 | Admin cria fila especializada, cadastra operador, vincula e delega responsáveis |
 | **008 — Supervisão** | Área independente por fila: equipe, capacidade, status, prioridades, escalonamento, dashboards operacionais | SPEC-007 | Supervisor A vê e gerencia só suas filas; outro gestor opera fila independente |
 | **009 — Auditoria** | Portal de auditor com pesquisa, histórico por segmento e evidências, filtros, logs de acesso | SPEC-006 + 008 | Auditor N1 lê apenas segmentos/evidências N1, nunca N2 sem concessão |
-| **010 — Monitoria Assistida** | MONITOR role + live read-only + coaching privado/ACK + popup operador | SPEC-006 + 008 | Monitor observa e orienta operador, sem enviar texto ao usuário |
+| **010 — Monitoria Assistida** | MONITOR role + observação proativa + **solicitação de auxílio pelo operador** + inbox/aceite atômico + coaching privado/ACK | SPEC-006 + 008 | Operador pede ajuda sem transferir chamada; monitor autorizado assume, orienta e conclui sem falar com o usuário |
 | **011 — Mídia** | Upload seguro de print, quarentena/verificação, download autorizado e preview | SPEC-006 + 009 | Screenshot em conversa, acessível ao operador e leitores autorizados |
 | **012 — Canal real** | Inbox/outbox duráveis, adapter Teams Embedded, identidade de integração, ACK/retry/DLQ | SPEC-006 + 011* | Usuário envia texto e imagem ao bot original; operador recebe e responde com ACK |
 | **013 — Métricas e readiness** | SLA/indicadores históricos/qualidade/exportação e observabilidade/hardening | SPEC-008/009/010/012 | Métricas reproduzíveis, carga, segurança e falhas avaliadas por gates |
@@ -72,15 +72,32 @@
 
 **Gate:** acesso limitado às filas/segmentos concedidos; exportação é auditada e expira; mascaramento/retention observados; consultas paginadas (sem `GET /dashboard` retornar 200 casos indiscriminadamente); operador/supervisor sem permission `audit.export` recebe 403/404.
 
-## 6. SPEC-010 — Monitoria e coaching
+## 6. SPEC-010 — Monitoria Assistida Bidirecional
 
-**Modelo:** `monitor_assignments` como role grants; `coaching_recommendations` com destinatário, operador, fila/segmento, texto, prioridade, TTL, estado e decisões.
+**Contrato detalhado:** [SPEC-010 — Monitoria Assistida Bidirecional](SPEC-010-bidirectional-assisted-monitoring.md).
 
-**Fluxo:** monitor seleciona ticket ativo da fila autorizada → recebe texto/estado ao vivo (somente leitura) → escreve recomendação interna → operador recebe cartão discreto → pode (a) reconhecer, (b) copiar sugestão para rascunho e editar, (c) dispensar → evento auditado. Mesmo se aceitar a sugestão, somente comando de envio explícito do operador cria `messages/OutboxEvent`.
+**Dois gatilhos de assistência:**
+1. **Proativo:** monitor autorizado da fila acompanha ticket ativo e envia recomendação privada ao operador.
+2. **Reativo:** operador responsável por atendimento ACTIVE seleciona **Solicitar auxílio**, informa motivo, resumo, prioridade e acompanha o pedido até a resolução, sem transferir o ticket.
 
-**Gate:** monitor de outra fila não vê atendimento; recomendação não gera mensagens externas; 2 recomendações simultâneas não bloqueiam o chat; usuário e bot não recebem coaching; expiração e ACK não duplicam; sem spam sem limite.
+**Modelo:** grants de MONITOR por fila/segmento; `assistance_requests`, `assistance_events` e `assistance_messages` separados do chat do usuário; `coaching_recommendations` vinculadas opcionalmente ao pedido. Uma solicitação pendente por operador/ticket como contrato inicial; dedupe/idempotência.
 
-**Sinalização mais segura:** INFO sem popup bloqueante; ALERT exige destaque não modal; crítico apenas conforme política e logs. Suporte a futura base de conhecimento citada, não IA autônoma nesta entrega.
+**Jornada reativa:** operador abre drawer não bloqueante → pedido persistido na inbox da fila autorizada → monitor elegível assume **atomicamente** → envia orientação interna → operador reconhece, dispensa ou insere no rascunho → operador resolve/cancela pedido. Somente envio explícito do operador no composer cria mensagem ao usuário.
+
+**Ausência de monitor:** pedido permanece QUEUED com aging e SLA próprio; após prazo configurado pode ser escalonado ao supervisor ou a outro monitor com grant, **sem redirecionar a conversa para N2**. Transferências/revogação de grants revalidam a fila e o segmento; registro de auditoria permanece.
+
+**Interface:** botão Solicitar auxílio ao lado das ações da conversa no Portal do Operador; badge de status, drawer lateral e notificação discreta de orientação; Monitoria com duas áreas independentes — pedidos de auxílio e observação ao vivo; Supervisor tem visão agregada por fila. Nenhum popup pode bloquear permanentemente o composer.
+
+**Gates:**
+- Operador não abre auxílio em sessão alheia; monitor apenas N2 não enxerga pedidos N1.
+- Duas tentativas simultâneas de assumir o mesmo pedido: **um sucesso e um conflito**.
+- Sem monitores online, pedido não desaparece; escalonamento preserva audit trail.
+- Recomendação de monitor não aparece em `messages` nem `outbox_events`; aplicar no rascunho não envia.
+- Transferência N1→N2, cancelamento, encerramento e revogação de acesso não expõem conversas indevidas.
+- Backlog de assistência, tempo de primeira orientação, tempo até resolução e taxa de escalonamento medidos sem confundir assistência com atendimento de usuário.
+- A POC 0.5 mantém inbox, conversa, transferências, RBAC e rodízio sem regressão.
+
+**Fatiamento:** SPEC-010A para modelo/grants/solicitação/inbox/claim; 010B para orientações privadas/UX; 010C para SLA/escalonamento/notificações e relatórios.
 
 ## 7. SPEC-011 — Prints e anexos seguros
 
@@ -105,7 +122,7 @@
 **KPI calculado sobre eventos com semântica documentada:**
 - backlog e aging por fila (tempo no trecho), oferta/aceite, abandono, TMA/TME, taxa de transferência, reabertura e capacidade;
 - alertas de espera/SLA e notificações internas;
-- monitoria: recomendações enviadas, reconhecidas, aceitas e descartadas, nunca contá-las como respostas ao usuário;
+- monitoria: pedidos de auxílio, tempo de atendimento do monitor, escalonamentos e resoluções; recomendações enviadas/reconhecidas/aproveitadas/dispensadas, **sem contá-las como respostas ao usuário**;
 - auditoria: volume revisado, checklist de qualidade e conformidade, não score automático sem metodologia aprovada.
 
 **Gate operacional:** teste de concorrência >1 processo usando mecanismo apropriado ao banco final, limites de carga definidos a partir da demanda real, backup/recovery, revisão LGPD, relatórios segmentados, autenticação Entra, observabilidade, E2E Teams, acessibilidade, gestão de segredos e política de deploy/reversão.
@@ -163,7 +180,7 @@ web/src/
 1. Aprovar seis personas e separação de responsabilidades, incluindo ADMIN sem leitura irrestrita de conteúdo por padrão.
 2. Aprovar a unidade de segurança `operação → fila → segmento do atendimento`.
 3. Aprovar primeiro investimento em SPEC-006 (grants/migration), em vez de iniciar pela criação de dashboards.
-4. Aprovar monitoria com recomendações internas sem postagem automática e anexo de imagens com segurança server-side.
+4. Aprovar monitoria **proativa e reativa (auxílio solicitado pelo operador)**, com recomendações internas sem postagem automática e anexo de imagens com segurança server-side.
 5. Confirmar plataforma de destino do primeiro adapter (Teams Embedded com o bot original) antes de SPEC-012.
 
 **Não há código de produção alterado por esta proposta.**
