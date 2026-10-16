@@ -266,6 +266,14 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
     @app.get("/v1/queues", dependencies=[Depends(authenticate)])
     def queues(principal: Principal = Depends(authenticate)):
         with factory() as db:
+            if principal.role == "OPERATOR":
+                # Operators may see names of transfer destinations without
+                # receiving another team's queue occupancy or conversation data.
+                destinations = db.scalars(select(Queue).where(
+                    Queue.operation_id == principal.operation_id
+                ).order_by(Queue.id)).all()
+                return [{"id": q.id, "operation_id": q.operation_id, "name": q.name,
+                         "waiting": 0} for q in destinations]
             allowed = permitted_queues(db, principal)
             qs = db.scalars(select(Queue).where(
                 Queue.operation_id == principal.operation_id,
