@@ -1,3 +1,9 @@
+## SPEC-006B-1 — Migração versionada segura (em homologação)
+
+Esta branch incorpora Alembic para **instalações novas** e um utilitário explícito para **adotar o schema de SQLite POC-006A existente**, com verificação de estrutura, backup consistente e SHA-256. O `start.cmd` **não migra automaticamente** o banco existente.
+
+Antes de qualquer migração real, execute `.\start.cmd --check` e leia [SPEC-006B-1 — Procedimento de adoção segura](docs/specs/SPEC-006B-1-safe-alembic-baseline.md). Comece por `.\.venv\Scripts\python.exe -m handoff_hub.schema_admin inspect` (somente leitura). Não use `alembic stamp` diretamente, não apague `data/handoff-poc.db` nem compartilhe backups.
+
 ## UX-005.1 — Mesa compacta e intake N1-first
 
 Atualização da POC 0.5: a Mesa do Operador não usa mais rolagem da página; histórico de mensagens e lista de atendimento rolam apenas internamente quando necessário. Campo de resposta permanente (Enter envia; Shift+Enter adiciona linha), ações de Histórico, Transferir e Encerrar próximas ao cabeçalho da conversa. Em telas estreitas, as áreas alternam por abas.
