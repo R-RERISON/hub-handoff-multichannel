@@ -17,6 +17,7 @@ from handoff_hub.provenance_schema import (
 )
 from handoff_hub.provenance_writer import ProvenanceRecorder
 from handoff_hub.queue_authorization import SCOPED_ROLES, require_queue
+from handoff_hub.security_writer import journal_denials
 
 
 def register_verified_history(
@@ -25,6 +26,7 @@ def register_verified_history(
     router = APIRouter(prefix="/v1", dependencies=[Depends(authenticate)])
 
     @router.get("/history/verified-sessions")
+    @journal_denials(factory, provenance, resource="LIST")
     def verified_sessions(
         request: Request,
         queue_id: str = Query(min_length=1, max_length=60),
@@ -114,6 +116,7 @@ def register_verified_history(
             }
 
     @router.get("/handoffs/{handoff_id}/verified-history")
+    @journal_denials(factory, provenance, resource="DETAIL")
     def verified_history(
         handoff_id: str,
         request: Request,
