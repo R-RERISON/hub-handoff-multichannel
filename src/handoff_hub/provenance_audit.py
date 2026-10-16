@@ -29,7 +29,8 @@ def provenance_report(database: Path) -> dict:
         "events": counts["session_events"],
         "backfill_applied": False,
     }
-    if revision not in ("006b2_queue_provenance", "006b3_history_access_audit"):
+    if revision not in ("006b2_queue_provenance", "006b3_history_access_audit",
+                         "006b4_security_decisions"):
         result["status"] = "NOT_MIGRATED"
         result["provenance_available"] = False
         return result
