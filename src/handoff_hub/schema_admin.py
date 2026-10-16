@@ -20,12 +20,14 @@ from alembic.config import Config
 from sqlalchemy.dialects import sqlite
 from sqlalchemy.engine import URL
 
+from handoff_hub.audit_schema import HISTORY_ACCESS_AUDIT
 from handoff_hub.poc_db import Base
 from handoff_hub.provenance_schema import PROVENANCE_TABLES
 
 BASELINE_REVISION = "006b1_poc_baseline"
 PROVENANCE_REVISION = "006b2_queue_provenance"
-LATEST_REVISION = PROVENANCE_REVISION
+AUDIT_REVISION = "006b3_history_access_audit"
+LATEST_REVISION = AUDIT_REVISION
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DB = PROJECT_ROOT / "data" / "handoff-poc.db"
 DEFAULT_BACKUPS = PROJECT_ROOT / "data" / "backups"
@@ -68,13 +70,15 @@ def verify_database(path: Path) -> dict:
         if existing_version:
             rows = db.execute("SELECT version_num FROM alembic_version").fetchall()
             if len(rows) != 1 or rows[0][0] not in (
-                BASELINE_REVISION, PROVENANCE_REVISION,
+                BASELINE_REVISION, PROVENANCE_REVISION, AUDIT_REVISION,
             ):
                 raise SchemaSafetyError("Unexpected Alembic revision: manual review required")
             version = rows[0][0]
         signature_tables = list(Base.metadata.sorted_tables)
-        if version == PROVENANCE_REVISION:
+        if version in (PROVENANCE_REVISION, AUDIT_REVISION):
             signature_tables.extend(PROVENANCE_TABLES)
+        if version == AUDIT_REVISION:
+            signature_tables.append(HISTORY_ACCESS_AUDIT)
         expected_tables = {table.name for table in signature_tables}
         if actual_tables != expected_tables:
             missing = sorted(expected_tables - actual_tables)
@@ -214,9 +218,9 @@ def upgrade_existing(database: Path, backup_dir: Path, *, confirmed: bool) -> di
         )
     backup_path, digest = verified_backup(database, backup_dir)
     try:
-        command.upgrade(_config(database), LATEST_REVISION)
+        command.upgrade(_config(database), PROVENANCE_REVISION)
         after = verify_database(database)
-        if after["revision"] != LATEST_REVISION:
+        if after["revision"] != PROVENANCE_REVISION:
             raise SchemaSafetyError("Alembic did not record the expected revision")
         if any(after["row_counts"].get(name) != count
                for name, count in before["row_counts"].items()):
@@ -231,13 +235,48 @@ def upgrade_existing(database: Path, backup_dir: Path, *, confirmed: bool) -> di
         ) from exc
     return {
         "action": "upgraded",
-        "revision": LATEST_REVISION,
+        "revision": PROVENANCE_REVISION,
         "backup": str(backup_path),
         "backup_sha256": digest,
         "preserved_rows": {
             name: after["row_counts"][name] for name in before["row_counts"]
         },
         "provenance_tables_empty": True,
+    }
+
+
+def upgrade_audit_existing(database: Path, backup_dir: Path, *, confirmed: bool) -> dict:
+    """Opt-in 006B-2 → 006B-3, after a verified offline backup."""
+    if not confirmed:
+        raise SchemaSafetyError("Explicit --confirm-offline is required")
+    before = verify_database(database)
+    if before["revision"] != PROVENANCE_REVISION:
+        raise SchemaSafetyError(
+            "Audit upgrade requires a verified 006b2_queue_provenance revision"
+        )
+    backup_path, digest = verified_backup(database, backup_dir)
+    try:
+        command.upgrade(_config(database), AUDIT_REVISION)
+        after = verify_database(database)
+        if after["revision"] != AUDIT_REVISION:
+            raise SchemaSafetyError("Audit migration revision mismatch")
+        if any(after["row_counts"].get(table) != amount
+               for table, amount in before["row_counts"].items()):
+            raise SchemaSafetyError("Audit migration changed a preexisting row count")
+        if after["row_counts"][HISTORY_ACCESS_AUDIT.name] != 0:
+            raise SchemaSafetyError("New audit journal unexpectedly contains rows")
+    except Exception as exc:
+        raise SchemaSafetyError(
+            f"Audit upgrade failed; preserve original and backup: {backup_path}; "
+            f"original error: {exc}"
+        ) from exc
+    return {
+        "action": "audit_upgraded",
+        "revision": AUDIT_REVISION,
+        "backup": str(backup_path),
+        "backup_sha256": digest,
+        "preserved_rows": before["row_counts"],
+        "audit_table_empty": True,
     }
 
 
@@ -263,7 +302,7 @@ def main(argv: list[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="action", required=True)
     subparsers.add_parser("inspect", help="Read-only strict schema verification")
     subparsers.add_parser("backup", help="Consistent verified SQLite backup")
-    for action in ("adopt", "create", "upgrade"):
+    for action in ("adopt", "create", "upgrade", "upgrade-audit"):
         subparsers.add_parser(action).add_argument(
             "--confirm-offline", action="store_true",
             help="I confirm API, Vite and dispatcher are stopped",
@@ -281,6 +320,9 @@ def main(argv: list[str] | None = None) -> int:
         elif args.action == "upgrade":
             result = upgrade_existing(args.database, args.backup_dir,
                                       confirmed=args.confirm_offline)
+        elif args.action == "upgrade-audit":
+            result = upgrade_audit_existing(args.database, args.backup_dir,
+                                            confirmed=args.confirm_offline)
         else:
             result = create_new(args.database, confirmed=args.confirm_offline)
         print(json.dumps(result, indent=2, ensure_ascii=False))
