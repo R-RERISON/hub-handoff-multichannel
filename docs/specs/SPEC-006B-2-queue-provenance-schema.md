@@ -52,6 +52,24 @@ git switch --track origin/feat/006b2-segment-provenance-schema
 
 **Esperado para o banco original da POC:** 17 tabelas e `revision=null`, pois a migração é explícita. Nesse momento, **não executar upgrade no banco principal**.
 
+## Homologação automatizada com proteção contra alteração do original
+
+**Procedimento preferencial:** foi adicionado o script versionado `scripts/homologate-spec006b2.ps1` (Windows PowerShell 5.1/7). Ele automatiza a homologação abaixo, exige confirmação de serviços parados, verifica se as portas de desenvolvimento ainda estão em uso e **nunca passa o banco original aos comandos `adopt` ou `upgrade`**.
+
+```powershell
+# Com FastAPI, Vite e dispatcher parados:
+.\scripts\homologate-spec006b2.ps1 -ConfirmServicesStopped
+```
+
+O script verifica a assinatura do original (`revision=null`, 17 tabelas), cria snapshot `sqlite3.backup` com hash SHA-256, confere que o arquivo está dentro de `data/backups/homolog006b2/snapshots`, adota a baseline `006b1_poc_baseline` **somente nessa cópia**, executa upgrade `006b2_queue_provenance` nela e verifica que:
+
+- As contagens de todas as 17 tabelas legadas são idênticas antes/depois;
+- A cópia passou a conter 20 tabelas com as três novas vazias;
+- O original segue com `revision=null`, 17 tabelas e contagens preservadas;
+- Os backups pré-adoção e pré-upgrade foram criados em subpastas locais ignoradas no Git.
+
+**Não executar** `adopt --confirm-offline` ou `upgrade --confirm-offline` contra `data/handoff-poc.db` nesta etapa. O script ainda precisa passar pela execução real no Windows antes de ser considerado homologado; não enviar arquivos de backup nem tokens por chat.
+
 ## Homologação de upgrade — somente em cópia, com todos os serviços parados
 
 O banco de origem continua sem Alembic. O roteiro abaixo cria uma cópia consistente, adota a baseline **somente nela**, e aplica a 006B-2 **somente nela**, com cópias de segurança em cada passagem:
