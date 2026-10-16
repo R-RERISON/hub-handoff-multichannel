@@ -38,8 +38,15 @@ from handoff_hub.poc_db import (
     Queue,
     QueueMembership,
     SessionEvent,
+    SessionTransfer,
     make_session_factory,
     utc_now,
+)
+from handoff_hub.queue_authorization import (
+    change_grant,
+    granted_queues,
+    require_handoff,
+    require_queue,
 )
 
 
@@ -73,6 +80,13 @@ class QueueMemberUpdate(BaseModel):
 
 class CapacityUpdate(BaseModel):
     capacity: int = Field(ge=1, le=5)
+
+
+class QueueGrantUpdate(BaseModel):
+    user_id: str
+    queue_id: str
+    role: Literal["SUPERVISOR", "AUDITOR"]
+    enabled: bool
 
 
 def as_handoff(h: HandoffSession) -> dict:
@@ -128,7 +142,9 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
     ) -> Principal:
         if (legacy_test_mode and api_key and x_poc_key
                 and hmac.compare_digest(api_key, x_poc_key)):
-            return Principal("legacy-tests", "ADMIN", "demo", None, "legacy")
+            principal = Principal("legacy-tests", "ADMIN", "demo", None, "legacy")
+            request.state.principal = principal
+            return principal
         principal = get_principal(factory, authorization)
         body = None
         if request.method in ("POST", "PATCH", "PUT"):
@@ -138,6 +154,61 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
             except ValueError:
                 body = None
         assert_access(factory, principal, request, body)
+        with factory() as db:
+            path = request.url.path
+            queue_id = None
+            if path.startswith("/v1/queues/"):
+                queue_id = path.split("/")[3]
+            if path in ("/v1/dispatch/next", "/v1/dispatch/offer"):
+                queue_id = (body or {}).get("queue_id")
+            if path == "/v1/handoffs" and request.method == "POST":
+                queue_id = (body or {}).get("queue_id", DEFAULT_INTAKE_QUEUE_ID)
+            if path == "/v1/operators" and request.method != "GET":
+                raise HTTPException(403, "Cadastro de operadores reservado à administração")
+            if path.startswith("/v1/operators/") and path.endswith("/capacity"):
+                if principal.role not in ("ADMIN", "SUPERVISOR"):
+                    raise HTTPException(403, "Perfil sem permissão para capacidade")
+                if principal.role == "SUPERVISOR":
+                    operator_id = path.split("/")[3]
+                    operator = db.get(Operator, operator_id)
+                    affected = set(db.scalars(
+                        select(QueueMembership.queue_id).where(
+                            QueueMembership.operator_id == operator_id
+                        )
+                    ).all())
+                    if (operator is None or operator.operation_id != principal.operation_id
+                            or not affected or not affected.issubset(
+                                granted_queues(db, principal)
+                            )):
+                        raise HTTPException(403, "Operador participa de fila não autorizada")
+            if (path.startswith("/v1/operators/")
+                    and path.endswith("/presence")
+                    and principal.role == "SUPERVISOR"):
+                operator_id = path.split("/")[3]
+                operator = db.get(Operator, operator_id)
+                affected = set(db.scalars(
+                    select(QueueMembership.queue_id).where(
+                        QueueMembership.operator_id == operator_id
+                    )
+                ).all())
+                if (operator is None or operator.operation_id != principal.operation_id
+                        or not affected or not affected.issubset(
+                            granted_queues(db, principal)
+                        )):
+                    raise HTTPException(403, "Presença fora do escopo de filas")
+            if path == "/v1/demo/bootstrap" and principal.role != "ADMIN":
+                raise HTTPException(403, "Bootstrap demonstrativo requer administrador")
+            if queue_id and principal.role in ("SUPERVISOR", "AUDITOR"):
+                require_queue(db, principal, queue_id, manage=request.method != "GET")
+            if path.startswith("/v1/queues/") and queue_id:
+                require_queue(db, principal, queue_id, manage=request.method != "GET")
+            if path.startswith("/v1/handoffs/"):
+                handoff_id = path.split("/")[3]
+                if handoff_id and principal.role in ("SUPERVISOR", "AUDITOR"):
+                    require_handoff(db, principal, handoff_id)
+            if principal.role in ("SUPERVISOR", "AUDITOR") and path == "/v1/outbox":
+                raise HTTPException(403, "Outbox não está disponível para este papel")
+        request.state.principal = principal
         return principal
 
     app.include_router(register_identity_endpoints(factory))
@@ -186,16 +257,28 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
         return {"result": "demo_ready", "operation_id": "demo", "queue_id": "n1"}
 
     @app.get("/v1/dashboard", dependencies=[Depends(authenticate)])
-    def dashboard_snapshot():
+    def dashboard_snapshot(request: Request):
         """One read for the local cockpit; excludes message bodies and outbox payloads."""
         with factory() as db:
-            qs = db.scalars(select(Queue).order_by(Queue.id)).all()
-            ops = db.scalars(select(Operator).order_by(Operator.name)).all()
-            recent = db.scalars(
-                select(HandoffSession)
-                .order_by(HandoffSession.created_at.desc(), HandoffSession.id.desc())
-                .limit(200)
-            ).all()
+            principal = request.state.principal
+            allowed = granted_queues(db, principal)
+            qs = db.scalars(select(Queue).where(
+                Queue.id.in_(allowed)
+            ).order_by(Queue.id)).all()
+            member_ids = db.scalars(select(QueueMembership.operator_id).where(
+                QueueMembership.queue_id.in_(allowed)
+            )).all()
+            ops = db.scalars(select(Operator).where(
+                Operator.id.in_(member_ids)
+            ).order_by(Operator.name)).all()
+            query = select(HandoffSession).where(HandoffSession.queue_id.in_(allowed))
+            if principal.role in ("SUPERVISOR", "AUDITOR"):
+                query = query.where(
+                    ~HandoffSession.id.in_(select(SessionTransfer.session_id))
+                )
+            recent = db.scalars(query.order_by(
+                HandoffSession.created_at.desc(), HandoffSession.id.desc()
+            ).limit(200)).all()
             waiting_by_queue = dict(db.execute(
                 select(HandoffSession.queue_id, func.count())
                 .where(HandoffSession.status == "QUEUED")
@@ -213,12 +296,14 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
             ).all())
             active_by_operator = dict(db.execute(
                 select(HandoffSession.operator_id, func.count())
-                .where(HandoffSession.status == "ACTIVE")
+                .where(HandoffSession.status == "ACTIVE",
+                       HandoffSession.queue_id.in_(allowed))
                 .group_by(HandoffSession.operator_id)
             ).all())
             offered_by_operator = dict(db.execute(
                 select(HandoffSession.operator_id, func.count())
-                .where(HandoffSession.status == "OFFERED")
+                .where(HandoffSession.status == "OFFERED",
+                       HandoffSession.queue_id.in_(allowed))
                 .group_by(HandoffSession.operator_id)
             ).all())
             outbox_by_status = dict(db.execute(
@@ -236,15 +321,39 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
                                "active": active_by_operator.get(o.id, 0),
                                "offered": offered_by_operator.get(o.id, 0)} for o in ops],
                 "outbox": {
-                    "total": sum(outbox_by_status.values()),
-                    "pending": outbox_by_status.get("PENDING_ADAPTER", 0),
+                    "total": sum(outbox_by_status.values()) if principal.role == "ADMIN" else 0,
+                    "pending": outbox_by_status.get("PENDING_ADAPTER", 0)
+                    if principal.role == "ADMIN" else 0,
                 },
             }
 
-    @app.get("/v1/queues", dependencies=[Depends(authenticate)])
-    def queues():
+    @app.get("/v1/me/queues", dependencies=[Depends(authenticate)])
+    def my_queues(request: Request):
         with factory() as db:
-            qs = db.scalars(select(Queue).order_by(Queue.id)).all()
+            p = request.state.principal
+            allowed = granted_queues(db, p)
+            return [{"id": q.id, "name": q.name, "operation_id": q.operation_id}
+                    for q in db.scalars(select(Queue).where(
+                        Queue.id.in_(allowed)).order_by(Queue.name)).all()]
+
+    @app.patch("/v1/admin/queue-grants", dependencies=[Depends(authenticate)])
+    def update_queue_grant(request: Request, body: QueueGrantUpdate):
+        with factory.begin() as db:
+            return change_grant(db, request.state.principal,
+                                body.user_id, body.queue_id,
+                                body.role, body.enabled)
+
+    @app.get("/v1/queues", dependencies=[Depends(authenticate)])
+    def queues(request: Request):
+        with factory() as db:
+            p = request.state.principal
+            allowed = granted_queues(db, p)
+            if p.role == "OPERATOR":
+                allowed = set(db.scalars(select(QueueMembership.queue_id).where(
+                    QueueMembership.operator_id == p.operator_id
+                )).all())
+            qs = db.scalars(select(Queue).where(Queue.id.in_(allowed))
+                            .order_by(Queue.id)).all()
             return [{"id": q.id, "operation_id": q.operation_id, "name": q.name,
                      "waiting": db.scalar(select(func.count()).select_from(HandoffSession).where(
                          HandoffSession.queue_id == q.id, HandoffSession.status == "QUEUED")) or 0} for q in qs]
@@ -345,15 +454,22 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
             return {"operator_id": operator_id, "capacity": op.capacity}
 
     @app.get("/v1/operators", dependencies=[Depends(authenticate)])
-    def operators():
+    def operators(request: Request):
         with factory() as db:
-            ops = db.scalars(select(Operator).order_by(Operator.name)).all()
+            allowed = granted_queues(db, request.state.principal)
+            ids = db.scalars(select(QueueMembership.operator_id).where(
+                QueueMembership.queue_id.in_(allowed)
+            )).all()
+            ops = db.scalars(select(Operator).where(Operator.id.in_(ids))
+                            .order_by(Operator.name)).all()
             return [{"id": o.id, "operation_id": o.operation_id, "name": o.name,
                      "presence": o.presence, "capacity": o.capacity,
                      "active": db.scalar(select(func.count()).select_from(HandoffSession).where(
-                         HandoffSession.operator_id == o.id, HandoffSession.status == "ACTIVE")) or 0,
+                         HandoffSession.operator_id == o.id, HandoffSession.status == "ACTIVE",
+                         HandoffSession.queue_id.in_(allowed))) or 0,
                      "offered": db.scalar(select(func.count()).select_from(HandoffSession).where(
-                         HandoffSession.operator_id == o.id, HandoffSession.status == "OFFERED")) or 0} for o in ops]
+                         HandoffSession.operator_id == o.id, HandoffSession.status == "OFFERED",
+                         HandoffSession.queue_id.in_(allowed))) or 0} for o in ops]
 
     @app.patch("/v1/operators/{operator_id}/presence", dependencies=[Depends(authenticate)])
     def update_presence(operator_id: str, body: PresenceUpdate):
@@ -392,10 +508,18 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
             return as_handoff(h)
 
     @app.get("/v1/handoffs", dependencies=[Depends(authenticate)])
-    def handoffs():
+    def handoffs(request: Request):
         with factory() as db:
-            return [as_handoff(h) for h in db.scalars(select(HandoffSession).order_by(
-                HandoffSession.created_at.desc(), HandoffSession.id.desc()).limit(200)).all()]
+            allowed = granted_queues(db, request.state.principal)
+            query = select(HandoffSession).where(HandoffSession.queue_id.in_(allowed))
+            if request.state.principal.role in ("SUPERVISOR", "AUDITOR"):
+                query = query.where(
+                    ~HandoffSession.id.in_(select(SessionTransfer.session_id))
+                )
+            return [as_handoff(h) for h in db.scalars(
+                query.order_by(HandoffSession.created_at.desc(), HandoffSession.id.desc())
+                .limit(200)
+            ).all()]
 
     @app.post("/v1/dispatch/next", dependencies=[Depends(authenticate)])
     def dispatch_next(body: DispatchRequest):

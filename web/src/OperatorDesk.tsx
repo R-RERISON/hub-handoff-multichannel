@@ -14,6 +14,16 @@ type Work = {
   active: Handoff[]
 }
 type ChatMessage = {id: string; content: string; sender: string; created_at: string}
+type TransferTarget = {id: string; name: string}
+type TransferTargetResponse = {session_id: string; source_queue_id: string; destinations: TransferTarget[]}
+type TransferNote = {
+  from_queue_id: string; to_queue_id: string; operator_id: string; reason: string; at: string
+  from_operator_name?: string; from_queue_name?: string; to_queue_name?: string
+}
+type TimelineResponse = {
+  events: {type:string;actor:string}[]
+  transfers: TransferNote[]
+}
 type Api = (path: string, method?: string, body?: object, extra?: Record<string,string>)=>Promise<any>
 type Props = {
   operators: Operator[]
@@ -39,7 +49,9 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
   const [selectedId,setSelectedId] = useState<string|null>(null)
   const [messages,setMessages] = useState<ChatMessage[]>([])
   const [reply,setReply] = useState('')
-  const [targetQueue,setTargetQueue] = useState('n2')
+  const [targetQueue,setTargetQueue] = useState('')
+  const [transferTargets,setTransferTargets] = useState<TransferTarget[]>([])
+  const [transferLoading,setTransferLoading] = useState(false)
   const [transferReason,setTransferReason] = useState('Encaminhamento para a equipe especializada')
   const [transferOpen,setTransferOpen] = useState(false)
   const [auditOpen,setAuditOpen] = useState(false)
@@ -48,8 +60,16 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
   const [error,setError] = useState('')
   const [notice,setNotice] = useState('')
   const [timeline,setTimeline] = useState<string[]>([])
+  const [transferNotes,setTransferNotes] = useState<TransferNote[]>([])
+  const [offerTransfer,setOfferTransfer] = useState<TransferNote|null>(null)
   const selected = work?.active.find(h=>h.id===selectedId) ?? null
-  const queueTitle = (id:string) => queues.find(q=>q.id===id)?.name ?? id
+  const queueTitle = (id:string) => transferTargets.find(q=>q.id===id)?.name
+    ?? queues.find(q=>q.id===id)?.name ?? id
+  const latestTransfer = transferNotes.at(-1)??null
+  const transferHeading = (note:TransferNote) =>
+    (note.from_queue_name??note.from_queue_id)+' → '+(note.to_queue_name??note.to_queue_id)
+  const transferAuthor = (note:TransferNote) =>
+    note.from_operator_name??note.operator_id
 
   useEffect(()=>setOperatorId(preferredOperatorId),[preferredOperatorId])
   useEffect(()=>{browserAlertsRef.current=browserAlerts},[browserAlerts])
@@ -91,18 +111,59 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
   },[reload])
 
   useEffect(()=>{
-    if(!selectedId) {setMessages([]);setTimeline([]);return}
+    if(!selectedId) {setMessages([]);setTimeline([]);setTransferNotes([]);return}
     let cancelled=false
+    setTransferNotes([])
     Promise.all([
       api('/v1/handoffs/'+selectedId+'/messages'),
       api('/v1/handoffs/'+selectedId+'/timeline'),
-    ]).then(([msgs,history])=>{
+    ]).then(([msgs,history]:[ChatMessage[],TimelineResponse])=>{
       if(cancelled)return
       setMessages(msgs)
-      setTimeline((history.events as {type:string;actor:string}[]).map(e=>e.type+' · '+e.actor))
+      setTimeline(history.events.map(e=>e.type+' · '+e.actor))
+      setTransferNotes(history.transfers??[])
     }).catch(e=>{if(!cancelled)setError((e as Error).message)})
     return ()=>{cancelled=true}
   },[selectedId,api])
+
+  // Show the previous operator's handoff note before the new operator accepts.
+  // A transfer note is INTERNAL metadata, never a message to the end user.
+  useEffect(()=>{
+    if(!alertOffer){setOfferTransfer(null);return}
+    let cancelled=false
+    setOfferTransfer(null)
+    void api('/v1/handoffs/'+encodeURIComponent(alertOffer.session_id)+'/timeline')
+      .then((history:TimelineResponse)=>{
+        if(!cancelled)setOfferTransfer(history.transfers?.at(-1)??null)
+      })
+      .catch(()=>{if(!cancelled)setOfferTransfer(null)})
+    return ()=>{cancelled=true}
+  },[alertOffer?.session_id,api])
+
+  // Destinations are NOT operator dispatch memberships. Load only for the
+  // currently owned conversation and invalidate stale requests on selection changes.
+  useEffect(()=>{
+    if(!transferOpen || !selectedId){
+      setTransferTargets([])
+      setTargetQueue('')
+      setTransferLoading(false)
+      return
+    }
+    let cancelled=false
+    setTransferLoading(true)
+    setTransferTargets([])
+    setTargetQueue('')
+    void api('/v1/handoffs/'+encodeURIComponent(selectedId)+'/transfer-targets')
+      .then((result:TransferTargetResponse)=>{
+        if(cancelled)return
+        const destinations=result.destinations??[]
+        setTransferTargets(destinations)
+        setTargetQueue(destinations[0]?.id??'')
+      })
+      .catch(e=>{if(!cancelled)setError((e as Error).message)})
+      .finally(()=>{if(!cancelled)setTransferLoading(false)})
+    return ()=>{cancelled=true}
+  },[api,selectedId,transferOpen])
 
   // Keep the active conversation fresh independently of offer notifications.
   useEffect(()=>{
@@ -128,6 +189,8 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
       await reload()
       await onChanged()
       if(select!==undefined){
+        setTransferNotes([])
+        setTimeline([])
         setSelectedId(select)
         setMobilePanel(select?'chat':'work')
       }
@@ -163,6 +226,11 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
         <h2 id="offer-dialog-title">Você recebeu um atendimento</h2>
         <p id="offer-dialog-text"><strong>{alertOffer.requester_label}</strong>
           <span>{alertOffer.subject} · {queueTitle(alertOffer.queue_id)}</span></p>
+        {offerTransfer&&<div className="offer-dialog__transfer-note" role="note">
+          <strong><ArrowRightLeft size={14}/> Orientação interna da transferência</strong>
+          <small>{transferHeading(offerTransfer)} · {transferAuthor(offerTransfer)}</small>
+          <p>{offerTransfer.reason}</p>
+        </div>}
         <p className="offer-dialog__hint">A oferta expira em até dois minutos. Se não for aceita, retorna à fila.</p>
         <div className="offer-dialog__buttons">
           <button className="outline" disabled={busy} onClick={()=>void execute(
@@ -251,7 +319,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
         <div className="desk-block-header">EM ATENDIMENTO <span>{activeCount}</span></div>
         {!activeCount&&<div className="desk-empty desk-empty--small">Nenhum atendimento ativo para este operador.</div>}
         {work?.active.map(h=><button className={'desk-active '+(selectedId===h.id?'desk-active--selected':'')}
-          key={h.id} onClick={()=>{setSelectedId(h.id);setMobilePanel('chat')}}>
+          key={h.id} onClick={()=>{setTransferOpen(false);setTransferNotes([]);setTimeline([]);setSelectedId(h.id);setMobilePanel('chat')}}>
           <div className="avatar">{h.requester_label.slice(0,2).toUpperCase()}</div>
           <div><b>{h.requester_label}</b><p>{h.subject}</p><small>{queueTitle(h.queue_id)}</small></div>
           <MessageSquareText size={17}/>
@@ -278,22 +346,40 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
           aria-label="Transferência de atendimento">
           <label htmlFor="transfer-destination">Fila de destino</label>
           <select id="transfer-destination" value={targetQueue}
+            disabled={busy||transferLoading||transferTargets.length===0}
             onChange={e=>setTargetQueue(e.target.value)}>
-            {queues.map(q=><option value={q.id} key={q.id}>{q.name}</option>)}
+            {transferLoading?<option value="">Carregando destinos...</option>
+              :transferTargets.length===0?<option value="">Nenhuma fila disponível</option>
+              :transferTargets.map(q=><option value={q.id} key={q.id}>{q.name}</option>)}
           </select>
           <input value={transferReason} onChange={e=>setTransferReason(e.target.value)}
             maxLength={300} aria-label="Motivo da transferência" placeholder="Motivo da transferência"/>
-          <button className="primary small" disabled={busy||transferReason.trim().length<3}
+          <button className="primary small"
+            disabled={busy||transferLoading||!transferTargets.some(q=>q.id===targetQueue)
+              ||transferReason.trim().length<3}
             onClick={()=>void execute(
               ()=>api('/v1/handoffs/'+selected.id+'/transfer','POST',{
                 operator_id:operatorId,queue_id:targetQueue,reason:transferReason.trim(),
               }), 'Atendimento transferido para '+queueTitle(targetQueue)+'.',null
             )}>Confirmar transferência</button>
         </div>}
-        {auditOpen&&<div className="desk-audit-panel"><b>Histórico auditável</b>
+        {auditOpen&&<div className="desk-audit-panel">
+          <b>Histórico auditável</b>
           <span>{timeline.slice(-6).join('  •  ') || 'Aguardando eventos'}</span>
+          {transferNotes.length>0&&<div className="desk-audit-transfers">
+            {transferNotes.map((note,i)=><p key={note.at+'-'+i}>
+              <strong>{transferHeading(note)} · {transferAuthor(note)}:</strong> {note.reason}
+            </p>)}
+          </div>}
         </div>}
         <div className="desk-chat-list" ref={messagePaneRef}>
+          {latestTransfer&&<div className="desk-handoff-note" role="note">
+            <strong><ArrowRightLeft size={14}/> Orientação interna recebida</strong>
+            <small>{transferHeading(latestTransfer)} · {transferAuthor(latestTransfer)}
+              {' · '}{labelTime(latestTransfer.at)}</small>
+            <p>{latestTransfer.reason}</p>
+            <span>Nota de transferência — não enviada ao usuário final</span>
+          </div>}
           <div className="chat-notice">CONVERSA SIMULADA · NÃO ENVIADA AO TEAMS</div>
           {!messages.length&&<div className="empty">Nenhuma mensagem registrada nesta conversa.</div>}
           {messages.map(m=><div key={m.id} className={'bubble-row '+(m.sender==='OPERATOR'?'right':'')}>

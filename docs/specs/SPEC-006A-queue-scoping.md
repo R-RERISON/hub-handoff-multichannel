@@ -1,0 +1,126 @@
+# SPEC-006A — Concessões por fila e isolamento de consultas
+
+**Implementação inicial, aguardando homologação local.**  
+Base: `feat/005-rbac-auto-dispatch`; PR separado da POC 0.5.  
+Constituição e planejamento: `docs/architecture/RFC-006-enterprise-operating-model.md` (branch de RFC) e SPEC-006 a SPEC-013.
+
+## Objetivo
+
+Criar a primeira camada de segurança que faltava na POC: papel SUPERVISOR/AUDITOR **não implica acesso a todas as filas**. O backend valida a fila por requisição e filtra listagens/contadores antes de serializar a resposta. Operadores mantêm vínculo pessoal e o fluxo original de atendimento.
+
+## Entregas efetivas nesta etapa
+
+1. `queue_role_grants` — concessões explícitas `(user_id, queue_id, role)` com autor e data. Não se confunde com `queue_memberships` (habilitação para distribuição).
+2. `queue_authorization.py` — serviços `granted_queues`, `require_queue`, `require_handoff` e `change_grant`; verificação de operação e papel.
+3. `GET /v1/me/queues` — filas autorizadas do usuário em sessão.
+4. `PATCH /v1/admin/queue-grants` — administrador concede/revoga permissões ao supervisor/auditor, validando operação e papel.
+5. Scoping server-side em dashboard, filas, operadores, lista de atendimentos, histórico de mensagens/timeline e gestão de equipe.
+6. Capacidade e presença: supervisores só ajustam operador quando **todas** as filas às quais ele pertence estão em seu escopo. A capacidade é global do operador; permitir alteração de uma única fila com efeitos nas demais seria inseguro.
+7. Acesso a `/v1/outbox` negado a supervisor/auditor; não compartilhar payloads externos.
+8. Historicamente transferidos: sem modelo de segmento ainda, **o backend nega todo o histórico do ticket** para supervisores/auditores, inclusive ao possuir a fila atual. A listagem de tickets não expõe o ticket transferido aos papéis escopados. Isso é temporário e intencional; a SPEC-006B implementará leitura por segmento sem exibir indevidamente N1 a N2.
+9. Contas demonstrativas: supervisor recebe N1/N2, auditor recebe somente N1. Seed registrado em `demo_seed_revisions` apenas uma vez; revogações administrativas não são refeitas após reinício.
+10. Testes de isolamento/IDOR e não regressão adicionados em `tests/test_queue_scopes.py`, com auditor N1 e chamadas diretas à API, supervisor revogado, usuário de outra fila, transferência e contadores.
+
+## Limitações conhecidas desta entrega
+
+- O modelo `AuthUser.role` ainda representa somente um papel principal; a SPEC-006B evoluirá os grants para múltiplos papéis por usuário, validade e autorização de segmentos.
+- `Base.metadata.create_all` continua usado na POC e cria a nova tabela adicional; **isso não é Alembic nem é um processo de migração de produção**. Não publicar fora de localhost.
+- Enquanto não houver segmentos, auditor/supervisor não conseguem ler o histórico completo de tickets transferidos. Não fazer workaround que libere conteúdos de outra fila.
+- A administração dos grants é uma API inicial, sem UI, versionamento formal nem log imutável de revogação. Esses itens são gates antes de produção.
+- Os testes foram adicionados ao repositório; execução Pytest/Ruff/frontend no Windows ainda é necessária.
+
+## Gates de aceitação — obrigatórios antes de promover
+
+- [ ] `.\start.cmd --check`: todos os testes Python, Ruff e frontend.
+- [ ] Auditor N1 vê exclusivamente filas e tickets N1; chamada direta a mensagens N2 retorna 404.
+- [ ] Supervisor N1 não muda membro da fila N2, não vê rotação N2, não cadastra ticket N2.
+- [ ] Revogação do grant em sessão já autenticada bloqueia a próxima consulta.
+- [ ] Supervisão ainda ajusta capacidade/presença de seus operadores sem afetar indevidamente outras filas.
+- [ ] Ticket transferido não expõe histórico N1/N2 integral a supervisores/auditores.
+- [ ] Login Ana/Bruno, N1 default, distribuição, oferta, chat, transferência e fechamento continuam funcionais.
+- [ ] Banco existente não perde contas, senha, tickets, eventos ou fila.
+- [ ] Nenhum GitHub Actions.
+
+## Homologação Windows
+
+```powershell
+cd C:\Projetos\hub-handoff\hub-handoff-multichannel
+git status --short
+git fetch origin
+git switch --track origin/feat/006-queue-scoped-authorization
+git pull --ff-only origin feat/006-queue-scoped-authorization
+.\start.cmd --check
+.\start.cmd
+```
+
+Se branch já existir localmente, usar `git switch feat/006-queue-scoped-authorization`. Não apagar SQLite, não redefinir senhas e não utilizar dados reais.
+
+
+## Homologação PowerShell confiável (Windows 5.1/7)
+
+Usar preferencialmente o script versionado `scripts/homologate-spec006a.ps1` em vez de copiar etapas isoladas manualmente. A função `Invoke-JsonApi` converte JSON explicitamente em bytes UTF-8 e usa Content-Type com `charset=utf-8`. Essa codificação evita a falha observada no Windows PowerShell 5.1 ao enviar textos acentuados: `{"detail":"There was an error parsing the body"}`.
+
+Pré-requisito: `.\start.cmd` executando no primeiro terminal; dados sintéticos e contas locais prontas. Em **outro** PowerShell:
+
+```powershell
+cd C:\Projetos\hub-handoff\hub-handoff-multichannel
+git pull --ff-only origin feat/006-queue-scoped-authorization
+
+# Baseline de grants, novo ticket N2, isolamento do Auditor,
+# inspeção somente leitura de Ana/Bruno.
+.\scripts\homologate-spec006a.ps1
+
+# Fase opcional: revoga N2 do supervisor, testa os 403/404
+# com a mesma sessão e RESTAURA o grant em finally.
+.\scripts\homologate-spec006a.ps1 -TestSupervisorRevocation
+```
+
+O script **não imprime senhas nem bearer tokens**. Ele NÃO altera membership dos operadores ou capacidades. Gera ticket sintético N2, que fica registrado no SQLite. A revogação é temporária e tenta restaurar N2 em `finally`, inclusive em caso de falha nas asserções. Se houver falha de conexão durante a restauração, conferir o grant antes de continuar.
+
+### Interpretação dos erros da homologação manual anterior
+
+- Um supervisor do seed de teste **já possui N1 e N2**. Esperar 404 para N2 **sem revogar a concessão** é um falso negativo, não evidência de falha do RBAC.
+- O parâmetro `user_id` é o `id` de `GET /v1/auth/me`; executar essa consulta antes de PATCH de grants. Variável PowerShell não inicializada gera JSON null e 422.
+- Um `PATCH /v1/queues/n2/members/op-ana` com `{"enabled":true}` enquanto N2 ainda está concedida **adiciona Ana a N2**. Um PATCH de `capacity=2` para Bruno muda sua capacidade global. Verificar e corrigir apenas se essas alterações foram acidentais e não existirem sessões afetadas.
+- A restauração de member com `{"enabled":false}` pode retornar **409** se Ana possuir oferta ou sessão ativa em N2. Encerrar/transferir por fluxo operacional antes; não forçar limpeza no SQLite.
+
+A validação automatizada da branch no Windows resultou em **55 testes Python aprovados**, Ruff, 7 testes frontend e Vite aprovados no commit `1c6a00d`. O script adicional de homologação é novo e ainda exige execução local.
+
+## Hotfix de homologação — Transferência N1 → N2
+
+**Diagnóstico confirmado por captura de tela:** após SPEC-006A, o operador Ana recebia `GET /v1/queues` com somente N1, conforme a política correta de membership. Entretanto, `OperatorDesk.tsx` utilizava a mesma coleção para o seletor de **Transferir**; com isso N2 não aparecia e o teste ponta a ponta ficava bloqueado.
+
+**Correção implementada:**
+- `GET /v1/queues` **continua** mostrando apenas filas de associação do operador para distribuição; não ampliar este endpoint, sob risco de regressão de RBAC.
+- Novo `GET /v1/handoffs/{id}/transfer-targets`, exclusivo do operador responsável pelo atendimento e sujeito ao estado ACTIVE. Retorna filas diferentes da atual, da mesma operação; esta POC ainda não tem status/engine formal de habilitação de destinos, previsto para SPEC-007/008.
+- A Mesa carrega os destinos ao abrir o formulário de transferência, sem depender de `snapshot.queues`. Loading, ausência de destinos e seleções inválidas desativam Confirmar. Troca de atendimento fecha o formulário antigo.
+- `POST /v1/handoffs/{id}/transfer` passa a rejeitar auto-transferência para a mesma fila (422), além de continuar rejeitando fila de outra operação (422).
+- Testes Python: Ana N1 pode descobrir N2; Bruno/supervisor/auditor/admin não podem consultar destinos da sessão dela; transferência para N2 funciona sem associação N2; nunca incluir fila de outra operação; listagem de membership de Ana permanece N1.
+- Teste de arquitetura frontend verifica que o dropdown não usa mais `queues.map`.
+
+**Gates manuais adicionais:** no navegador da Ana abrir Transferir em atendimento N1 → **Suporte N2 aparece como destino**, e Suporte N1 não aparece como destino redundante. Transferir → o atendimento sai de Ana, fica QUEUED em N2 e é ofertado automaticamente a Bruno disponível; confirmar aceite e fechamento. Sem alteração do banco ou reset de contas necessário.
+
+**Status:** correção publicada na branch; os novos testes e o build ainda dependem de `.\\start.cmd --check` no Windows, e o fluxo deve ser homologado antes de promover a SPEC-006A.
+
+## Hotfix UX — motivo da transferência chega ao próximo operador
+
+**Feedback da homologação:** o encaminhamento Ana/N1 → Bruno/N2 passou a funcionar. O usuário solicitou que o texto informado no campo de motivo acompanhasse o chamado, inclusive quando o segundo operador assume o atendimento.
+
+**Diagnóstico de código:** `POST /v1/handoffs/{id}/transfer` **já persistia** `SessionTransfer.reason` em `session_transfers`. A API `GET /v1/handoffs/{id}/timeline` já devolvia o campo em `transfers`, mas a Mesa do Operador descartava os detalhes de transferência e mostrava apenas `events.type` e `events.actor`. Não houve perda nem omissão de armazenamento da nota: apenas ausência de apresentação.
+
+**Mudança aditiva:** o backend passa a incluir nomes legíveis de operador de origem/fila origem/fila destino na `timeline.transfers` sem remover campos existentes. A Mesa mostra a nota interna na **oferta pendente** e no **topo da conversa após aceite**, com motivo, remetente e filas; o Histórico exibe todas as notas vinculadas ao atendimento. O texto permanece **exclusivamente em `session_transfers`**, não é enviado como mensagem ao usuário final, bot/Teams ou outbox.
+
+**Segurança:** a oferta e o histórico são consultados somente pelo operador atribuído; a proibição temporária de histórico transferido para supervisor/auditor da SPEC-006A permanece. Notas de transferência não equivalem a autorizações para acessar conversas de outras filas.
+
+**Gates adicionais:** conferir a nota ao receber uma oferta transferida; confirmar a mesma nota após aceite; garantir que `GET /messages` não inclua a justificativa como mensagem; preservar composer sempre visível e botão Encerrar; testar troca/recarregamento de conversa. Novos testes de contrato frontend e de API foram adicionados. Status: publicado na branch, **aguardando `.\\start.cmd --check` e homologação visual no Windows**.
+
+## Próxima fatia: SPEC-006B
+
+1. Alembic (migration baseline segura para banco SQLite já populado, scripts backup/restore);
+2. `role_assignments` com papéis independentes e escopo por operação/fila;
+3. `session_queue_segments` e provenance por mensagem/evento, inclusive transferência;
+4. Logs append-only de decisões e leituras confidenciais;
+5. Paginação e filtros seguros para auditores;
+6. Regresso das visualizações históricas agora segmentadas, com testes negativos.
+
+**Não começar SPEC-007 Administração completa antes da homologação e do isolamento correto da SPEC-006.**
