@@ -202,6 +202,16 @@ class LoginThrottle(Base):
 
 
 
+
+class DemoSeedRevision(Base):
+    """Apply baseline demo routing changes only once per SQLite database."""
+
+    __tablename__ = "demo_seed_revisions"
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    applied_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+
 class DispatchTurn(Base):
     """Queue-scoped round-robin position, durable across service restarts."""
 
