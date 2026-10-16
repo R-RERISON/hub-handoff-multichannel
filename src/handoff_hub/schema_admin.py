@@ -21,8 +21,11 @@ from sqlalchemy.dialects import sqlite
 from sqlalchemy.engine import URL
 
 from handoff_hub.poc_db import Base
+from handoff_hub.provenance_schema import PROVENANCE_TABLES
 
 BASELINE_REVISION = "006b1_poc_baseline"
+PROVENANCE_REVISION = "006b2_queue_provenance"
+LATEST_REVISION = PROVENANCE_REVISION
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DB = PROJECT_ROOT / "data" / "handoff-poc.db"
 DEFAULT_BACKUPS = PROJECT_ROOT / "data" / "backups"
@@ -61,7 +64,18 @@ def verify_database(path: Path) -> dict:
         }
         existing_version = "alembic_version" in actual_tables
         actual_tables.discard("alembic_version")
-        expected_tables = set(Base.metadata.tables)
+        version = None
+        if existing_version:
+            rows = db.execute("SELECT version_num FROM alembic_version").fetchall()
+            if len(rows) != 1 or rows[0][0] not in (
+                BASELINE_REVISION, PROVENANCE_REVISION,
+            ):
+                raise SchemaSafetyError("Unexpected Alembic revision: manual review required")
+            version = rows[0][0]
+        signature_tables = list(Base.metadata.sorted_tables)
+        if version == PROVENANCE_REVISION:
+            signature_tables.extend(PROVENANCE_TABLES)
+        expected_tables = {table.name for table in signature_tables}
         if actual_tables != expected_tables:
             missing = sorted(expected_tables - actual_tables)
             unknown = sorted(actual_tables - expected_tables)
@@ -69,7 +83,7 @@ def verify_database(path: Path) -> dict:
                 f"Unrecognized POC schema; missing tables={missing}; extra tables={unknown}"
             )
         dialect = sqlite.dialect()
-        for table in Base.metadata.sorted_tables:
+        for table in signature_tables:
             current = {
                 row[1]: row for row in _pragma(db, "table_info", table.name)
             }
@@ -111,12 +125,6 @@ def verify_database(path: Path) -> dict:
             if expected_fk != actual_fk:
                 raise SchemaSafetyError(f"Foreign key mismatch in {table.name}")
 
-        version = None
-        if existing_version:
-            rows = db.execute("SELECT version_num FROM alembic_version").fetchall()
-            if len(rows) != 1 or rows[0][0] != BASELINE_REVISION:
-                raise SchemaSafetyError("Unexpected Alembic revision: manual review required")
-            version = rows[0][0]
         counts = {
             table: db.execute(f'SELECT count(*) FROM "{table}"').fetchone()[0]
             for table in sorted(expected_tables)
@@ -194,6 +202,45 @@ def adopt_existing(database: Path, backup_dir: Path, *, confirmed: bool) -> dict
     }
 
 
+def upgrade_existing(database: Path, backup_dir: Path, *, confirmed: bool) -> dict:
+    """Upgrade only a correctly stamped 006B-1 SQLite database, with backup."""
+    if not confirmed:
+        raise SchemaSafetyError("Explicit --confirm-offline is required")
+    before = verify_database(database)
+    if before["revision"] != BASELINE_REVISION:
+        raise SchemaSafetyError(
+            "Upgrade requires a verified 006b1_poc_baseline revision; "
+            "unversioned or already-upgraded databases are not eligible"
+        )
+    backup_path, digest = verified_backup(database, backup_dir)
+    try:
+        command.upgrade(_config(database), LATEST_REVISION)
+        after = verify_database(database)
+        if after["revision"] != LATEST_REVISION:
+            raise SchemaSafetyError("Alembic did not record the expected revision")
+        if any(after["row_counts"].get(name) != count
+               for name, count in before["row_counts"].items()):
+            raise SchemaSafetyError("A legacy row count changed during migration")
+        if any(after["row_counts"][table.name] != 0
+               for table in PROVENANCE_TABLES):
+            raise SchemaSafetyError("Unexpected nonempty provenance table")
+    except Exception as exc:
+        raise SchemaSafetyError(
+            f"Upgrade failed. STOP and restore only from verified backup: "
+            f"{backup_path}; original error: {exc}"
+        ) from exc
+    return {
+        "action": "upgraded",
+        "revision": LATEST_REVISION,
+        "backup": str(backup_path),
+        "backup_sha256": digest,
+        "preserved_rows": {
+            name: after["row_counts"][name] for name in before["row_counts"]
+        },
+        "provenance_tables_empty": True,
+    }
+
+
 def create_new(database: Path, *, confirmed: bool) -> dict:
     if not confirmed:
         raise SchemaSafetyError("Explicit --confirm-offline is required")
@@ -202,8 +249,8 @@ def create_new(database: Path, *, confirmed: bool) -> dict:
     database.parent.mkdir(parents=True, exist_ok=True)
     command.upgrade(_config(database), "head")
     outcome = verify_database(database)
-    if outcome["revision"] != BASELINE_REVISION:
-        raise SchemaSafetyError("New database failed baseline verification")
+    if outcome["revision"] != LATEST_REVISION:
+        raise SchemaSafetyError("New database failed schema verification")
     return {"action": "created", "database": str(database), **outcome}
 
 
@@ -216,7 +263,7 @@ def main(argv: list[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="action", required=True)
     subparsers.add_parser("inspect", help="Read-only strict schema verification")
     subparsers.add_parser("backup", help="Consistent verified SQLite backup")
-    for action in ("adopt", "create"):
+    for action in ("adopt", "create", "upgrade"):
         subparsers.add_parser(action).add_argument(
             "--confirm-offline", action="store_true",
             help="I confirm API, Vite and dispatcher are stopped",
@@ -231,6 +278,9 @@ def main(argv: list[str] | None = None) -> int:
         elif args.action == "adopt":
             result = adopt_existing(args.database, args.backup_dir,
                                     confirmed=args.confirm_offline)
+        elif args.action == "upgrade":
+            result = upgrade_existing(args.database, args.backup_dir,
+                                      confirmed=args.confirm_offline)
         else:
             result = create_new(args.database, confirmed=args.confirm_offline)
         print(json.dumps(result, indent=2, ensure_ascii=False))

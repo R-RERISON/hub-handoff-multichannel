@@ -2,9 +2,12 @@
 from alembic import context
 from sqlalchemy import create_engine, pool
 
-from handoff_hub.poc_db import Base
-
-target_metadata = Base.metadata
+# SPEC-006B-2 uses explicit reviewed DDL only. Base.metadata contains the
+# 17 legacy POC tables, while migration-owned provenance tables are intentionally
+# outside Base to prevent implicit create_all. Pointing autogenerate at Base
+# would incorrectly propose DROPPING those provenance tables.
+# Autogenerate is disabled until metadata is safely unified in a later SPEC.
+target_metadata = None
 
 
 def run_migrations_online() -> None:
