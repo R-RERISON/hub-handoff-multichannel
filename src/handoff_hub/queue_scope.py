@@ -15,6 +15,7 @@ from handoff_hub.poc_db import (
     Queue,
     QueueMembership,
     QueueRoleGrant,
+    SessionTransfer,
 )
 
 SCOPED_ROLES = frozenset({"SUPERVISOR", "AUDITOR"})
@@ -62,7 +63,21 @@ def require_handoff(db: Session, principal, handoff_id: str) -> HandoffSession:
         if h.operator_id != principal.operator_id:
             raise HTTPException(404, "Atendimento não encontrado")
     else:
+        allowed = permitted_queues(db, principal)
         require_queue(db, principal, h.queue_id)
+        if principal.role in SCOPED_ROLES:
+            # Until messages/events are backfilled with explicit queue segments,
+            # deny the entire content/timeline of a transferred session unless
+            # *all* its historical queues are granted. Never leak N1 via N2.
+            route = db.execute(
+                select(SessionTransfer.from_queue_id, SessionTransfer.to_queue_id)
+                .where(SessionTransfer.session_id == handoff_id)
+            ).all()
+            if any(
+                from_queue not in allowed or to_queue not in allowed
+                for from_queue, to_queue in route
+            ):
+                raise HTTPException(404, "Atendimento não encontrado")
     return h
 
 
