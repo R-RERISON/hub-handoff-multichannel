@@ -175,6 +175,24 @@ class AuthUser(Base):
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
 
 
+
+class QueueRoleGrant(Base):
+    """Authorization by queue, independent of dispatch membership.
+
+    A principal can hold grants in several queues. Grants are checked against
+    live database state at every request; a UI filter is never authoritative.
+    """
+
+    __tablename__ = "queue_role_grants"
+    user_id: Mapped[str] = mapped_column(ForeignKey("auth_users.id"), primary_key=True)
+    queue_id: Mapped[str] = mapped_column(ForeignKey("queues.id"), primary_key=True)
+    role: Mapped[str] = mapped_column(String(24), primary_key=True)
+    granted_by: Mapped[str] = mapped_column(String(80), nullable=False, default="system")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    __table_args__ = (Index("ix_queue_role_grants_queue_role", "queue_id", "role"),)
+
+
+
 class AuthSession(Base):
     """Opaque bearer token is SHA-256 hashed; no plaintext tokens in SQLite."""
 
