@@ -34,6 +34,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
   const notified = useRef(new Set<string>())
   const browserAlertsRef = useRef(false)
   const acceptButtonRef = useRef<HTMLButtonElement|null>(null)
+  const messagePaneRef = useRef<HTMLDivElement|null>(null)
   const [work,setWork] = useState<Work|null>(null)
   const [selectedId,setSelectedId] = useState<string|null>(null)
   const [messages,setMessages] = useState<ChatMessage[]>([])
@@ -116,6 +117,10 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
     return ()=>{cancelled=true;window.clearInterval(interval)}
   },[selectedId,api])
 
+  useEffect(()=>{
+    if(messagePaneRef.current)messagePaneRef.current.scrollTop=messagePaneRef.current.scrollHeight
+  },[selectedId,messages.length])
+
   async function execute(action:()=>Promise<any>,success:string,select?:string|null) {
     setBusy(true);setError('');setNotice('')
     try{
@@ -124,7 +129,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
       await onChanged()
       if(select!==undefined){
         setSelectedId(select)
-        if(select)setMobilePanel('chat')
+        setMobilePanel(select?'chat':'work')
       }
       setTransferOpen(false)
       setNotice(success)
@@ -288,7 +293,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
         {auditOpen&&<div className="desk-audit-panel"><b>Histórico auditável</b>
           <span>{timeline.slice(-6).join('  •  ') || 'Aguardando eventos'}</span>
         </div>}
-        <div className="desk-chat-list">
+        <div className="desk-chat-list" ref={messagePaneRef}>
           <div className="chat-notice">CONVERSA SIMULADA · NÃO ENVIADA AO TEAMS</div>
           {!messages.length&&<div className="empty">Nenhuma mensagem registrada nesta conversa.</div>}
           {messages.map(m=><div key={m.id} className={'bubble-row '+(m.sender==='OPERATOR'?'right':'')}>
