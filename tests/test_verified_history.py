@@ -3,13 +3,12 @@
 All data is synthetic and every DB is created under tmp_path.
 """
 from fastapi.testclient import TestClient
-from sqlalchemy import select, update
+from sqlalchemy import select, text, update
 
 from handoff_hub.poc_api import create_app
 from handoff_hub.poc_db import (
     AuthUser,
     HandoffSession,
-    Message,
     SessionEvent,
     make_session_factory,
 )
@@ -221,5 +220,9 @@ def test_original_unversioned_db_never_unlocks_history(tmp_path):
         assert client.get(f"{BASE}/{hid}/messages", headers=supervisor).status_code == 403
         assert client.get(f"{BASE}/{hid}/timeline", headers=supervisor).status_code == 403
     with factory() as db:
-        names = set(db.execute(select(Message.__table__.name)).all()) if False else None
-        assert names is None  # No write path is invoked by verified-history reads.
+        tables = set(db.scalars(text(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        )).all())
+        assert len(tables) == 17
+        assert "session_queue_segments" not in tables
+        assert "alembic_version" not in tables
