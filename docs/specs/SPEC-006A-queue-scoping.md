@@ -55,6 +55,37 @@ git pull --ff-only origin feat/006-queue-scoped-authorization
 
 Se branch já existir localmente, usar `git switch feat/006-queue-scoped-authorization`. Não apagar SQLite, não redefinir senhas e não utilizar dados reais.
 
+
+## Homologação PowerShell confiável (Windows 5.1/7)
+
+Usar preferencialmente o script versionado `scripts/homologate-spec006a.ps1` em vez de copiar etapas isoladas manualmente. A função `Invoke-JsonApi` converte JSON explicitamente em bytes UTF-8 e usa Content-Type com `charset=utf-8`. Essa codificação evita a falha observada no Windows PowerShell 5.1 ao enviar textos acentuados: `{"detail":"There was an error parsing the body"}`.
+
+Pré-requisito: `.\start.cmd` executando no primeiro terminal; dados sintéticos e contas locais prontas. Em **outro** PowerShell:
+
+```powershell
+cd C:\Projetos\hub-handoff\hub-handoff-multichannel
+git pull --ff-only origin feat/006-queue-scoped-authorization
+
+# Baseline de grants, novo ticket N2, isolamento do Auditor,
+# inspeção somente leitura de Ana/Bruno.
+.\scripts\homologate-spec006a.ps1
+
+# Fase opcional: revoga N2 do supervisor, testa os 403/404
+# com a mesma sessão e RESTAURA o grant em finally.
+.\scripts\homologate-spec006a.ps1 -TestSupervisorRevocation
+```
+
+O script **não imprime senhas nem bearer tokens**. Ele NÃO altera membership dos operadores ou capacidades. Gera ticket sintético N2, que fica registrado no SQLite. A revogação é temporária e tenta restaurar N2 em `finally`, inclusive em caso de falha nas asserções. Se houver falha de conexão durante a restauração, conferir o grant antes de continuar.
+
+### Interpretação dos erros da homologação manual anterior
+
+- Um supervisor do seed de teste **já possui N1 e N2**. Esperar 404 para N2 **sem revogar a concessão** é um falso negativo, não evidência de falha do RBAC.
+- O parâmetro `user_id` é o `id` de `GET /v1/auth/me`; executar essa consulta antes de PATCH de grants. Variável PowerShell não inicializada gera JSON null e 422.
+- Um `PATCH /v1/queues/n2/members/op-ana` com `{"enabled":true}` enquanto N2 ainda está concedida **adiciona Ana a N2**. Um PATCH de `capacity=2` para Bruno muda sua capacidade global. Verificar e corrigir apenas se essas alterações foram acidentais e não existirem sessões afetadas.
+- A restauração de member com `{"enabled":false}` pode retornar **409** se Ana possuir oferta ou sessão ativa em N2. Encerrar/transferir por fluxo operacional antes; não forçar limpeza no SQLite.
+
+A validação automatizada da branch no Windows resultou em **55 testes Python aprovados**, Ruff, 7 testes frontend e Vite aprovados no commit `1c6a00d`. O script adicional de homologação é novo e ainda exige execução local.
+
 ## Próxima fatia: SPEC-006B
 
 1. Alembic (migration baseline segura para banco SQLite já populado, scripts backup/restore);
