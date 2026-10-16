@@ -227,8 +227,6 @@ def test_versioned_006b2_backup_is_independently_inspectable(tmp_path):
 
 def test_poc_startup_does_not_create_migration_owned_tables(tmp_path):
     """The POC launcher must not silently install 006B-2 DDL."""
-    from handoff_hub.poc_db import make_session_factory
-
     database = tmp_path / "unversioned-startup.db"
     _, engine = make_session_factory(f"sqlite:///{database.as_posix()}")
     try:
