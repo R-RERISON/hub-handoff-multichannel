@@ -802,3 +802,25 @@ body{background:var(--hub-bg)}
 @media(max-width:780px){.verified-history-intro{align-items:flex-start;flex-direction:column}
   .verified-history-toolbar{align-items:stretch;flex-direction:column}
   .verified-history-toolbar select{width:100%}}
+
+
+/* SPEC-006B-4.3 — independent bounded pages for verified chat and audit */
+.verified-history-detail-pages{
+  display:flex;flex-wrap:wrap;gap:9px;align-items:center;
+  padding:10px 16px;border-top:1px solid #e6eef4;background:#f8fbfe;
+}
+.verified-history-detail-pages strong{
+  color:#42647f;font-weight:750;font-size:11px;margin-right:auto;
+}
+.verified-history-detail-pages button{
+  display:inline-flex;justify-content:center;align-items:center;
+  min-height:34px;padding:7px 12px;font-size:11px;
+}
+.verified-history-detail-pages button:disabled{opacity:.46;cursor:not-allowed}
+.verified-history-detail-pages button:focus-visible{
+  outline:3px solid #8abfea;outline-offset:2px
+}
+@media(max-width:780px){
+  .verified-history-detail-pages strong{flex:1 0 100%}
+  .verified-history-detail-pages button{flex:1}
+}
