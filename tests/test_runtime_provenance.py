@@ -210,3 +210,22 @@ def test_failed_transfer_keeps_existing_segment_open(tmp_path):
         assert len(segments) == 1
         assert segments[0]["queue_id"] == "n1"
         assert segments[0]["ended_at"] is None
+
+
+def test_baseline_only_db_keeps_recorder_disabled(tmp_path):
+    path = tmp_path / "baseline-only.db"
+    factory, engine = make_session_factory(f"sqlite:///{path.as_posix()}")
+    provision(factory, tmp_path / "baseline-credentials.txt")
+    engine.dispose()
+    adopt_existing(path, tmp_path / "baseline-backup", confirmed=True)
+    with TestClient(create_app(database_url=f"sqlite:///{path.as_posix()}",
+                               api_key="legacy-test-key")) as client:
+        hid = create_ticket(client, "baseline")
+        new_message(client, hid, "USER", "baseline-user-message")
+    with factory() as db:
+        message = db.scalar(select(Message).where(Message.session_id == hid))
+        assert message is not None
+        tables = set(db.connection().exec_driver_sql(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).scalars())
+        assert "session_queue_segments" not in tables
