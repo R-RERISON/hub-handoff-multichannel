@@ -1,4 +1,4 @@
-"""SPEC-006B-4.1: queue-scoped read of runtime-verified history only.
+"""SPEC-006B-4: queue-scoped read of runtime-verified history only.
 
 This deliberately separate endpoint does not relax the legacy full-history
 authorization on /messages or /timeline. No historical inference or backfill.
@@ -110,6 +110,9 @@ def register_verified_history(
         handoff_id: str,
         request: Request,
         queue_id: str = Query(min_length=1, max_length=60),
+        message_page: int = Query(default=1, ge=1, le=1000),
+        event_page: int = Query(default=1, ge=1, le=1000),
+        page_size: int = Query(default=25, ge=1, le=50),
     ):
         principal = request.state.principal
         # An operator's operational context is governed by ownership; neither
@@ -157,6 +160,8 @@ def register_verified_history(
                     MESSAGE_QUEUE_PROVENANCE.c.assigned_by == "RUNTIME",
                 )
                 .order_by(Message.created_at, Message.id)
+                .offset((message_page - 1) * page_size)
+                .limit(page_size + 1)
             ).all()
             event_rows = db.execute(
                 select(SessionEvent.id, SessionEvent.event_type, SessionEvent.actor,
@@ -178,6 +183,8 @@ def register_verified_history(
                     SESSION_EVENT_QUEUE_PROVENANCE.c.assigned_by == "RUNTIME",
                 )
                 .order_by(SessionEvent.created_at, SessionEvent.id)
+                .offset((event_page - 1) * page_size)
+                .limit(page_size + 1)
             ).all()
 
             # No transfer reason, current queue, requester, other queue IDs,
@@ -186,14 +193,23 @@ def register_verified_history(
                 "scope": "RUNTIME_VERIFIED_QUEUE_ONLY",
                 "queue_id": queue_id,
                 "partial_history": True,
+                "page_size": page_size,
+                "message_page": message_page,
+                "event_page": event_page,
+                "message_next_page": (
+                    message_page + 1 if len(message_rows) > page_size else None
+                ),
+                "event_next_page": (
+                    event_page + 1 if len(event_rows) > page_size else None
+                ),
                 "messages": [
                     {"id": mid, "sender": sender, "content": body,
                      "created_at": at.isoformat()}
-                    for mid, sender, body, at in message_rows
+                    for mid, sender, body, at in message_rows[:page_size]
                 ],
                 "events": [
                     {"type": kind, "actor": actor, "at": at.isoformat()}
-                    for _, kind, actor, at in event_rows
+                    for _, kind, actor, at in event_rows[:page_size]
                 ],
             }
 
