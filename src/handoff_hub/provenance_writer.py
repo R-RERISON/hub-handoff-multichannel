@@ -20,6 +20,7 @@ from handoff_hub.provenance_schema import (
 
 REQUIRED_REVISION = "006b2_queue_provenance"
 AUDIT_REVISION = "006b3_history_access_audit"
+SECURITY_REVISION = "006b4_security_decisions"
 
 
 class ProvenanceRecorder:
@@ -28,6 +29,7 @@ class ProvenanceRecorder:
     def __init__(self, engine: Engine) -> None:
         self.enabled = False
         self.audit_enabled = False
+        self.security_audit_enabled = False
         if engine.dialect.name != "sqlite":
             return
         with engine.connect() as connection:
@@ -42,7 +44,7 @@ class ProvenanceRecorder:
             )).scalar_one()
             if revision == "006b1_poc_baseline":
                 return
-            if revision not in (REQUIRED_REVISION, AUDIT_REVISION):
+            if revision not in (REQUIRED_REVISION, AUDIT_REVISION, SECURITY_REVISION):
                 raise RuntimeError(f"Unknown database revision: {revision}")
             actual = set(connection.execute(text(
                 "SELECT name FROM sqlite_master WHERE type='table'"
@@ -54,10 +56,14 @@ class ProvenanceRecorder:
             }
             if not expected.issubset(actual):
                 raise RuntimeError("Queue provenance schema is missing required tables")
-            if revision == AUDIT_REVISION:
+            if revision in (AUDIT_REVISION, SECURITY_REVISION):
                 if "history_access_audit" not in actual:
                     raise RuntimeError("Required history access audit table is missing")
                 self.audit_enabled = True
+            if revision == SECURITY_REVISION:
+                if "security_decisions" not in actual:
+                    raise RuntimeError("Required security decisions table is missing")
+                self.security_audit_enabled = True
         self.enabled = True
 
     def _current(self, db: Session, session_id: str):
