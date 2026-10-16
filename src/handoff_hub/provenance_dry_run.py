@@ -17,6 +17,7 @@ from handoff_hub.schema_admin import DEFAULT_DB, verify_database
 
 SCHEMA_PROVENANCE = "006b2_queue_provenance"
 SCHEMA_AUDIT = "006b3_history_access_audit"
+SCHEMA_SECURITY = "006b4_security_decisions"
 DISPOSITIONS = (
     "review_candidate",
     "no_transfer_evidence",
@@ -102,7 +103,7 @@ def dry_run_report(database: Path) -> dict:
     """Assess only chain evidence, without reading message content or writing data."""
     state = verify_database(database)
     version = state["revision"]
-    if version not in (None, "006b1_poc_baseline", SCHEMA_PROVENANCE, SCHEMA_AUDIT):
+    if version not in (None, "006b1_poc_baseline", SCHEMA_PROVENANCE, SCHEMA_AUDIT, SCHEMA_SECURITY):
         raise RuntimeError("Unknown revision for the legacy dry run")
     summary = {
         "mode": "DRY_RUN_READ_ONLY",
@@ -152,7 +153,7 @@ def dry_run_report(database: Path) -> dict:
             messages[row["session_id"]].append(row["created_at"])
 
         existing = set()
-        if version in (SCHEMA_PROVENANCE, SCHEMA_AUDIT):
+        if version in (SCHEMA_PROVENANCE, SCHEMA_AUDIT, SCHEMA_SECURITY):
             existing.update(row[0] for row in db.execute(
                 "SELECT DISTINCT session_id FROM session_queue_segments"
             ))
