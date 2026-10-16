@@ -100,8 +100,7 @@ Assert-Queues 'Auditor' $auditor @('n1')
 $key = [guid]::NewGuid().ToString('N')
 $ticketHeaders = @{ Authorization = $admin.Authorization; 'Idempotency-Key' = $key }
 # Build accented text independently of the PS 5.1 file encoding.
-$subject = 'Solicita' + [char]0x00E7 + [char]0x00E3 + 'o de valida' +
-    [char]0x00E7 + [char]0x00E3 + 'o de permiss' + [char]0x00F5 + 'es N2'
+$subject = 'Solicita' + [char]0x00E7 + [char]0x00E3 + 'o de valida' + [char]0x00E7 + [char]0x00E3 + 'o de permiss' + [char]0x00F5 + 'es N2'
 $ticket = Invoke-JsonApi -Uri "$ApiBaseUrl/v1/handoffs" `
     -Headers $ticketHeaders -Payload @{
         operation_id = 'demo'
