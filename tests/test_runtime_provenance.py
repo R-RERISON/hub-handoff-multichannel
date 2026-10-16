@@ -5,10 +5,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from handoff_hub.auto_dispatch import run_dispatch_cycle
-from handoff_hub.provenance_audit import provenance_report
-from handoff_hub.poc_auth import naive_utc
-
 from handoff_hub.poc_api import create_app
+from handoff_hub.poc_auth import naive_utc
 from handoff_hub.poc_db import (
     HandoffOffer,
     HandoffSession,
@@ -16,6 +14,7 @@ from handoff_hub.poc_db import (
     SessionEvent,
     make_session_factory,
 )
+from handoff_hub.provenance_audit import provenance_report
 from handoff_hub.provenance_schema import (
     MESSAGE_QUEUE_PROVENANCE,
     SESSION_EVENT_QUEUE_PROVENANCE,
