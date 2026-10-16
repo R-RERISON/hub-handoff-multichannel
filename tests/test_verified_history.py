@@ -545,7 +545,6 @@ def test_verified_history_access_is_persistently_journaled_without_payloads(tmp_
     app, factory, passwords = environment(tmp_path)
     with TestClient(app) as client:
         auditor = bearer(client, passwords, "auditor.demo")
-        supervisor = bearer(client, passwords, "supervisor.demo")
         hid = new_ticket(client, "journal-content")
         user_message(client, hid, "SENSITIVE_MESSAGE_FOR_TEST")
         listed = verified_listing(client, "n1", auditor)
@@ -576,7 +575,7 @@ def test_verified_history_access_is_persistently_journaled_without_payloads(tmp_
             assert "SENSITIVE_MESSAGE_FOR_TEST" not in str(audit_rows)
         # Denied cross-queue request does not make a successful read.
         assert history(client, hid, "n2", auditor).status_code == 404
-        assert verified_listing(client, "n1", supervisor).status_code == 404
+        assert verified_listing(client, "n2", auditor).status_code == 404
         with factory() as db:
             assert len(db.execute(select(HISTORY_ACCESS_AUDIT)).all()) == 2
     # An auditable access cannot be destroyed by a routine schema downgrade.
