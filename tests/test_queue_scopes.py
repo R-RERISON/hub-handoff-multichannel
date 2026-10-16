@@ -5,6 +5,7 @@ No corporate data or external connector required.
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from handoff_hub.auto_dispatch import run_dispatch_cycle
 from handoff_hub.poc_api import create_app
 from handoff_hub.poc_db import (
     AuthUser,
@@ -219,6 +220,17 @@ def test_operator_can_transfer_to_n2_without_being_member_of_n2(tmp_path):
 
         inactive = c.get(f"/v1/handoffs/{hid}/transfer-targets", headers=ana)
         assert inactive.status_code == 403
+
+        # Bruno can read the private handoff reason as soon as N2 offers him
+        # the session, before he has accepted the transfer.
+        run_dispatch_cycle(factory)
+        offered = c.get(f"/v1/handoffs/{hid}/timeline", headers=bruno)
+        assert offered.status_code == 200, offered.text
+        transfer_note = offered.json()["transfers"][-1]
+        assert transfer_note["reason"] == "Escalonamento para N2"
+        assert transfer_note["from_operator_name"] == "Ana (demonstração)"
+        assert transfer_note["from_queue_name"] == "Suporte N1"
+        assert transfer_note["to_queue_name"] == "Suporte N2"
 
 
 def test_transfer_destinations_do_not_expose_other_operations(tmp_path):
