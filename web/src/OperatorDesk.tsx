@@ -221,9 +221,13 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
     </div>
     <div className="desk-grid">
       <section className="panel desk-inbox">
-        <div className="panel-header"><div><h3>Caixa de trabalho</h3><p>Ofertas e atendimentos da identidade selecionada</p></div></div>
+        <div className="panel-header desk-worklist-head"><h3>Meus atendimentos</h3>
+          <span>{activeCount} ativo(s) · {offerCount} oferta(s)</span></div>
+        <div className="desk-worklist" role="region" aria-label="Ofertas e atendimentos">
         <div className="desk-block-header">OFERTAS PENDENTES <span>{offerCount}</span></div>
-        {!offerCount&&<div className="desk-empty"><Clock3 size={23}/><b>Nenhuma oferta aguardando</b><p>Novos atendimentos serão ofertados automaticamente quando você estiver online e disponível.</p>{!lockedIdentity&&<button className="outline" onClick={onGoQueues}>Ir para Filas</button>}</div>}
+        {!offerCount&&<div className="desk-empty desk-empty--compact"><Clock3 size={15}/>
+          <span>Aguardando novas ofertas</span>{!lockedIdentity&&<button className="outline small"
+            onClick={onGoQueues}>Filas</button>}</div>}
         {work?.offers.map(o=><div className="desk-item" key={o.offer_id}>
           <span className="desk-item-meta">OFERTA · {queueTitle(o.queue_id)}</span>
           <b>{o.requester_label}</b><p>{o.subject}</p>
@@ -242,53 +246,70 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
         <div className="desk-block-header">EM ATENDIMENTO <span>{activeCount}</span></div>
         {!activeCount&&<div className="desk-empty desk-empty--small">Nenhum atendimento ativo para este operador.</div>}
         {work?.active.map(h=><button className={'desk-active '+(selectedId===h.id?'desk-active--selected':'')}
-          key={h.id} onClick={()=>setSelectedId(h.id)}>
+          key={h.id} onClick={()=>{setSelectedId(h.id);setMobilePanel('chat')}}>
           <div className="avatar">{h.requester_label.slice(0,2).toUpperCase()}</div>
           <div><b>{h.requester_label}</b><p>{h.subject}</p><small>{queueTitle(h.queue_id)}</small></div>
           <MessageSquareText size={17}/>
         </button>)}
+        </div>
       </section>
       <section className="panel desk-chat">
         {selected?<><div className="conversation-head"><div className="avatar">OP</div>
-          <div><b>{selected.requester_label}</b><p>{selected.subject} · {queueTitle(selected.queue_id)}</p></div>
-          <span className="status active">Ativo</span>
+          <div className="desk-chat-identity"><b>{selected.requester_label}</b>
+            <p>{selected.subject} · {queueTitle(selected.queue_id)}</p></div>
+          <div className="desk-chat-tools">
+            <button className="outline small" disabled={busy} aria-expanded={auditOpen}
+              onClick={()=>setAuditOpen(value=>!value)}>Histórico</button>
+            <button className="outline small" disabled={busy} aria-expanded={transferOpen}
+              onClick={()=>{setTransferOpen(value=>!value);setAuditOpen(false)}}>
+              <ArrowRightLeft size={14}/> Transferir</button>
+            <button className="primary small" disabled={busy} onClick={()=>void execute(
+              ()=>api('/v1/operators/'+operatorId+'/handoffs/'+selected.id+'/close','POST'),
+              'Atendimento encerrado.',null
+            )}><CheckCircle2 size={14}/> Encerrar</button>
+          </div>
         </div>
+        {transferOpen&&<div className="desk-transfer-panel" role="region"
+          aria-label="Transferência de atendimento">
+          <label htmlFor="transfer-destination">Fila de destino</label>
+          <select id="transfer-destination" value={targetQueue}
+            onChange={e=>setTargetQueue(e.target.value)}>
+            {queues.map(q=><option value={q.id} key={q.id}>{q.name}</option>)}
+          </select>
+          <input value={transferReason} onChange={e=>setTransferReason(e.target.value)}
+            maxLength={300} aria-label="Motivo da transferência" placeholder="Motivo da transferência"/>
+          <button className="primary small" disabled={busy||transferReason.trim().length<3}
+            onClick={()=>void execute(
+              ()=>api('/v1/handoffs/'+selected.id+'/transfer','POST',{
+                operator_id:operatorId,queue_id:targetQueue,reason:transferReason.trim(),
+              }), 'Atendimento transferido para '+queueTitle(targetQueue)+'.',null
+            )}>Confirmar transferência</button>
+        </div>}
+        {auditOpen&&<div className="desk-audit-panel"><b>Histórico auditável</b>
+          <span>{timeline.slice(-6).join('  •  ') || 'Aguardando eventos'}</span>
+        </div>}
         <div className="desk-chat-list">
           <div className="chat-notice">CONVERSA SIMULADA · NÃO ENVIADA AO TEAMS</div>
-          {!messages.length&&<div className="empty">Nenhuma mensagem. Simule um usuário para começar.</div>}
+          {!messages.length&&<div className="empty">Nenhuma mensagem registrada nesta conversa.</div>}
           {messages.map(m=><div key={m.id} className={'bubble-row '+(m.sender==='OPERATOR'?'right':'')}>
             <div className="bubble"><b>{m.sender==='OPERATOR'?'Operador':'Usuário'}</b><p>{m.content}</p><small>{labelTime(m.created_at)}</small></div>
           </div>)}
         </div>
         <div className="desk-compose">
           <textarea value={reply} onChange={e=>setReply(e.target.value)} rows={2}
-            maxLength={4000} placeholder="Escreva sua resposta para o usuário simulado" aria-label="Responder como operador"/>
+            onKeyDown={e=>{
+              if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){
+                e.preventDefault()
+                if(!busy&&reply.trim())void sendMessage('OPERATOR')
+              }
+            }}
+            maxLength={4000} placeholder="Responder... Enter envia · Shift+Enter quebra linha"
+            aria-label="Responder como operador"/>
           <div className="desk-actions">
             {!lockedIdentity&&<button className="outline small" disabled={busy} onClick={()=>void sendMessage('USER')}>Simular usuário</button>}
             <button className="primary small" disabled={busy||!reply.trim()} onClick={()=>void sendMessage('OPERATOR')}><Send size={14}/> Enviar resposta</button>
           </div>
         </div>
-        <div className="desk-footer-actions">
-          <div className="desk-transfer">
-            <label htmlFor="transfer-destination">Transferir atendimento para</label>
-            <select id="transfer-destination" value={targetQueue} onChange={e=>setTargetQueue(e.target.value)}>
-              {queues.map(q=><option value={q.id} key={q.id}>{q.name}</option>)}
-            </select>
-            <input value={transferReason} onChange={e=>setTransferReason(e.target.value)}
-              maxLength={300} aria-label="Motivo da transferência" placeholder="Motivo da transferência"/>
-            <button className="outline small" disabled={busy||transferReason.trim().length<3}
-              onClick={()=>void execute(
-                ()=>api('/v1/handoffs/'+selected.id+'/transfer','POST',{
-                  operator_id:operatorId,queue_id:targetQueue,reason:transferReason.trim(),
-                }), 'Atendimento transferido e devolvido à fila.',null
-              )}><ArrowRightLeft size={14}/> Transferir</button>
-          </div>
-          <button className="primary small" disabled={busy} onClick={()=>void execute(
-            ()=>api('/v1/operators/'+operatorId+'/handoffs/'+selected.id+'/close','POST'),
-            'Atendimento concluído e capacidade liberada.',null
-          )}><CheckCircle2 size={14}/> Encerrar atendimento</button>
-        </div>
-        <div className="desk-timeline"><b>Histórico auditável</b><span>{timeline.slice(-4).join('  •  ') || 'Aguardando eventos'}</span></div>
         </>:<div className="center-empty"><Inbox size={38}/><h3>Selecione um atendimento ativo</h3>
           <p>Ao aceitar uma oferta, a conversa aparece aqui com as opções de resposta, transferência e encerramento.</p></div>}
       </section>
