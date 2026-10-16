@@ -102,6 +102,18 @@ A validação automatizada da branch no Windows resultou em **55 testes Python a
 
 **Status:** correção publicada na branch; os novos testes e o build ainda dependem de `.\\start.cmd --check` no Windows, e o fluxo deve ser homologado antes de promover a SPEC-006A.
 
+## Hotfix UX — motivo da transferência chega ao próximo operador
+
+**Feedback da homologação:** o encaminhamento Ana/N1 → Bruno/N2 passou a funcionar. O usuário solicitou que o texto informado no campo de motivo acompanhasse o chamado, inclusive quando o segundo operador assume o atendimento.
+
+**Diagnóstico de código:** `POST /v1/handoffs/{id}/transfer` **já persistia** `SessionTransfer.reason` em `session_transfers`. A API `GET /v1/handoffs/{id}/timeline` já devolvia o campo em `transfers`, mas a Mesa do Operador descartava os detalhes de transferência e mostrava apenas `events.type` e `events.actor`. Não houve perda nem omissão de armazenamento da nota: apenas ausência de apresentação.
+
+**Mudança aditiva:** o backend passa a incluir nomes legíveis de operador de origem/fila origem/fila destino na `timeline.transfers` sem remover campos existentes. A Mesa mostra a nota interna na **oferta pendente** e no **topo da conversa após aceite**, com motivo, remetente e filas; o Histórico exibe todas as notas vinculadas ao atendimento. O texto permanece **exclusivamente em `session_transfers`**, não é enviado como mensagem ao usuário final, bot/Teams ou outbox.
+
+**Segurança:** a oferta e o histórico são consultados somente pelo operador atribuído; a proibição temporária de histórico transferido para supervisor/auditor da SPEC-006A permanece. Notas de transferência não equivalem a autorizações para acessar conversas de outras filas.
+
+**Gates adicionais:** conferir a nota ao receber uma oferta transferida; confirmar a mesma nota após aceite; garantir que `GET /messages` não inclua a justificativa como mensagem; preservar composer sempre visível e botão Encerrar; testar troca/recarregamento de conversa. Novos testes de contrato frontend e de API foram adicionados. Status: publicado na branch, **aguardando `.\\start.cmd --check` e homologação visual no Windows**.
+
 ## Próxima fatia: SPEC-006B
 
 1. Alembic (migration baseline segura para banco SQLite já populado, scripts backup/restore);
