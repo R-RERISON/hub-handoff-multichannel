@@ -100,7 +100,8 @@ try {
     }
 
     $checksum = (Get-FileHash -LiteralPath $copy -Algorithm SHA256).Hash
-    Assert-Equal 'SHA-256 da copia' $checksum ([string]$snapshot.sha256).ToUpperInvariant()
+    $expectedChecksum = ([string]$snapshot.sha256).ToUpperInvariant()
+    Assert-Equal 'SHA-256 da copia' $checksum $expectedChecksum
     $copyBefore = Invoke-Schema -Arguments @('--database', $copy, 'inspect')
     Assert-Equal 'Copia inicial sem revision' $copyBefore.revision ''
     Assert-Counts 'Snapshot vs. original' $originalBefore.row_counts $copyBefore.row_counts
