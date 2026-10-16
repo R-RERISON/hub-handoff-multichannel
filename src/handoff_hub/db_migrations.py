@@ -65,6 +65,7 @@ def upgrade_database(database_url: str) -> str | None:
             with sqlite3.connect(str(destination)) as backup:
                 source.backup(backup)
         backup_path = str(destination)
+        print(f"[Handoff] Backup SQLite antes do upgrade: {backup_path}", flush=True)
 
     if current is None and existing:
         # Recognize complete POC-005 schema; do not recreate its tables.
