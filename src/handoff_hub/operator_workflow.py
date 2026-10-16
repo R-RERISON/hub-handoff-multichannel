@@ -15,7 +15,6 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from handoff_hub.domain.state_machine import HandoffStatus, assert_transition
-from handoff_hub.provenance_writer import ProvenanceRecorder
 from handoff_hub.poc_db import (
     HandoffOffer,
     HandoffSession,
@@ -26,6 +25,7 @@ from handoff_hub.poc_db import (
     SessionTransfer,
     utc_now,
 )
+from handoff_hub.provenance_writer import ProvenanceRecorder
 
 OFFER_SECONDS = 120
 DECLINE_COOLDOWN_SECONDS = 120
