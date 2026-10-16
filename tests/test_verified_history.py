@@ -3,6 +3,7 @@
 All data is synthetic and every DB is created under tmp_path.
 """
 from alembic import command
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import insert, select, text, update
 
@@ -20,7 +21,13 @@ from handoff_hub.provenance_schema import (
     SESSION_EVENT_QUEUE_PROVENANCE,
     SESSION_QUEUE_SEGMENTS,
 )
-from handoff_hub.schema_admin import PROVENANCE_REVISION, _config, create_new
+from handoff_hub.schema_admin import (
+    AUDIT_REVISION,
+    PROVENANCE_REVISION,
+    _config,
+    create_new,
+    verify_database,
+)
 from handoff_hub.seed_demo_auth import provision
 
 KEY = {"X-POC-Key": "local-test-only"}
@@ -572,6 +579,13 @@ def test_verified_history_access_is_persistently_journaled_without_payloads(tmp_
         assert verified_listing(client, "n1", supervisor).status_code == 404
         with factory() as db:
             assert len(db.execute(select(HISTORY_ACCESS_AUDIT)).all()) == 2
+    # An auditable access cannot be destroyed by a routine schema downgrade.
+    database = tmp_path / "verified.db"
+    with pytest.raises(RuntimeError, match="Refusing destructive downgrade"):
+        command.downgrade(_config(database), PROVENANCE_REVISION)
+    state = verify_database(database)
+    assert state["revision"] == AUDIT_REVISION
+    assert state["row_counts"]["history_access_audit"] == 2
 
 
 def test_audit_storage_failure_prevents_verified_payload_delivery(tmp_path):
