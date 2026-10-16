@@ -189,6 +189,8 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
       await reload()
       await onChanged()
       if(select!==undefined){
+        setTransferNotes([])
+        setTimeline([])
         setSelectedId(select)
         setMobilePanel(select?'chat':'work')
       }
@@ -317,7 +319,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
         <div className="desk-block-header">EM ATENDIMENTO <span>{activeCount}</span></div>
         {!activeCount&&<div className="desk-empty desk-empty--small">Nenhum atendimento ativo para este operador.</div>}
         {work?.active.map(h=><button className={'desk-active '+(selectedId===h.id?'desk-active--selected':'')}
-          key={h.id} onClick={()=>{setTransferOpen(false);setSelectedId(h.id);setMobilePanel('chat')}}>
+          key={h.id} onClick={()=>{setTransferOpen(false);setTransferNotes([]);setTimeline([]);setSelectedId(h.id);setMobilePanel('chat')}}>
           <div className="avatar">{h.requester_label.slice(0,2).toUpperCase()}</div>
           <div><b>{h.requester_label}</b><p>{h.subject}</p><small>{queueTitle(h.queue_id)}</small></div>
           <MessageSquareText size={17}/>
