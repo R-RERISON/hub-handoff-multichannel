@@ -9,6 +9,7 @@ from handoff_hub.poc_api import create_app
 from handoff_hub.poc_db import (
     AuthUser,
     HandoffSession,
+    SessionTransfer,
     SessionEvent,
     make_session_factory,
 )
@@ -226,3 +227,29 @@ def test_original_unversioned_db_never_unlocks_history(tmp_path):
         assert len(tables) == 17
         assert "session_queue_segments" not in tables
         assert "alembic_version" not in tables
+
+
+def test_versioned_legacy_ticket_without_segment_is_not_reconstructed(tmp_path):
+    app, factory, passwords = environment(tmp_path)
+    with factory.begin() as db:
+        # This row predates the runtime recorder. The current queue and even
+        # an explicit transfer do not prove the ownership of old chat content.
+        row = HandoffSession(
+            operation_id="demo", integration_id="demo-bot", queue_id="n2",
+            external_conversation_id="old-conversation",
+            requester_label="Pessoa sintética", subject="Legado",
+            idempotency_key="old-unverified", status="QUEUED",
+        )
+        db.add(row)
+        db.flush()
+        db.add(SessionTransfer(
+            session_id=row.id, from_queue_id="n1", to_queue_id="n2",
+            from_operator_id="op-ana", reason="Histórico não comprovado",
+        ))
+        hid = row.id
+    with TestClient(app) as client:
+        auditor = bearer(client, passwords, "auditor.demo")
+        supervisor = bearer(client, passwords, "supervisor.demo")
+        assert history(client, hid, "n1", auditor).status_code == 404
+        assert history(client, hid, "n2", supervisor).status_code == 404
+        assert client.get(f"{BASE}/{hid}/messages", headers=supervisor).status_code == 403
