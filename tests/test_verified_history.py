@@ -24,6 +24,7 @@ from handoff_hub.provenance_schema import (
 from handoff_hub.schema_admin import (
     AUDIT_REVISION,
     PROVENANCE_REVISION,
+    SECURITY_REVISION,
     _config,
     create_new,
     verify_database,
@@ -584,8 +585,11 @@ def test_verified_history_access_is_persistently_journaled_without_payloads(tmp_
     with pytest.raises(RuntimeError, match="Refusing destructive downgrade"):
         command.downgrade(_config(database), PROVENANCE_REVISION)
     state = verify_database(database)
-    assert state["revision"] == AUDIT_REVISION
+    # A scoped denial is now also evidence, so the 006b4 downgrade guard
+    # aborts before the history-audit downgrade can begin.
+    assert state["revision"] == SECURITY_REVISION
     assert state["row_counts"]["history_access_audit"] == 2
+    assert state["row_counts"]["security_decisions"] == 2
 
 
 def test_audit_storage_failure_prevents_verified_payload_delivery(tmp_path):
