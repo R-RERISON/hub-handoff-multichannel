@@ -76,8 +76,10 @@ def register_operator_workflow(
 ) -> APIRouter:
     router = APIRouter(prefix="/v1", dependencies=[Depends(authenticate)])
 
-    def event(db: Session, handoff_id: str, name: str, actor: str) -> None:
-        db.add(SessionEvent(session_id=handoff_id, event_type=name, actor=actor))
+    def event(db: Session, handoff: HandoffSession, name: str, actor: str) -> None:
+        row = SessionEvent(session_id=handoff.id, event_type=name, actor=actor)
+        db.add(row)
+        provenance.event_for_handoff(db, handoff, row)
 
     def requeue_expired(db: Session) -> int:
         now = utc_naive()
@@ -97,7 +99,7 @@ def register_operator_workflow(
                 session.status = "QUEUED"
                 session.operator_id = None
                 session.updated_at = utc_now()
-                event(db, session.id, "OFFER_EXPIRED", offer.operator_id)
+                event(db, session, "OFFER_EXPIRED", offer.operator_id)
                 changed += 1
         return changed
 
@@ -192,7 +194,7 @@ def register_operator_workflow(
                 expires_at=utc_now() + timedelta(seconds=OFFER_SECONDS),
             )
             db.add(offer)
-            event(db, waiting.id, "OFFERED", op.id)
+            event(db, waiting, "OFFERED", op.id)
             db.flush()
             result = as_offer(offer, waiting)
             db.commit()
@@ -252,7 +254,7 @@ def register_operator_workflow(
             offer.resolved_at = utc_now()
             handoff.status = "ACTIVE"
             handoff.updated_at = utc_now()
-            event(db, handoff.id, "ACCEPTED", op.id)
+            event(db, handoff, "ACCEPTED", op.id)
             db.commit()
             return as_handoff(handoff)
 
@@ -271,7 +273,7 @@ def register_operator_workflow(
             handoff.status = "QUEUED"
             handoff.operator_id = None
             handoff.updated_at = utc_now()
-            event(db, handoff.id, "DECLINED", body.operator_id)
+            event(db, handoff, "DECLINED", body.operator_id)
             db.commit()
             return as_handoff(handoff)
 
@@ -360,7 +362,7 @@ def register_operator_workflow(
                 raise HTTPException(409, "Somente atendimento ativo pode ser encerrado")
             handoff.status = "CLOSED"
             handoff.updated_at = utc_now()
-            event(db, handoff.id, "CLOSED", operator_id)
+            event(db, handoff, "CLOSED", operator_id)
             db.commit()
             return as_handoff(handoff)
 
