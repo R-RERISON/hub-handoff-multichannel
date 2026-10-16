@@ -13,7 +13,7 @@ from handoff_hub.poc_db import (
 )
 from handoff_hub.provenance_dry_run import dry_run_report
 from handoff_hub.provenance_schema import SESSION_QUEUE_SEGMENTS
-from handoff_hub.schema_admin import create_new, verify_database
+from handoff_hub.schema_admin import LATEST_REVISION, create_new, verify_database
 from handoff_hub.seed_demo_auth import provision
 
 START = datetime(2026, 10, 16, 15, 0, tzinfo=UTC)
@@ -124,7 +124,7 @@ def test_existing_provenance_is_never_reassessed_for_backfill(tmp_path):
     engine.dispose()
     before = verify_database(database)
     report = dry_run_report(database)
-    assert report["schema_revision"] == "006b2_queue_provenance"
+    assert report["schema_revision"] == LATEST_REVISION
     assert report["session_assessment"]["already_has_provenance"] == 1
     assert report["session_assessment"]["review_candidate"] == 0
     assert report["message_assessment"]["not_assessed"] == 3

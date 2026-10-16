@@ -11,12 +11,14 @@ from handoff_hub.poc_db import (
     make_session_factory,
 )
 from handoff_hub.schema_admin import (
+    AUDIT_REVISION,
     BASELINE_REVISION,
     LATEST_REVISION,
     PROVENANCE_REVISION,
     SchemaSafetyError,
     adopt_existing,
     create_new,
+    upgrade_audit_existing,
     upgrade_existing,
     verified_backup,
     verify_database,
@@ -111,6 +113,7 @@ def test_create_fresh_versioned_sqlite_and_preserve_normal_seed(tmp_path):
     assert result["row_counts"]["session_queue_segments"] == 0
     assert result["row_counts"]["message_queue_provenance"] == 0
     assert result["row_counts"]["session_event_queue_provenance"] == 0
+    assert result["row_counts"]["history_access_audit"] == 0
     with pytest.raises(SchemaSafetyError, match="overwrite"):
         create_new(path, confirmed=True)
     factory, engine = make_session_factory(f"sqlite:///{path.as_posix()}")
@@ -221,7 +224,7 @@ def test_versioned_006b2_backup_is_independently_inspectable(tmp_path):
     create_new(path, confirmed=True)
     backup_path, checksum = verified_backup(path, tmp_path / "backups")
     assert len(checksum) == 64
-    assert verify_database(backup_path)["revision"] == PROVENANCE_REVISION
+    assert verify_database(backup_path)["revision"] == AUDIT_REVISION
     assert verify_database(path) == verify_database(backup_path)
 
 
@@ -235,6 +238,7 @@ def test_poc_startup_does_not_create_migration_owned_tables(tmp_path):
         assert "message_queue_provenance" not in created
         assert "session_event_queue_provenance" not in created
         assert "alembic_version" not in created
+        assert "history_access_audit" not in created
         assert verify_database(database)["revision"] is None
     finally:
         engine.dispose()
@@ -248,3 +252,42 @@ def test_new_schema_validator_detects_missing_provenance_index(tmp_path):
         db.commit()
     with pytest.raises(SchemaSafetyError, match="Index mismatch"):
         verify_database(database)
+
+
+def test_audit_revision_requires_explicit_offline_upgrade_and_preserves_rows(tmp_path):
+    db_path = legacy_database(tmp_path)
+    backups = tmp_path / "safe-backups"
+    original = verify_database(db_path)
+    with pytest.raises(SchemaSafetyError, match="requires a verified"):
+        upgrade_audit_existing(db_path, backups, confirmed=True)
+    assert not backups.exists()
+    adopt_existing(db_path, backups, confirmed=True)
+    upgrade_existing(db_path, backups, confirmed=True)
+    before = verify_database(db_path)
+    assert before["revision"] == PROVENANCE_REVISION
+    with pytest.raises(SchemaSafetyError, match="confirm-offline"):
+        upgrade_audit_existing(db_path, backups, confirmed=False)
+    assert verify_database(db_path) == before
+    result = upgrade_audit_existing(db_path, backups, confirmed=True)
+    after = verify_database(db_path)
+    assert result["revision"] == AUDIT_REVISION
+    assert result["audit_table_empty"] is True
+    assert len(result["backup_sha256"]) == 64
+    assert after["revision"] == AUDIT_REVISION
+    assert after["table_count"] == original["table_count"] + 4
+    assert after["row_counts"]["history_access_audit"] == 0
+    assert all(after["row_counts"][table] == amount
+               for table, amount in before["row_counts"].items())
+    assert verify_database(db_path)["row_counts"]["messages"] == 1
+    with pytest.raises(SchemaSafetyError, match="requires a verified"):
+        upgrade_audit_existing(db_path, backups, confirmed=True)
+
+
+def test_audit_schema_validator_detects_missing_index(tmp_path):
+    path = tmp_path / "audit-index.db"
+    create_new(path, confirmed=True)
+    with sqlite3.connect(path) as conn:
+        conn.execute("DROP INDEX ix_history_audit_user_time")
+        conn.commit()
+    with pytest.raises(SchemaSafetyError, match="Index mismatch"):
+        verify_database(path)
