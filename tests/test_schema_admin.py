@@ -11,6 +11,7 @@ from handoff_hub.poc_db import (
     make_session_factory,
 )
 from handoff_hub.schema_admin import (
+    AUDIT_REVISION,
     BASELINE_REVISION,
     LATEST_REVISION,
     PROVENANCE_REVISION,
@@ -18,6 +19,7 @@ from handoff_hub.schema_admin import (
     adopt_existing,
     create_new,
     upgrade_existing,
+    upgrade_audit_existing,
     verified_backup,
     verify_database,
 )
@@ -111,6 +113,7 @@ def test_create_fresh_versioned_sqlite_and_preserve_normal_seed(tmp_path):
     assert result["row_counts"]["session_queue_segments"] == 0
     assert result["row_counts"]["message_queue_provenance"] == 0
     assert result["row_counts"]["session_event_queue_provenance"] == 0
+    assert result["row_counts"]["history_access_audit"] == 0
     with pytest.raises(SchemaSafetyError, match="overwrite"):
         create_new(path, confirmed=True)
     factory, engine = make_session_factory(f"sqlite:///{path.as_posix()}")
@@ -221,7 +224,7 @@ def test_versioned_006b2_backup_is_independently_inspectable(tmp_path):
     create_new(path, confirmed=True)
     backup_path, checksum = verified_backup(path, tmp_path / "backups")
     assert len(checksum) == 64
-    assert verify_database(backup_path)["revision"] == PROVENANCE_REVISION
+    assert verify_database(backup_path)["revision"] == AUDIT_REVISION
     assert verify_database(path) == verify_database(backup_path)
 
 
