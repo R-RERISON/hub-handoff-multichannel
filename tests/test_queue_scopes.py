@@ -107,7 +107,7 @@ def test_supervisor_grant_controls_queue_mutations(tmp_path):
 
 
 def test_roles_cannot_cross_operations_using_queue_grants(tmp_path):
-    app, factory, passwords = setup(tmp_path)
+    app, _, passwords = setup(tmp_path)
     with TestClient(app) as c:
         admin = login(c, passwords, "admin.demo")
         auditor = login(c, passwords, "auditor.demo")
