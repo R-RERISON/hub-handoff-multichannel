@@ -3,7 +3,7 @@
 All data is synthetic and every DB is created under tmp_path.
 """
 from fastapi.testclient import TestClient
-from sqlalchemy import select, text, update
+from sqlalchemy import insert, select, text, update
 
 from handoff_hub.poc_api import create_app
 from handoff_hub.poc_db import (
@@ -394,3 +394,139 @@ def test_unversioned_verified_discovery_reports_explicit_unavailability(tmp_path
             "SELECT name FROM sqlite_master WHERE type='table'"
         )).all())
         assert len(tables) == 17
+
+
+def test_verified_detail_has_independent_bounded_message_and_event_pages(tmp_path):
+    app, factory, passwords = environment(tmp_path)
+    with TestClient(app) as client:
+        auditor = bearer(client, passwords, "auditor.demo")
+        supervisor = bearer(client, passwords, "supervisor.demo")
+        hid = new_ticket(client, "detail-pages")
+        expected = [
+            user_message(client, hid, f"n1-page-{index}") for index in range(5)
+        ]
+        with factory.begin() as db:
+            segment_id = db.scalar(select(SESSION_QUEUE_SEGMENTS.c.id).where(
+                SESSION_QUEUE_SEGMENTS.c.session_id == hid,
+                SESSION_QUEUE_SEGMENTS.c.queue_id == "n1",
+            ))
+            for i in range(4):
+                row = SessionEvent(
+                    session_id=hid, event_type="ACTIVE", actor=f"synthetic-{i}",
+                )
+                db.add(row)
+                db.flush()
+                db.execute(insert(SESSION_EVENT_QUEUE_PROVENANCE).values(
+                    event_id=row.id,
+                    segment_id=segment_id,
+                    assigned_by="RUNTIME",
+                    confidence="VERIFIED",
+                ))
+
+        transfer(client, factory, hid)
+        user_message(client, hid, "N2-confidential-after-transfer")
+        url = f"{BASE}/{hid}/verified-history"
+        one = client.get(url, headers=auditor, params={
+            "queue_id": "n1", "message_page": 1, "event_page": 1,
+            "page_size": 2,
+        })
+        assert one.status_code == 200, one.text
+        assert one.json()["partial_history"] is True
+        assert one.json()["page_size"] == 2
+        assert len(one.json()["messages"]) == 2
+        assert len(one.json()["events"]) == 2
+        assert one.json()["message_next_page"] == 2
+        assert one.json()["event_next_page"] == 2
+        assert "N2-confidential-after-transfer" not in one.text
+        assert "reason" not in one.text
+
+        # Advancing messages must not advance the event page.
+        two = client.get(url, headers=auditor, params={
+            "queue_id": "n1", "message_page": 2, "event_page": 1,
+            "page_size": 2,
+        })
+        assert two.status_code == 200
+        assert len(two.json()["messages"]) == 2
+        assert two.json()["events"] == one.json()["events"]
+        assert two.json()["message_next_page"] == 3
+
+        three = client.get(url, headers=auditor, params={
+            "queue_id": "n1", "message_page": 3, "event_page": 3,
+            "page_size": 2,
+        })
+        assert three.status_code == 200
+        assert len(three.json()["messages"]) == 1
+        assert len(three.json()["events"]) == 2  # QUEUED + 4 ACTIVE + TRANSFERRED
+        assert three.json()["message_next_page"] is None
+        assert three.json()["event_next_page"] is None
+        all_ids = [
+            *(m["id"] for m in one.json()["messages"]),
+            *(m["id"] for m in two.json()["messages"]),
+            *(m["id"] for m in three.json()["messages"]),
+        ]
+        assert set(all_ids) == set(expected)
+        assert len(all_ids) == len(expected)
+
+        other_queue = client.get(url, headers=supervisor, params={
+            "queue_id": "n2", "page_size": 2,
+        })
+        assert other_queue.status_code == 200
+        assert [m["content"] for m in other_queue.json()["messages"]] == [
+            "N2-confidential-after-transfer",
+        ]
+        assert "n1-page-" not in other_queue.text
+
+
+def test_verified_detail_pages_revalidate_grant_and_reject_invalid_parameters(tmp_path):
+    app, factory, passwords = environment(tmp_path)
+    with TestClient(app) as client:
+        auditor = bearer(client, passwords, "auditor.demo")
+        admin = bearer(client, passwords, "admin.demo")
+        hid = new_ticket(client, "detail-grant")
+        for i in range(3):
+            user_message(client, hid, f"before-revoke-{i}")
+        url = f"{BASE}/{hid}/verified-history"
+        params = {"queue_id": "n1", "page_size": 2}
+        first = client.get(url, headers=auditor, params=params)
+        assert first.status_code == 200
+        assert first.json()["message_next_page"] == 2
+        assert client.get(url, headers=auditor, params={
+            **params, "message_page": 0,
+        }).status_code == 422
+        assert client.get(url, headers=auditor, params={
+            **params, "event_page": 1001,
+        }).status_code == 422
+        assert client.get(url, headers=auditor, params={
+            **params, "page_size": 51,
+        }).status_code == 422
+        with factory() as db:
+            uid = db.scalar(select(AuthUser.id).where(
+                AuthUser.username == "auditor.demo",
+            ))
+        revoke = client.patch("/v1/admin/queue-grants", headers=admin, json={
+            "user_id": uid, "queue_id": "n1",
+            "role": "AUDITOR", "enabled": False,
+        })
+        assert revoke.status_code == 200
+        assert client.get(url, headers=auditor, params={
+            **params, "message_page": 2,
+        }).status_code == 404
+
+
+def test_unversioned_detail_with_page_options_keeps_history_closed(tmp_path):
+    app, factory, passwords = environment(tmp_path, versioned=False)
+    with TestClient(app) as client:
+        auditor = bearer(client, passwords, "auditor.demo")
+        hid = new_ticket(client, "detail-unversioned")
+        for i in range(3):
+            user_message(client, hid, f"legacy-message-{i}")
+        result = client.get(f"{BASE}/{hid}/verified-history", headers=auditor, params={
+            "queue_id": "n1", "message_page": 2, "event_page": 2, "page_size": 1,
+        })
+        assert result.status_code == 404
+    with factory() as db:
+        tables = set(db.scalars(text(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        )).all())
+        assert len(tables) == 17
+        assert "session_queue_segments" not in tables
