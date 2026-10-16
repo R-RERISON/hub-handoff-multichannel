@@ -140,10 +140,12 @@ def verified_backup(source: Path, backup_dir: Path) -> tuple[Path, str]:
     if backup_path.exists():
         raise SchemaSafetyError("Backup destination unexpectedly exists")
     try:
-        with closing(_read_only(source)) as origin:
-            with closing(sqlite3.connect(backup_path)) as destination:
-                origin.backup(destination, pages=100)
-                destination.commit()
+        with (
+            closing(_read_only(source)) as origin,
+            closing(sqlite3.connect(backup_path)) as destination,
+        ):
+            origin.backup(destination, pages=100)
+            destination.commit()
         backup = verify_database(backup_path)
         after = verify_database(source)
         if (backup["revision"] != before["revision"]
