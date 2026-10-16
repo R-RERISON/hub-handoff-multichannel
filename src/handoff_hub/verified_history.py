@@ -8,6 +8,7 @@ from collections.abc import Callable
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, or_, select
 
+from handoff_hub.audit_writer import record_verified_read
 from handoff_hub.poc_db import HandoffSession, Message, SessionEvent
 from handoff_hub.provenance_schema import (
     MESSAGE_QUEUE_PROVENANCE,
@@ -38,7 +39,7 @@ def register_verified_history(
         principal = request.state.principal
         if principal.role not in SCOPED_ROLES:
             raise HTTPException(403, "Consulta reservada à supervisão e auditoria")
-        with factory() as db:
+        with factory.begin() as db:
             require_queue(db, principal, queue_id)
             if not provenance.enabled:
                 return {
@@ -50,6 +51,8 @@ def register_verified_history(
                     "page": page,
                     "next_page": None,
                 }
+            if not provenance.audit_enabled:
+                raise HTTPException(503, "Auditoria obrigatória indisponível")
 
             seg = SESSION_QUEUE_SEGMENTS
             messages_with_proof = (
@@ -92,6 +95,11 @@ def register_verified_history(
             )
             rows = db.execute(stmt).all()
             visible = rows[:page_size]
+            record_verified_read(
+                db, principal, resource="LIST", queue_id=queue_id,
+                session_id=None, page_size=page_size,
+                returned_sessions=len(visible),
+            )
             return {
                 "scope": "RUNTIME_VERIFIED_QUEUE_ONLY",
                 "queue_id": queue_id,
@@ -120,7 +128,7 @@ def register_verified_history(
         if principal.role not in SCOPED_ROLES:
             raise HTTPException(403, "Consulta reservada à supervisão e auditoria")
 
-        with factory() as db:
+        with factory.begin() as db:
             # Keep authorization and data retrieval within the same DB read
             # transaction. Revoked grants take effect on the next request.
             require_queue(db, principal, queue_id)
@@ -130,6 +138,8 @@ def register_verified_history(
             if not provenance.enabled:
                 # The original 17-table POC cannot prove queue ownership.
                 raise HTTPException(404, "Histórico verificado indisponível")
+            if not provenance.audit_enabled:
+                raise HTTPException(503, "Auditoria obrigatória indisponível")
 
             segments = select(SESSION_QUEUE_SEGMENTS.c.id).where(
                 SESSION_QUEUE_SEGMENTS.c.session_id == handoff_id,
@@ -187,6 +197,15 @@ def register_verified_history(
                 .limit(page_size + 1)
             ).all()
 
+            # Commit this journal with the same read transaction. If the insert
+            # or commit fails, the exception prevents delivery of protected data.
+            record_verified_read(
+                db, principal, resource="DETAIL", queue_id=queue_id,
+                session_id=handoff_id, page_size=page_size,
+                message_page=message_page, event_page=event_page,
+                returned_messages=min(len(message_rows), page_size),
+                returned_events=min(len(event_rows), page_size),
+            )
             # No transfer reason, current queue, requester, other queue IDs,
             # total counts or summary fields: those can expose another scope.
             return {
