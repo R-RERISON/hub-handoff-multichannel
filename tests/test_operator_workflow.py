@@ -101,6 +101,9 @@ def test_offer_accept_transfer_reoffer_and_close(tmp_path) -> None:
 def test_decline_returns_session_to_queue_and_skips_same_operator(tmp_path) -> None:
     with TestClient(app_for(tmp_path)) as c:
         c.post("/v1/demo/bootstrap", headers=AUTH)
+        # Explicitly broaden N1 for this routing/decline test.
+        assert c.patch("/v1/queues/n1/members/op-bruno", headers=AUTH,
+                       json={"enabled": True}).status_code == 200
         handoff_id = create_handoff(c, 2)
         first = c.post("/v1/dispatch/offer", headers=AUTH, json={}).json()["offer"]
         result = c.post(f"/v1/handoffs/{handoff_id}/decline", headers=AUTH,
