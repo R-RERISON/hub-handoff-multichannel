@@ -178,6 +178,20 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
                                 granted_queues(db, principal)
                             )):
                         raise HTTPException(403, "Operador participa de fila não autorizada")
+            if path.startswith("/v1/operators/") and path.endswith("/presence"):
+                if principal.role == "SUPERVISOR":
+                    operator_id = path.split("/")[3]
+                    operator = db.get(Operator, operator_id)
+                    affected = set(db.scalars(
+                        select(QueueMembership.queue_id).where(
+                            QueueMembership.operator_id == operator_id
+                        )
+                    ).all())
+                    if (operator is None or operator.operation_id != principal.operation_id
+                            or not affected or not affected.issubset(
+                                granted_queues(db, principal)
+                            )):
+                        raise HTTPException(403, "Presença fora do escopo de filas")
             if path == "/v1/demo/bootstrap" and principal.role != "ADMIN":
                 raise HTTPException(403, "Bootstrap demonstrativo requer administrador")
             if queue_id and principal.role in ("SUPERVISOR", "AUDITOR"):
