@@ -237,7 +237,8 @@ def test_poc_startup_does_not_create_migration_owned_tables(tmp_path):
         assert "session_queue_segments" not in created
         assert "message_queue_provenance" not in created
         assert "session_event_queue_provenance" not in created
-        assert "alembic_version" not in created\n        assert "history_access_audit" not in created
+        assert "alembic_version" not in created
+        assert "history_access_audit" not in created
         assert verify_database(database)["revision"] is None
     finally:
         engine.dispose()
