@@ -2,9 +2,11 @@
 
 All data is synthetic and every DB is created under tmp_path.
 """
+from alembic import command
 from fastapi.testclient import TestClient
 from sqlalchemy import insert, select, text, update
 
+from handoff_hub.audit_schema import HISTORY_ACCESS_AUDIT
 from handoff_hub.poc_api import create_app
 from handoff_hub.poc_db import (
     AuthUser,
@@ -18,7 +20,7 @@ from handoff_hub.provenance_schema import (
     SESSION_EVENT_QUEUE_PROVENANCE,
     SESSION_QUEUE_SEGMENTS,
 )
-from handoff_hub.schema_admin import create_new
+from handoff_hub.schema_admin import PROVENANCE_REVISION, _config, create_new
 from handoff_hub.seed_demo_auth import provision
 
 KEY = {"X-POC-Key": "local-test-only"}
@@ -530,3 +532,98 @@ def test_unversioned_detail_with_page_options_keeps_history_closed(tmp_path):
         )).all())
         assert len(tables) == 17
         assert "session_queue_segments" not in tables
+
+
+def test_verified_history_access_is_persistently_journaled_without_payloads(tmp_path):
+    app, factory, passwords = environment(tmp_path)
+    with TestClient(app) as client:
+        auditor = bearer(client, passwords, "auditor.demo")
+        supervisor = bearer(client, passwords, "supervisor.demo")
+        hid = new_ticket(client, "journal-content")
+        user_message(client, hid, "SENSITIVE_MESSAGE_FOR_TEST")
+        listed = verified_listing(client, "n1", auditor)
+        assert listed.status_code == 200
+        details = history(client, hid, "n1", auditor)
+        assert details.status_code == 200
+        assert "SENSITIVE_MESSAGE_FOR_TEST" in details.text
+        with factory() as db:
+            audit_rows = db.execute(
+                select(HISTORY_ACCESS_AUDIT)
+                .order_by(HISTORY_ACCESS_AUDIT.c.created_at, HISTORY_ACCESS_AUDIT.c.id)
+            ).mappings().all()
+            assert len(audit_rows) == 2
+            assert {row["resource"] for row in audit_rows} == {"LIST", "DETAIL"}
+            list_row = next(r for r in audit_rows if r["resource"] == "LIST")
+            detail_row = next(r for r in audit_rows if r["resource"] == "DETAIL")
+            assert list_row["user_id"] == detail_row["user_id"]
+            assert list_row["role"] == "AUDITOR"
+            assert list_row["operation_id"] == "demo"
+            assert list_row["queue_id"] == "n1"
+            assert list_row["session_id"] is None
+            assert list_row["returned_sessions"] == 1
+            assert detail_row["session_id"] == hid
+            assert detail_row["message_page"] == 1
+            assert detail_row["event_page"] == 1
+            assert detail_row["returned_messages"] == 1
+            assert detail_row["returned_events"] == 1
+            assert "SENSITIVE_MESSAGE_FOR_TEST" not in str(audit_rows)
+        # Denied cross-queue request does not make a successful read.
+        assert history(client, hid, "n2", auditor).status_code == 404
+        assert verified_listing(client, "n1", supervisor).status_code == 404
+        with factory() as db:
+            assert len(db.execute(select(HISTORY_ACCESS_AUDIT)).all()) == 2
+
+
+def test_audit_storage_failure_prevents_verified_payload_delivery(tmp_path):
+    app, factory, passwords = environment(tmp_path)
+    # This SQLite trigger models an unavailable journal WITHOUT deleting schema.
+    with TestClient(app, raise_server_exceptions=False) as client:
+        auditor = bearer(client, passwords, "auditor.demo")
+        hid = new_ticket(client, "audit-write-failed")
+        user_message(client, hid, "DO_NOT_DISCLOSE_ON_AUDIT_FAILURE")
+        with factory.begin() as db:
+            db.connection().exec_driver_sql(
+                "CREATE TRIGGER reject_audit_insert BEFORE INSERT ON history_access_audit "
+                "BEGIN SELECT RAISE(ABORT, 'journal unavailable'); END"
+            )
+        listing = verified_listing(client, "n1", auditor)
+        details = history(client, hid, "n1", auditor)
+        assert listing.status_code == 500
+        assert details.status_code == 500
+        assert "DO_NOT_DISCLOSE_ON_AUDIT_FAILURE" not in listing.text
+        assert "DO_NOT_DISCLOSE_ON_AUDIT_FAILURE" not in details.text
+        with factory() as db:
+            assert len(db.execute(select(HISTORY_ACCESS_AUDIT)).all()) == 0
+
+
+def test_verified_data_stays_closed_on_versioned_database_without_audit_schema(tmp_path):
+    database = tmp_path / "older-revision.db"
+    create_new(database, confirmed=True)
+    # Downgrade only an empty, disposable test database to model legacy 006B-2.
+    command.downgrade(_config(database), PROVENANCE_REVISION)
+    url = f"sqlite:///{database.as_posix()}"
+    factory, engine = make_session_factory(url)
+    credentials = tmp_path / "older-credentials.txt"
+    provision(factory, credentials)
+    passwords = {
+        line.split(" [", 1)[0]: line.split("]: ", 1)[1]
+        for line in credentials.read_text(encoding="utf-8").splitlines()
+        if " [" in line and "]: " in line
+    }
+    engine.dispose()
+    app = create_app(database_url=url, api_key="local-test-only")
+    with TestClient(app) as client:
+        auditor = bearer(client, passwords, "auditor.demo")
+        hid = new_ticket(client, "older-audit-revision")
+        user_message(client, hid, "CONFIDENTIAL_LEGACY_VERSIONED")
+        listing = verified_listing(client, "n1", auditor)
+        details = history(client, hid, "n1", auditor)
+        assert listing.status_code == 503
+        assert details.status_code == 503
+        assert "CONFIDENTIAL_LEGACY_VERSIONED" not in details.text
+    with factory() as db:
+        tables = set(db.scalars(text(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        )).all())
+        assert "history_access_audit" not in tables
+        assert "session_queue_segments" in tables
