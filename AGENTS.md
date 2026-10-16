@@ -1,3 +1,16 @@
+
+## SPEC-006A — Fundações de acesso com escopo por fila (em andamento)
+
+- Nunca retornar dados de outra fila em APIs gerenciais ou administrativas. SQL deve filtrar operação/fila ANTES de agregar, ordenar, paginar, acessar mensagens ou fornecer histórico.
+- `queue_role_grants` controla autorização SUPERVISOR/AUDITOR; `queue_memberships` controla despacho de operadores. Nunca unificar sem ADR e testes.
+- Transferências cruzam segmentos. Até SPEC-006B, leitura de histórico é fail-closed para papéis sem concessões em **todas** as filas da sessão.
+- ADMIN não ganha acesso automático ao conteúdo de conversas; /v1/outbox não expõe corpos de mensagens aos papéis humanos.
+- Operadores precisam ver os **nomes das filas destino** para N1→N2, mas não seus indicadores ou conversas.
+- Para SQLite persistente, esquema novo passa por Alembic; bases legadas completas recebem backup via sqlite3.backup antes de stamp/upgrade. Nunca apagar dados para consertar schema.
+- Gates devem incluir pytest, Ruff e build local `.\\start.cmd --check`, além da checagem negativa de acesso entre N1/N2, rollback e histórico.
+- A SPEC-006B ainda precisa implementar segmentos históricos e trilhas de consulta. Não promover administração CRUD/monitoria/auditoria antes de escopo seguro completo.
+- Sem GitHub Actions, sem dados reais e sem implantar em rede antes do hardening IAM/OIDC.
+
 ## POC-005 — Identidade, autorização e roteamento (obrigatório)
 
 - A navegação por perfil deve refletir **autorizações do backend**, nunca somente menus ocultos.
