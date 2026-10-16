@@ -38,13 +38,20 @@ test('each supervisor screen has an independent page module', () => {
   }
 })
 
-test('operator is in a dedicated shell with scrollable content', () => {
+test('operator is a separate viewport-fitted workspace with internal scrolling only', () => {
   const app = read('src/App.tsx')
+  const desk = read('src/OperatorDesk.tsx')
   const css = read('src/styles.css')
   assert.match(app,/if\(operatorMode\)return/)
   assert.match(app,/className="operator-portal"/)
   assert.match(app,/className="operator-portal__main"/)
-  assert.match(css,/\.operator-portal__main\s*\{[^}]*overflow-y:auto/s)
+  assert.match(css,/\.operator-portal__main\s*\{[\s\S]*?overflow:hidden/)
+  assert.match(css,/\.operator-portal__main \.desk-grid\s*\{[\s\S]*?height:auto!important/)
+  assert.match(css,/\.operator-portal__main \.desk-chat-list\s*\{[\s\S]*?overflow-y:auto/)
+  assert.match(css,/\.desk-layout--compact \.desk-worklist\s*\{[\s\S]*?overflow-y:auto/)
+  assert.match(desk,/className="desk-chat-tools"/)
+  assert.match(desk,/setTransferOpen/)
+  assert.match(desk,/e\.shiftKey/)
   assert.match(app,/if\(adminMode\)return/)
   assert.match(app,/className="layout layout--supervisor"/)
 })
