@@ -103,7 +103,7 @@ def dry_run_report(database: Path) -> dict:
     """Assess only chain evidence, without reading message content or writing data."""
     state = verify_database(database)
     version = state["revision"]
-    if version not in (None, "006b1_poc_baseline", SCHEMA_PROVENANCE, SCHEMA_AUDIT, SCHEMA_SECURITY):
+    if version not in (\n        None, "006b1_poc_baseline", SCHEMA_PROVENANCE, SCHEMA_AUDIT, SCHEMA_SECURITY,\n    ):
         raise RuntimeError("Unknown revision for the legacy dry run")
     summary = {
         "mode": "DRY_RUN_READ_ONLY",
