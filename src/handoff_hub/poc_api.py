@@ -18,6 +18,7 @@ from sqlalchemy import func, select
 from handoff_hub.auto_dispatch import run_dispatch_cycle
 from handoff_hub.demo_routing import DEFAULT_INTAKE_QUEUE_ID, configure_demo_routing
 from handoff_hub.operator_workflow import register_operator_workflow
+from handoff_hub.queue_scope import permitted_queues, visible_operator_ids
 from handoff_hub.poc_auth import (
     Principal,
     assert_access,
@@ -186,43 +187,62 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
         return {"result": "demo_ready", "operation_id": "demo", "queue_id": "n1"}
 
     @app.get("/v1/dashboard", dependencies=[Depends(authenticate)])
-    def dashboard_snapshot():
-        """One read for the local cockpit; excludes message bodies and outbox payloads."""
+    def dashboard_snapshot(principal: Principal = Depends(authenticate)):
+        """All metrics use queue-scoped SQL before aggregation or pagination."""
         with factory() as db:
-            qs = db.scalars(select(Queue).order_by(Queue.id)).all()
-            ops = db.scalars(select(Operator).order_by(Operator.name)).all()
+            allowed = permitted_queues(db, principal)
+            operator_ids = visible_operator_ids(db, principal)
+            qs = db.scalars(select(Queue).where(
+                Queue.operation_id == principal.operation_id,
+                Queue.id.in_(allowed),
+            ).order_by(Queue.id)).all()
+            ops = db.scalars(select(Operator).where(
+                Operator.operation_id == principal.operation_id,
+                Operator.id.in_(operator_ids),
+            ).order_by(Operator.name)).all()
             recent = db.scalars(
                 select(HandoffSession)
+                .where(HandoffSession.operation_id == principal.operation_id,
+                       HandoffSession.queue_id.in_(allowed))
                 .order_by(HandoffSession.created_at.desc(), HandoffSession.id.desc())
                 .limit(200)
             ).all()
             waiting_by_queue = dict(db.execute(
                 select(HandoffSession.queue_id, func.count())
-                .where(HandoffSession.status == "QUEUED")
+                .where(HandoffSession.status == "QUEUED",
+                       HandoffSession.queue_id.in_(allowed))
                 .group_by(HandoffSession.queue_id)
             ).all())
             offered_by_queue = dict(db.execute(
                 select(HandoffSession.queue_id, func.count())
-                .where(HandoffSession.status == "OFFERED")
+                .where(HandoffSession.status == "OFFERED",
+                       HandoffSession.queue_id.in_(allowed))
                 .group_by(HandoffSession.queue_id)
             ).all())
             active_by_queue = dict(db.execute(
                 select(HandoffSession.queue_id, func.count())
-                .where(HandoffSession.status == "ACTIVE")
+                .where(HandoffSession.status == "ACTIVE",
+                       HandoffSession.queue_id.in_(allowed))
                 .group_by(HandoffSession.queue_id)
             ).all())
             active_by_operator = dict(db.execute(
                 select(HandoffSession.operator_id, func.count())
-                .where(HandoffSession.status == "ACTIVE")
+                .where(HandoffSession.status == "ACTIVE",
+                       HandoffSession.queue_id.in_(allowed))
                 .group_by(HandoffSession.operator_id)
             ).all())
             offered_by_operator = dict(db.execute(
                 select(HandoffSession.operator_id, func.count())
-                .where(HandoffSession.status == "OFFERED")
+                .where(HandoffSession.status == "OFFERED",
+                       HandoffSession.queue_id.in_(allowed))
                 .group_by(HandoffSession.operator_id)
             ).all())
             outbox_by_status = dict(db.execute(
-                select(OutboxEvent.status, func.count()).group_by(OutboxEvent.status)
+                select(OutboxEvent.status, func.count())
+                .join(HandoffSession, HandoffSession.id == OutboxEvent.session_id)
+                .where(HandoffSession.operation_id == principal.operation_id,
+                       HandoffSession.queue_id.in_(allowed))
+                .group_by(OutboxEvent.status)
             ).all())
             return {
                 "handoffs": [as_handoff(h) for h in recent],
@@ -242,9 +262,13 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
             }
 
     @app.get("/v1/queues", dependencies=[Depends(authenticate)])
-    def queues():
+    def queues(principal: Principal = Depends(authenticate)):
         with factory() as db:
-            qs = db.scalars(select(Queue).order_by(Queue.id)).all()
+            allowed = permitted_queues(db, principal)
+            qs = db.scalars(select(Queue).where(
+                Queue.operation_id == principal.operation_id,
+                Queue.id.in_(allowed),
+            ).order_by(Queue.id)).all()
             return [{"id": q.id, "operation_id": q.operation_id, "name": q.name,
                      "waiting": db.scalar(select(func.count()).select_from(HandoffSession).where(
                          HandoffSession.queue_id == q.id, HandoffSession.status == "QUEUED")) or 0} for q in qs]
@@ -345,9 +369,13 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
             return {"operator_id": operator_id, "capacity": op.capacity}
 
     @app.get("/v1/operators", dependencies=[Depends(authenticate)])
-    def operators():
+    def operators(principal: Principal = Depends(authenticate)):
         with factory() as db:
-            ops = db.scalars(select(Operator).order_by(Operator.name)).all()
+            ids = visible_operator_ids(db, principal)
+            ops = db.scalars(select(Operator).where(
+                Operator.operation_id == principal.operation_id,
+                Operator.id.in_(ids),
+            ).order_by(Operator.name)).all()
             return [{"id": o.id, "operation_id": o.operation_id, "name": o.name,
                      "presence": o.presence, "capacity": o.capacity,
                      "active": db.scalar(select(func.count()).select_from(HandoffSession).where(
@@ -392,10 +420,17 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
             return as_handoff(h)
 
     @app.get("/v1/handoffs", dependencies=[Depends(authenticate)])
-    def handoffs():
+    def handoffs(principal: Principal = Depends(authenticate)):
         with factory() as db:
-            return [as_handoff(h) for h in db.scalars(select(HandoffSession).order_by(
-                HandoffSession.created_at.desc(), HandoffSession.id.desc()).limit(200)).all()]
+            allowed = permitted_queues(db, principal)
+            return [as_handoff(h) for h in db.scalars(
+                select(HandoffSession).where(
+                    HandoffSession.operation_id == principal.operation_id,
+                    HandoffSession.queue_id.in_(allowed),
+                ).order_by(
+                    HandoffSession.created_at.desc(), HandoffSession.id.desc()
+                ).limit(200)
+            ).all()]
 
     @app.post("/v1/dispatch/next", dependencies=[Depends(authenticate)])
     def dispatch_next(body: DispatchRequest):
