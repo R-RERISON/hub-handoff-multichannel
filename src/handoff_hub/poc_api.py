@@ -18,6 +18,7 @@ from sqlalchemy import func, select
 from handoff_hub.auto_dispatch import run_dispatch_cycle
 from handoff_hub.demo_routing import DEFAULT_INTAKE_QUEUE_ID, configure_demo_routing
 from handoff_hub.operator_workflow import register_operator_workflow
+from handoff_hub.queue_grants_api import register_queue_grants
 from handoff_hub.queue_scope import permitted_queues, visible_operator_ids
 from handoff_hub.poc_auth import (
     Principal,
@@ -119,7 +120,7 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
 
     app = FastAPI(title="Handoff Hub — SQLite POC", version="0.5.0-poc", lifespan=lifespan)
     app.add_middleware(CORSMiddleware, allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
-                       allow_credentials=False, allow_methods=["GET", "POST", "PATCH"],
+                       allow_credentials=False, allow_methods=["GET", "POST", "PATCH", "DELETE"],
                        allow_headers=["X-POC-Key", "Idempotency-Key", "Content-Type", "Authorization"])
 
     async def authenticate(
@@ -142,6 +143,7 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
         return principal
 
     app.include_router(register_identity_endpoints(factory))
+    app.include_router(register_queue_grants(factory, authenticate))
 
     def exclusive_tx(db):
         """SQLite writer lock. Do not reuse this locking syntax in SQL Server."""
