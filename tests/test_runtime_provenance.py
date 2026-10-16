@@ -189,3 +189,24 @@ def test_unversioned_database_does_not_create_provenance_tables(tmp_path):
         assert "session_queue_segments" not in tables
         assert "message_queue_provenance" not in tables
         assert "session_event_queue_provenance" not in tables
+
+
+def test_failed_transfer_keeps_existing_segment_open(tmp_path):
+    path, factory = setup_versioned(tmp_path)
+    with TestClient(create_app(database_url=f"sqlite:///{path.as_posix()}",
+                               api_key="legacy-test-key")) as client:
+        hid = create_ticket(client, "failed-transfer")
+        assigned(factory, hid, "op-ana")
+        rejected = client.post(
+            f"/v1/handoffs/{hid}/transfer", headers=HEADERS,
+            json={"operator_id": "op-ana", "queue_id": "n1",
+                  "reason": "Destino igual a origem"},
+        )
+        assert rejected.status_code == 422
+    with factory() as db:
+        segments = db.execute(
+            select(SESSION_QUEUE_SEGMENTS).where(SESSION_QUEUE_SEGMENTS.c.session_id == hid)
+        ).mappings().all()
+        assert len(segments) == 1
+        assert segments[0]["queue_id"] == "n1"
+        assert segments[0]["ended_at"] is None
