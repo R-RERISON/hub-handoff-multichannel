@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import insert, select, text, update
 
 from handoff_hub.audit_schema import HISTORY_ACCESS_AUDIT
+from handoff_hub.security_schema import SECURITY_DECISIONS
 from handoff_hub.poc_api import create_app
 from handoff_hub.poc_db import (
     AuthUser,
@@ -640,3 +641,116 @@ def test_verified_data_stays_closed_on_versioned_database_without_audit_schema(t
         )).all())
         assert "history_access_audit" not in tables
         assert "session_queue_segments" in tables
+
+
+def test_security_denials_record_scoped_actions_without_hidden_identifiers(tmp_path):
+    app, factory, passwords = environment(tmp_path)
+    with TestClient(app) as client:
+        auditor = bearer(client, passwords, "auditor.demo")
+        hid = new_ticket(client, "security-denials")
+        user_message(client, hid, "DO_NOT_LOG_MESSAGE_CONTENT")
+        assert history(client, hid, "n2", auditor).status_code == 404
+        assert verified_listing(client, "n2", auditor).status_code == 404
+        assert history(client, "foreign-session", "n1", auditor).status_code == 404
+        assert verified_listing(client, "unknown-queue", auditor).status_code == 404
+        with factory() as db:
+            rows = db.execute(select(SECURITY_DECISIONS)).mappings().all()
+            assert len(rows) == 4
+            assert {r["action"] for r in rows} == {
+                "HISTORY_LIST_DENIED", "HISTORY_DETAIL_DENIED",
+            }
+            assert all(r["actor_role"] == "AUDITOR" for r in rows)
+            assert all(r["outcome"] == "DENIED" for r in rows)
+            assert all(r["operation_id"] == "demo" for r in rows)
+            assert [r["queue_id"] for r in rows].count(None) == 1
+            assert "foreign-session" not in str(rows)
+            assert "DO_NOT_LOG_MESSAGE_CONTENT" not in str(rows)
+            assert "unknown-queue" not in str(rows)
+            assert all(r["target_user_id"] is None for r in rows)
+
+
+def test_security_grant_and_revocation_records_are_atomic_and_idempotent(tmp_path):
+    app, factory, passwords = environment(tmp_path)
+    with TestClient(app) as client:
+        admin = bearer(client, passwords, "admin.demo")
+        auditor = bearer(client, passwords, "auditor.demo")
+        with factory() as db:
+            target = db.scalar(select(AuthUser.id).where(
+                AuthUser.username == "auditor.demo",
+            ))
+            actor = db.scalar(select(AuthUser.id).where(
+                AuthUser.username == "admin.demo",
+            ))
+        args = {"user_id": target, "queue_id": "n1", "role": "AUDITOR"}
+        endpoint = "/v1/admin/queue-grants"
+        disabled = client.patch(endpoint, headers=admin, json={
+            **args, "enabled": False,
+        })
+        assert disabled.status_code == 200, disabled.text
+        again = client.patch(endpoint, headers=admin, json={
+            **args, "enabled": False,
+        })
+        assert again.status_code == 200
+        # Scope denial after revocation does not restore old history access.
+        assert verified_listing(client, "n1", auditor).status_code == 404
+        enabled = client.patch(endpoint, headers=admin, json={
+            **args, "enabled": True,
+        })
+        assert enabled.status_code == 200, enabled.text
+        with factory() as db:
+            rows = db.execute(select(SECURITY_DECISIONS)
+                              .order_by(SECURITY_DECISIONS.c.created_at,
+                                        SECURITY_DECISIONS.c.id)).mappings().all()
+            assert len(rows) == 3
+            grant_rows = [r for r in rows if r["outcome"] == "APPLIED"]
+            assert {r["action"] for r in grant_rows} == {
+                "GRANT_ENABLED", "GRANT_REVOKED",
+            }
+            assert len(grant_rows) == 2
+            assert all(r["actor_user_id"] == actor for r in grant_rows)
+            assert all(r["target_user_id"] == target for r in grant_rows)
+            assert all(r["queue_id"] == "n1" for r in grant_rows)
+            assert all(r["operation_id"] == "demo" for r in grant_rows)
+            assert "GRANT_REVOKED" in {r["action"] for r in rows}
+
+
+def test_security_journal_failure_cannot_commit_admin_grant(tmp_path):
+    app, factory, passwords = environment(tmp_path)
+    with TestClient(app, raise_server_exceptions=False) as client:
+        admin = bearer(client, passwords, "admin.demo")
+        with factory.begin() as db:
+            target = db.scalar(select(AuthUser.id).where(
+                AuthUser.username == "auditor.demo",
+            ))
+            db.connection().exec_driver_sql(
+                "CREATE TRIGGER block_security_write "
+                "BEFORE INSERT ON security_decisions "
+                "BEGIN SELECT RAISE(ABORT, 'journal unavailable'); END"
+            )
+        response = client.patch("/v1/admin/queue-grants", headers=admin, json={
+            "user_id": target, "queue_id": "n1", "role": "AUDITOR",
+            "enabled": False,
+        })
+        assert response.status_code == 500
+        with factory() as db:
+            from handoff_hub.poc_db import QueueRoleGrant
+
+            assert db.get(QueueRoleGrant, (target, "n1", "AUDITOR")) is not None
+            assert db.execute(select(SECURITY_DECISIONS)).all() == []
+
+
+def test_failed_denial_audit_does_not_change_scoped_http_denial(tmp_path):
+    app, factory, passwords = environment(tmp_path)
+    with TestClient(app, raise_server_exceptions=False) as client:
+        auditor = bearer(client, passwords, "auditor.demo")
+        with factory.begin() as db:
+            db.connection().exec_driver_sql(
+                "CREATE TRIGGER block_security_write "
+                "BEFORE INSERT ON security_decisions "
+                "BEGIN SELECT RAISE(ABORT, 'journal unavailable'); END"
+            )
+        response = verified_listing(client, "n2", auditor)
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Fila não encontrada"
+        with factory() as db:
+            assert db.execute(select(SECURITY_DECISIONS)).all() == []
