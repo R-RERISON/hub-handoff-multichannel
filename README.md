@@ -1,3 +1,12 @@
+# SPEC-006A — Autorização por fila e migrações seguras (em homologação)
+
+Primeiro incremento da evolução enterprise: filtros e permissões de SUPERVISOR/AUDITOR por fila, APIs de concessões para ADMIN, proteção de consultas de mensagens e dashboards, e migrações Alembic para SQLite com backup automático antes de atualizar o banco anterior.
+
+**Pendente de homologação:** execute `.\\start.cmd --check` na branch `feat/006-queue-scoped-auth-foundation` e depois `.\\start.cmd`; não apague bancos nem senhas. Acesso a históricos transferidos fica temporariamente **negado** a quem não tiver concessão para todas as filas envolvidas, até a fatia SPEC-006B de segmentação histórica.
+
+[Contrato e gates](docs/specs/SPEC-006A-queue-scopes-and-migrations.md).
+
+
 ## UX-005.1 — Mesa compacta e intake N1-first
 
 Atualização da POC 0.5: a Mesa do Operador não usa mais rolagem da página; histórico de mensagens e lista de atendimento rolam apenas internamente quando necessário. Campo de resposta permanente (Enter envia; Shift+Enter adiciona linha), ações de Histórico, Transferir e Encerrar próximas ao cabeçalho da conversa. Em telas estreitas, as áreas alternam por abas.
