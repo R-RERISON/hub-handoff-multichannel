@@ -342,3 +342,39 @@ def test_readonly_legacy_audit_never_backfills_or_reads_message_content(tmp_path
     after = provenance_report(path)
     assert after == before
     assert "confidential-marker-only-for-test" not in str(after)
+
+
+def test_decline_and_direct_assignment_events_have_verified_segments(tmp_path):
+    path, factory = setup_versioned(tmp_path)
+    with TestClient(create_app(database_url=f"sqlite:///{path.as_posix()}",
+                               api_key="legacy-test-key")) as client:
+        hid = create_ticket(client, "decline-then-assign")
+        offer = client.post(
+            "/v1/dispatch/offer", headers=HEADERS, json={"queue_id": "n1"}
+        )
+        assert offer.status_code == 200
+        declined = client.post(
+            f"/v1/handoffs/{hid}/decline", headers=HEADERS,
+            json={"operator_id": "op-ana"},
+        )
+        assert declined.status_code == 200, declined.text
+        assignment = client.post(
+            "/v1/dispatch/next", headers=HEADERS,
+            json={"queue_id": "n1"},
+        )
+        assert assignment.status_code == 200, assignment.text
+        assert assignment.json()["result"] == "assigned"
+        assert assignment.json()["session"]["id"] == hid
+    with factory() as db:
+        events = db.scalars(
+            select(SessionEvent).where(SessionEvent.session_id == hid)
+        ).all()
+        assert {"QUEUED", "OFFERED", "DECLINED", "ACTIVE"} == {
+            event.event_type for event in events
+        }
+        evidence = {
+            row["event_id"]: row
+            for row in db.execute(select(SESSION_EVENT_QUEUE_PROVENANCE)).mappings()
+        }
+        assert set(evidence) == {event.id for event in events}
+        assert all(row["confidence"] == "VERIFIED" for row in evidence.values())
