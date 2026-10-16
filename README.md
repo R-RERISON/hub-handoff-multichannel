@@ -1,3 +1,13 @@
+## UX-005.1 — Mesa compacta e intake N1-first
+
+Atualização da POC 0.5: a Mesa do Operador não usa mais rolagem da página; histórico de mensagens e lista de atendimento rolam apenas internamente quando necessário. Campo de resposta permanente (Enter envia; Shift+Enter adiciona linha), ações de Histórico, Transferir e Encerrar próximas ao cabeçalho da conversa. Em telas estreitas, as áreas alternam por abas.
+
+O intake sem direcionamento explícito é **sempre N1**. O seed de demonstração vincula **Ana somente a N1** e **Bruno somente a N2**; um direcionamento com queue_id=n2 continua possível e transferências de N1 para N2 continuam automáticas. O banco de testes antigo é atualizado somente uma vez, preservando sessões ativas e mudanças subsequentes feitas pelo supervisor.
+
+Validar com .\\start.cmd --check e .\\start.cmd após atualizar a branch. Não apague o SQLite ou as senhas.
+
+Detalhes: [UX-005.1](docs/ux/UX-005-compact-operator-and-default-intake.md).
+
 # Handoff Hub Multichannel — POC 0.5 / RBAC + filas automáticas
 
 **Nova etapa:** login individual com autorização por perfil no backend, fila FIFO com rodízio durável por operador e notificação modal de novas ofertas. As telas de Operador, Supervisão e Administração continuam independentes. O SQLite recebe somente novas tabelas.
