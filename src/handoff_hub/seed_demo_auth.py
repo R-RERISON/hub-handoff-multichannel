@@ -13,12 +13,12 @@ from handoff_hub.poc_auth import password_hash
 from handoff_hub.poc_db import (
     AuthSession,
     AuthUser,
+    DemoSeedRevision,
     Integration,
     Operation,
     Operator,
     Queue,
     QueueRoleGrant,
-    DemoSeedRevision,
     make_session_factory,
 )
 
