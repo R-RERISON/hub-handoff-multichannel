@@ -43,6 +43,7 @@ from handoff_hub.poc_db import (
     utc_now,
 )
 from handoff_hub.provenance_writer import ProvenanceRecorder
+from handoff_hub.verified_history import register_verified_history
 from handoff_hub.queue_authorization import (
     change_grant,
     granted_queues,
@@ -206,7 +207,13 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
                 require_queue(db, principal, queue_id, manage=request.method != "GET")
             if path.startswith("/v1/handoffs/"):
                 handoff_id = path.split("/")[3]
-                if handoff_id and principal.role in ("SUPERVISOR", "AUDITOR"):
+                verified_scoped_read = (
+                    request.method == "GET"
+                    and len(path.split("/")) == 5
+                    and path.endswith("/verified-history")
+                )
+                if (handoff_id and principal.role in ("SUPERVISOR", "AUDITOR")
+                        and not verified_scoped_read):
                     require_handoff(db, principal, handoff_id)
             if principal.role in ("SUPERVISOR", "AUDITOR") and path == "/v1/outbox":
                 raise HTTPException(403, "Outbox não está disponível para este papel")
@@ -640,4 +647,5 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
     app.include_router(register_operator_workflow(
         factory, authenticate, exclusive_tx, as_handoff, provenance
     ))
+    app.include_router(register_verified_history(factory, authenticate, provenance))
     return app
