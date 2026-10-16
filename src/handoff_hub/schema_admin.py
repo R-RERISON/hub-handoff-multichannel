@@ -11,9 +11,9 @@ import hashlib
 import json
 import os
 import sqlite3
+from contextlib import closing
 from datetime import UTC, datetime
 from pathlib import Path
-from urllib.parse import quote
 
 from alembic import command
 from alembic.config import Config
@@ -35,7 +35,7 @@ class SchemaSafetyError(RuntimeError):
 def _read_only(path: Path) -> sqlite3.Connection:
     if not path.is_file():
         raise SchemaSafetyError(f"Database does not exist: {path}")
-    uri = "file:" + quote(path.resolve().as_posix(), safe="/:") + "?mode=ro"
+    uri = path.resolve().as_uri() + "?mode=ro"
     return sqlite3.connect(uri, uri=True, timeout=10)
 
 
@@ -47,7 +47,7 @@ def _pragma(conn: sqlite3.Connection, name: str, table: str) -> list[tuple]:
 
 def verify_database(path: Path) -> dict:
     """Read-only, fail-closed validation against the checked-in POC schema."""
-    with _read_only(path) as db:
+    with closing(_read_only(path)) as db:
         integrity = db.execute("PRAGMA integrity_check").fetchone()
         if not integrity or integrity[0] != "ok":
             raise SchemaSafetyError("SQLite integrity_check failed")
@@ -138,12 +138,15 @@ def verified_backup(source: Path, backup_dir: Path) -> tuple[Path, str]:
     if backup_path.exists():
         raise SchemaSafetyError("Backup destination unexpectedly exists")
     try:
-        with _read_only(source) as origin, sqlite3.connect(backup_path) as destination:
-            origin.backup(destination, pages=100)
+        with closing(_read_only(source)) as origin:
+            with closing(sqlite3.connect(backup_path)) as destination:
+                origin.backup(destination, pages=100)
+                destination.commit()
         backup = verify_database(backup_path)
         if backup["revision"] != verify_database(source)["revision"]:
             raise SchemaSafetyError("Backup version differs from source; stop writers")
-        sha256 = hashlib.file_digest(backup_path.open("rb"), "sha256").hexdigest()
+        with backup_path.open("rb") as handle:
+            sha256 = hashlib.file_digest(handle, "sha256").hexdigest()
         return backup_path, sha256
     except Exception:
         backup_path.unlink(missing_ok=True)
