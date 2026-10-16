@@ -25,12 +25,6 @@ from handoff_hub.poc_auth import (
     naive_utc,
     register_identity_endpoints,
 )
-from handoff_hub.queue_authorization import (
-    change_grant,
-    granted_queues,
-    require_handoff,
-    require_queue,
-)
 from handoff_hub.poc_db import (
     AuthSession,
     AuthUser,
@@ -47,6 +41,12 @@ from handoff_hub.poc_db import (
     SessionTransfer,
     make_session_factory,
     utc_now,
+)
+from handoff_hub.queue_authorization import (
+    change_grant,
+    granted_queues,
+    require_handoff,
+    require_queue,
 )
 
 
