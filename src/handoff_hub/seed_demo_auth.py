@@ -18,6 +18,7 @@ from handoff_hub.poc_db import (
     Operator,
     Queue,
     QueueRoleGrant,
+    DemoSeedRevision,
     make_session_factory,
 )
 
@@ -70,23 +71,25 @@ def provision(factory, credential_file: Path, reset: bool = False) -> list[str]:
                 account.role = role
                 account.operator_id = operator_id
             generated.append((username, role, password))
-        # Grant demo supervisors both queues, and auditors N1 only by default.
-        # Existing grants are never overwritten on subsequent startups.
-        db.flush()
-        demo_grants = {
-            "supervisor.demo": ("SUPERVISOR", ("n1", "n2")),
-            "auditor.demo": ("AUDITOR", ("n1",)),
-        }
-        for name, (role, queue_ids) in demo_grants.items():
-            account = db.scalar(select(AuthUser).where(AuthUser.username == name))
-            if account is None:
-                continue
-            for qid in queue_ids:
-                if db.get(QueueRoleGrant, (account.id, qid, role)) is None:
-                    db.add(QueueRoleGrant(
-                        user_id=account.id, queue_id=qid, role=role,
-                        granted_by="demo-seed",
-                    ))
+        # Grant scopes only once. Later ADMIN revocations must survive restart.
+        if db.get(DemoSeedRevision, "spec006_demo_grants_v1") is None:
+            # Existing grants are never overwritten on subsequent startups.
+            db.flush()
+            demo_grants = {
+                "supervisor.demo": ("SUPERVISOR", ("n1", "n2")),
+                "auditor.demo": ("AUDITOR", ("n1",)),
+            }
+            for name, (role, queue_ids) in demo_grants.items():
+                account = db.scalar(select(AuthUser).where(AuthUser.username == name))
+                if account is None:
+                    continue
+                for qid in queue_ids:
+                    if db.get(QueueRoleGrant, (account.id, qid, role)) is None:
+                        db.add(QueueRoleGrant(
+                            user_id=account.id, queue_id=qid, role=role,
+                            granted_by="demo-seed",
+                        ))
+            db.add(DemoSeedRevision(id="spec006_demo_grants_v1"))
 
     if generated:
         # File only on the developer's machine, excluded from version control.
