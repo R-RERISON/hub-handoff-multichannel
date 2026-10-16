@@ -13,6 +13,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from handoff_hub.poc_db import AuthSession, AuthUser, HandoffSession, LoginThrottle, utc_now
+from handoff_hub.queue_scope import (
+    require_handoff,
+    require_operator_management,
+    require_queue,
+)
 
 PBKDF2_ITERATIONS = 600_000
 HEARTBEAT_MAX_AGE = 40
@@ -96,6 +101,41 @@ def require_owner(factory, handoff_id: str, operator_id: str) -> None:
 
 def assert_access(factory, p: Principal, request: Request, payload: dict | None) -> None:
     path, method = request.url.path, request.method
+    # Apply object/queue checks for every non-operator request before the
+    # endpoint runs. Aggregated list endpoints additionally filter in SQL.
+    if p.role in ("ADMIN", "SUPERVISOR", "AUDITOR"):
+        if method == "GET" and path == "/v1/outbox":
+            raise HTTPException(403, "Conteúdo da outbox reservado ao conector")
+        if (p.role == "ADMIN" and method == "GET"
+                and re.fullmatch(r"/v1/handoffs/[^/]+/(messages|timeline)", path)):
+            raise HTTPException(403, "Administração não concede leitura de chats")
+        with factory() as db:
+            queue_route = re.fullmatch(r"/v1/queues/([^/]+)(?:/.*)?", path)
+            if queue_route:
+                require_queue(db, p, queue_route.group(1))
+            handoff_route = re.fullmatch(
+                r"/v1/handoffs/([^/]+)/(?:messages|timeline)", path
+            )
+            if handoff_route and method == "GET":
+                require_handoff(db, p, handoff_route.group(1))
+            if method == "POST" and path == "/v1/handoffs":
+                body = payload or {}
+                if body.get("operation_id", "demo") != p.operation_id:
+                    raise HTTPException(404, "Operação não encontrada")
+                require_queue(db, p, body.get("queue_id", "n1"))
+            operator_route = re.fullmatch(
+                r"/v1/operators/([^/]+)/(?:capacity|presence)", path
+            )
+            if operator_route and method == "PATCH":
+                require_operator_management(db, p, operator_route.group(1))
+            membership = re.fullmatch(
+                r"/v1/queues/([^/]+)/members/([^/]+)", path
+            )
+            if membership and method == "PATCH":
+                require_queue(db, p, membership.group(1))
+                require_operator_management(db, p, membership.group(2))
+    if p.role != "ADMIN" and path == "/v1/demo/bootstrap":
+        raise HTTPException(403, "Somente administração prepara dados de laboratório")
     if p.role == "ADMIN":
         if method == "POST" and (
             path in ("/v1/dispatch/next", "/v1/dispatch/offer")
