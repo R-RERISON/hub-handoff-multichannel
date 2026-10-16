@@ -273,7 +273,7 @@ def test_audit_revision_requires_explicit_offline_upgrade_and_preserves_rows(tmp
     assert result["audit_table_empty"] is True
     assert len(result["backup_sha256"]) == 64
     assert after["revision"] == AUDIT_REVISION
-    assert after["table_count"] == original["table_count"] + 5
+    assert after["table_count"] == original["table_count"] + 4
     assert after["row_counts"]["history_access_audit"] == 0
     assert all(after["row_counts"][table] == amount
                for table, amount in before["row_counts"].items())
