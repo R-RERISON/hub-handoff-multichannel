@@ -163,8 +163,21 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
             if path == "/v1/operators" and request.method != "GET":
                 raise HTTPException(403, "Cadastro de operadores reservado à administração")
             if path.startswith("/v1/operators/") and path.endswith("/capacity"):
-                if principal.role != "ADMIN":
-                    raise HTTPException(403, "Capacidade global requer administrador")
+                if principal.role not in ("ADMIN", "SUPERVISOR"):
+                    raise HTTPException(403, "Perfil sem permissão para capacidade")
+                if principal.role == "SUPERVISOR":
+                    operator_id = path.split("/")[3]
+                    operator = db.get(Operator, operator_id)
+                    affected = set(db.scalars(
+                        select(QueueMembership.queue_id).where(
+                            QueueMembership.operator_id == operator_id
+                        )
+                    ).all())
+                    if (operator is None or operator.operation_id != principal.operation_id
+                            or not affected or not affected.issubset(
+                                granted_queues(db, principal)
+                            )):
+                        raise HTTPException(403, "Operador participa de fila não autorizada")
             if path == "/v1/demo/bootstrap" and principal.role != "ADMIN":
                 raise HTTPException(403, "Bootstrap demonstrativo requer administrador")
             if queue_id and principal.role in ("SUPERVISOR", "AUDITOR"):
