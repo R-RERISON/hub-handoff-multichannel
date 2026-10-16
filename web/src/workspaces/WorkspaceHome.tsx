@@ -26,7 +26,7 @@ export default function WorkspaceHome(){
       <span className="workspace-home__warning">POC SQLite local · Seleção demonstrativa sem autenticação corporativa</span>
     </div>
     <div className="workspace-home__cards">
-      {spaces.map(space=><button className={'workspace-home__card workspace-home__card--'+space.kind}
+      {spaces.filter(space=>space.kind!=='operator').map(space=><button className={'workspace-home__card workspace-home__card--'+space.kind}
         key={space.path} onClick={()=>navigate(space.path)}>
         <span className="workspace-home__icon">{space.icon}</span>
         <span className="workspace-home__status">{space.status}</span>

@@ -1,3 +1,16 @@
+## POC-005 — Identidade, autorização e roteamento (obrigatório)
+
+- A navegação por perfil deve refletir **autorizações do backend**, nunca somente menus ocultos.
+- Operador é definido pelo login autenticado. Não permitir simulação de identidade operacional nem atuação cruzada.
+- Supervisor e admin não assumem ou respondem conversas do operador. Auditor possui somente leitura.
+- A chave compartilhada antiga é válida apenas em testes explícitos create_app(api_key=...), não no runtime do launcher.
+- Senhas de demo geradas na máquina do desenvolvedor, em data/demo-credentials.txt ignorado pelo Git; não publicar passwords, hashes, tokens ou IDs sensíveis.
+- Worker local usa BEGIN IMMEDIATE + status online/heartbeat + capacidade + QueueMembership + DispatchTurn por fila. Não transformar em atribuição na memória.
+- FIFO de tickets e round-robin persistido por fila. Nova oferta envia destinatário ao fim da ordem; cooldown para recusas e expiração.
+- Modal de ofertas em Mesa do Operador, alertas do navegador com consentimento, e API protegida por papel.
+- Sem GitHub Actions. Sempre fornecer git pull, start.cmd --check, start.cmd e evidências/pendências.
+- Para produção: OIDC/Entra ID, Alembic, multioperação, worker externo e Teams adapter ainda são gates.
+
 # AGENTS.md — Engenharia do Handoff Hub
 
 Antes de qualquer desenvolvimento, leia CONSTITUTION.md, docs/architecture/overview.md, docs/poc-data-model.md e docs/roadmap.md.

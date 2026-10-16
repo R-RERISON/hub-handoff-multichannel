@@ -39,7 +39,10 @@ function ActiveLink({to,icon,label,count}:{
 export default function App() {
   const location = useLocation()
   const navigate = useNavigate()
-  const [key,setKey] = useState('')
+  const [username,setUsername] = useState('')
+  const [password,setPassword] = useState('')
+  const [token,setToken] = useState('')
+  const [user,setUser] = useState<{username:string;role:'ADMIN'|'SUPERVISOR'|'OPERATOR'|'AUDITOR';operator_id:string|null}|null>(null)
   const [connected,setConnected] = useState(false)
   const [snapshot,setSnapshot] = useState<DashboardSnapshot>(EMPTY_SNAPSHOT)
   const [operatorId,setOperatorId] = useState('op-ana')
@@ -57,20 +60,25 @@ export default function App() {
   )=>{
     const response = await fetch(API_URL+path, {
       method,
-      headers: {'X-POC-Key':key,'Content-Type':'application/json',...(extra||{})},
+      headers: {'Authorization':'Bearer '+token,'Content-Type':'application/json',...(extra||{})},
       body: body ? JSON.stringify(body) : undefined,
     })
     if(!response.ok)throw new Error(String(response.status)+': '+(await response.text()).slice(0,240))
     return response.json()
-  },[key])
+  },[token])
 
   const refresh = useCallback(async ()=>{
     if(!connected)return
     try {
-      const data:DashboardSnapshot = await api('/v1/dashboard')
-      setSnapshot(data)
+      if(user?.role==='OPERATOR'){
+        const queues=await api('/v1/queues')
+        setSnapshot(s=>({...s,queues}))
+      }else{
+        const data:DashboardSnapshot = await api('/v1/dashboard')
+        setSnapshot(data)
+      }
     }catch(e){setError((e as Error).message)}
-  },[connected,api])
+  },[connected,api,user?.role])
 
   useEffect(()=>{
     if(!connected)return
@@ -84,6 +92,15 @@ export default function App() {
   },[connected,refresh])
 
   useEffect(()=>{
+    if(!connected||!token)return
+    const ping=()=>{void api('/v1/auth/heartbeat','POST').catch(e=>setError((e as Error).message))}
+    ping()
+    const id=window.setInterval(ping,10000)
+    document.addEventListener('visibilitychange',ping)
+    return ()=>{window.clearInterval(id);document.removeEventListener('visibilitychange',ping)}
+  },[connected,token,api])
+
+  useEffect(()=>{
     setError('')
     setNotice('')
   },[location.pathname])
@@ -91,12 +108,43 @@ export default function App() {
   async function connect(){
     setBusy(true);setError('')
     try{
-      await api('/v1/demo/bootstrap','POST')
-      const data:DashboardSnapshot=await api('/v1/dashboard')
-      setSnapshot(data);setConnected(true)
-      if(location.pathname==='/')navigate('/inicio',{replace:true})
+      const response=await fetch(API_URL+'/v1/auth/login',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({username:username.trim().toLowerCase(),password})
+      })
+      if(!response.ok)throw new Error('Usuário ou senha inválidos.')
+      const result=await response.json()
+      const accessToken:string=result.access_token
+      const principal=result.user as NonNullable<typeof user>
+      const headers={'Authorization':'Bearer '+accessToken}
+      if(principal.role==='OPERATOR'){
+        const r=await fetch(API_URL+'/v1/queues',{headers})
+        if(!r.ok)throw new Error('Falha ao carregar filas')
+        const queues=await r.json()
+        const display=principal.username.split('.')[0]
+        setSnapshot({...EMPTY_SNAPSHOT,queues,operators:[{
+          id:principal.operator_id??'',name:display.charAt(0).toUpperCase()+display.slice(1),
+          presence:'AVAILABLE',capacity:1,active:0,offered:0
+        }]})
+        setOperatorId(principal.operator_id??'')
+      }else{
+        const r=await fetch(API_URL+'/v1/dashboard',{headers})
+        if(!r.ok)throw new Error('Falha ao carregar a operação')
+        setSnapshot(await r.json())
+      }
+      setToken(accessToken);setUser(principal);setConnected(true);setPassword('')
+      const path=principal.role==='OPERATOR'?'/operador'
+        :principal.role==='AUDITOR'?'/supervisao/conversas'
+        :principal.role==='SUPERVISOR'?'/supervisao':'/inicio'
+      navigate(path,{replace:true})
     }catch(e){setError((e as Error).message)}
     finally{setBusy(false)}
+  }
+
+  async function logout(){
+    try{await api('/v1/auth/logout','POST')}catch{ /* token expires if offline */ }
+    setToken('');setUser(null);setConnected(false);setSnapshot(EMPTY_SNAPSHOT)
+    setNotice('');setError('');navigate('/',{replace:true})
   }
 
   async function createTicket(){
@@ -110,25 +158,18 @@ export default function App() {
         subject:['Solicitação de acesso','Ajuda com aplicativo','Equipamento indisponível'][previous%3],
       },{'Idempotency-Key':id})
       await refresh()
-      setNotice('Solicitação criada na fila Suporte N1. Agora oferte a um operador disponível.')
+      setNotice('Solicitação criada. A distribuição ocorrerá automaticamente quando houver operador conectado e disponível.')
       navigate('/supervisao/filas')
     }catch(e){setError((e as Error).message)}
     finally{setBusy(false)}
   }
 
-  async function offerNext(queueId:string){
-    setBusy(true);setError('');setNotice('')
+  async function changeCapacity(operator:string,capacity:number){
+    setBusy(true);setError('')
     try{
-      const result = await api('/v1/dispatch/offer','POST',{queue_id:queueId,operation_id:'demo'})
+      await api('/v1/operators/'+operator+'/capacity','PATCH',{capacity})
       await refresh()
-      if(result.result==='offered'){
-        setOperatorId(result.offer.operator_id)
-        navigate('/operador')
-      }else if(result.result==='no_operator_available'){
-        setNotice('Nenhum operador disponível ou com capacidade nesta fila.')
-      }else{
-        setNotice('Fila vazia: não há solicitação aguardando oferta.')
-      }
+      setNotice('Capacidade do operador atualizada.')
     }catch(e){setError((e as Error).message)}
     finally{setBusy(false)}
   }
@@ -143,29 +184,39 @@ export default function App() {
     finally{setBusy(false)}
   }
 
-  function openOperator(id:string){
-    setOperatorId(id)
-    navigate('/operador')
-  }
-
   if(!connected)return <div className="login-wrap">
     <section className="login-panel">
       <div className="app-mark"><Headset size={26}/></div>
       <span className="kicker">HANDOFF HUB · SQLITE POC</span>
-      <h1>Uma plataforma. Workspaces independentes.</h1>
-      <p>Acesse a Mesa do Operador, a Supervisão ou o Laboratório. A navegação é separada, mas utiliza a mesma operação demonstrativa.</p>
-      <label htmlFor="poc-key">Chave de acesso local</label>
-      <input id="poc-key" type="password" autoComplete="off" value={key}
-        onChange={e=>setKey(e.target.value)}
-        onKeyDown={e=>{if(e.key==='Enter')void connect()}}
-        placeholder="Chave exibida pelo start.cmd"/>
-      <button className="primary full" disabled={!key||busy} onClick={()=>void connect()}>
-        <Lock size={16}/> Entrar no Handoff Hub <ArrowRight size={16}/>
+      <h1>Bem-vindo ao Handoff Hub.</h1>
+      <p>Acesse com seu perfil de operador, supervisor, auditor ou administrador. A API valida suas permissões.</p>
+      <label htmlFor="username">Usuário</label>
+      <input id="username" autoComplete="username" value={username}
+        onChange={e=>setUsername(e.target.value)} placeholder="ex.: ana.demo"/>
+      <label htmlFor="password">Senha</label>
+      <input id="password" type="password" autoComplete="current-password" value={password}
+        onChange={e=>setPassword(e.target.value)}
+        onKeyDown={e=>{if(e.key==='Enter')void connect()}}/>
+      <button className="primary full" disabled={!username.trim()||!password||busy} onClick={()=>void connect()}>
+        <Lock size={16}/> Entrar no meu workspace <ArrowRight size={16}/>
       </button>
       {error&&<p className="alert" role="alert">{error}</p>}
-      <small>POC local · Sem Entra ID ou controle de acesso individual</small>
+      <small>Credenciais geradas em data/demo-credentials.txt · POC local sem SSO</small>
     </section>
   </div>
+
+  const permitted=!!user && ((user.role==='ADMIN' && !operatorMode) ||
+    (user.role==='OPERATOR' && operatorMode) ||
+    (user.role==='SUPERVISOR' && (
+      location.pathname.startsWith('/supervisao') || location.pathname==='/laboratorio')) ||
+    (user.role==='AUDITOR' && (
+      location.pathname==='/supervisao' || location.pathname==='/supervisao/conversas')))
+  if(!permitted)return <div className="login-wrap"><section className="login-panel">
+    <h1>Acesso não permitido</h1><p>Este espaço não pertence ao seu perfil.</p>
+    <button className="primary full" onClick={()=>navigate(user?.role==='OPERATOR'?'/operador':
+      user?.role==='AUDITOR'?'/supervisao/conversas':'/supervisao')}>Ir para meu workspace</button>
+    <button className="outline full" onClick={()=>void logout()}>Sair</button>
+  </section></div>
 
   if(homeMode)return <WorkspaceHome/>
 
@@ -176,8 +227,8 @@ export default function App() {
         <span>Workspace dedicado</span></div>
       <div className="operator-portal__actions">
         <span className="local-tag"><ShieldCheck size={15}/> SIMULAÇÃO LOCAL</span>
-        <button className="outline" onClick={()=>navigate('/inicio')}>
-          <ArrowLeftRight size={16}/> Trocar espaço
+        <button className="outline" onClick={()=>void logout()}>
+          <ArrowLeftRight size={16}/> Sair
         </button>
       </div>
     </header>
@@ -188,13 +239,14 @@ export default function App() {
           queues={snapshot.queues}
           api={api}
           preferredOperatorId={operatorId}
+          lockedIdentity={user?.role==='OPERATOR'}
           onChanged={refresh}
           onGoQueues={()=>navigate('/supervisao/filas')}
         />}/>
         <Route path="*" element={<Navigate to="/operador" replace/>}/>
       </Routes>
     </main>
-    <div className="portal-disclaimer">POC 0.4 · A seleção do operador ainda é simulada · Nenhuma mensagem é entregue ao Teams</div>
+    <div className="portal-disclaimer">POC 0.5 · Perfil autenticado · Sem entrega externa ao Teams</div>
   </div>
 
   if(adminMode)return <div className="admin-portal">
@@ -206,10 +258,10 @@ export default function App() {
         <small>Funções planejadas · Não operacionais</small></div>
     </aside>
     <main className="admin-portal__main">
-      <header className="portal-topbar"><span>Administração / POC 0.4</span>
+      <header className="portal-topbar"><span>Administração / POC 0.5</span>
         <button className="outline" onClick={()=>navigate('/inicio')}>
           <ArrowLeftRight size={15}/> Trocar espaço
-        </button></header>
+        </button><button className="outline" onClick={()=>void logout()}>Sair</button></header>
       <Routes><Route path="/administracao" element={<AdminLanding/>}/>
         <Route path="*" element={<Navigate to="/administracao" replace/>}/></Routes>
     </main>
@@ -221,16 +273,16 @@ export default function App() {
       <span className="sidebar-title">CENTRAL DE SUPERVISÃO</span>
       <ActiveLink to="/supervisao" icon={<ChartNoAxesCombined size={18}/>} label="Visão geral"/>
       <ActiveLink to="/supervisao/conversas" icon={<MessageSquareText size={18}/>} label="Conversas" count={snapshot.handoffs.length}/>
-      <ActiveLink to="/supervisao/filas" icon={<Layers size={18}/>} label="Filas" count={waiting+offered}/>
-      <ActiveLink to="/supervisao/equipe" icon={<Users size={18}/>} label="Equipe"/>
+      {user?.role!=='AUDITOR'&&<>
+        <ActiveLink to="/supervisao/filas" icon={<Layers size={18}/>} label="Filas" count={waiting+offered}/>
+        <ActiveLink to="/supervisao/equipe" icon={<Users size={18}/>} label="Equipe"/>
+      </>}
       <div className="sidebar-separator"/>
       <span className="sidebar-title">AMBIENTE DE TESTES</span>
-      <ActiveLink to="/laboratorio" icon={<FlaskConical size={18}/>} label="Laboratório"/>
+      {user?.role!=='AUDITOR'&&<ActiveLink to="/laboratorio" icon={<FlaskConical size={18}/>} label="Laboratório"/>}
       <div className="sidebar-separator"/>
       <span className="sidebar-title">OUTROS ESPAÇOS</span>
-      <NavLink className="nav nav--external" to="/inicio"><ArrowLeftRight size={18}/><span>Escolher espaço</span><ArrowRight size={14}/></NavLink>
-      <NavLink className="nav nav--external" to="/operador"><Headset size={18}/><span>Mesa do Operador</span><ArrowRight size={14}/></NavLink>
-      <NavLink className="nav nav--external" to="/administracao"><Settings2 size={18}/><span>Administração</span><ArrowRight size={14}/></NavLink>
+      {user?.role==='ADMIN'&&<NavLink className="nav nav--external" to="/inicio"><ArrowLeftRight size={18}/><span>Escolher espaço</span><ArrowRight size={14}/></NavLink>}
       <div className="sidebar-bottom"><span className="online-dot"/> API local · SQLite
         <small>POC 0.4 · Sem integração Teams</small></div>
     </aside>
@@ -239,6 +291,7 @@ export default function App() {
         <span>Handoff Hub / Operação demonstrativa</span>
         <div className="portal-topbar__actions">
           <span className="local-tag"><ShieldCheck size={15}/> AMBIENTE LOCAL</span>
+          <button className="outline" onClick={()=>void logout()}>Sair ({user?.username})</button>
           <button className="icon-btn" aria-label="Atualizar dados" onClick={()=>void refresh()}>
             <RefreshCw size={17}/>
           </button>
@@ -255,15 +308,15 @@ export default function App() {
           tickets={snapshot.handoffs} api={api}/>}/>
         <Route path="/supervisao/filas" element={<SupervisorQueues
           queues={snapshot.queues} operators={snapshot.operators}
-          tickets={snapshot.handoffs} busy={busy}
-          onOffer={offerNext} onOpenOperator={openOperator}/>}/>
+          tickets={snapshot.handoffs} api={api} onChanged={refresh}/>}/>
         <Route path="/supervisao/equipe" element={<SupervisorTeam
-          operators={snapshot.operators} busy={busy} onPresence={changePresence}/>}/>
+          operators={snapshot.operators} busy={busy} onPresence={changePresence}
+          onCapacity={changeCapacity}/>}/>
         <Route path="/laboratorio" element={<DemoLab
           tickets={snapshot.handoffs} busy={busy} onCreate={createTicket}/>}/>
         <Route path="*" element={<Navigate to="/supervisao" replace/>}/>
       </Routes>
-      <footer>Handoff Hub · POC SQLite 0.4 · Identidades demonstrativas · Dados locais</footer>
+      <footer>Handoff Hub · POC SQLite 0.5 · Controle de acesso por perfil · Uso local</footer>
     </main>
   </div>
 }

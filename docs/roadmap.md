@@ -1,3 +1,12 @@
+## POC-005 — RBAC local, filas e alertas automáticos
+
+Branch feat/005-rbac-auto-dispatch. Backend: usuários individuais, tokens opacos, papéis e ownership; login com lockout, heartbeat e revogação; worker periódico SQLite com distribuição FIFO e rodízio por fila, ofertas persistidas, cooldown, capacidade, membros e auditoria. Frontend: login por papel, Mesa do Operador autenticada, popup e alertas opcionais, supervisão com ordem e vinculação de operadores, ajuste de capacidade.
+
+Gates: testes locais, autorização negativa, duas identidades simultâneas, capacidade, rodízio, N1→N2, expiração, reentrada, responsividade e segurança. Sem GitHub Actions.
+
+Próximos: Entra ID/OIDC, isolamento multioperação, Alembic, worker/outbox externo, Teams adapter, SSE/WebSockets e testes de carga. [SPEC-005](specs/POC-005-rbac-auto-dispatch.md).
+
+
 ## POC-004 — Portais separados e navegação por rotas
 
 Implementação publicada na branch `feat/004-separated-workspaces`. Separação real de interfaces de Operador, Supervisão, Administração (landing planejada) e Laboratório, com React Router e componentes independentes. Mesmo FastAPI e SQLite da POC 0.3, sem alteração de esquema.

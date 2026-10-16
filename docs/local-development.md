@@ -1,3 +1,22 @@
+## POC 0.5 — Login individual e despacho automático
+
+    cd C:\Projetos\hub-handoff\hub-handoff-multichannel
+    git status --short
+    git fetch origin
+    git switch --track origin/feat/005-rbac-auto-dispatch
+    git pull --ff-only origin feat/005-rbac-auto-dispatch
+    .\start.cmd --check
+    .\start.cmd
+
+Já tem a branch local? Utilize git switch feat/005-rbac-auto-dispatch. As contas são criadas automaticamente ao iniciar. Para ler usuários e senhas locais execute Get-Content .\data\demo-credentials.txt. Para rotacionar credenciais e revogar sessões existentes, pare a aplicação e execute .\start.cmd --reset-users, depois .\start.cmd.
+
+Para testar diferentes perfis simultaneamente, utilize sessões ou perfis separados no navegador. O token fica apenas em memória e é perdido ao recarregar.
+
+O novo worker só opera na instância de demonstração do launcher; seus testes de regressão antigos usando chave local explicitamente mantêm a lógica anterior para comparação. Nenhuma rotina de bot real é iniciada.
+
+[Contrato e checklist SPEC-005](specs/POC-005-rbac-auto-dispatch.md).
+
+
 ## Nova branch — POC 0.4 / Portais independentes
 
 ```powershell
