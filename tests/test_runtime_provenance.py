@@ -1,11 +1,19 @@
 """SPEC-006B-3 runtime queue provenance; all SQLite files are disposable tmp_path DBs."""
+from datetime import timedelta
+
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from handoff_hub.auto_dispatch import run_dispatch_cycle
+from handoff_hub.provenance_audit import provenance_report
+from handoff_hub.poc_auth import naive_utc
+
 from handoff_hub.poc_api import create_app
 from handoff_hub.poc_db import (
+    HandoffOffer,
     HandoffSession,
     Message,
+    SessionEvent,
     make_session_factory,
 )
 from handoff_hub.provenance_schema import (
@@ -229,3 +237,109 @@ def test_baseline_only_db_keeps_recorder_disabled(tmp_path):
             "SELECT name FROM sqlite_master WHERE type='table'"
         ).scalars())
         assert "session_queue_segments" not in tables
+
+
+def test_operational_events_are_provenanced_for_manual_offer_and_close(tmp_path):
+    path, factory = setup_versioned(tmp_path)
+    with TestClient(create_app(database_url=f"sqlite:///{path.as_posix()}",
+                               api_key="legacy-test-key")) as client:
+        hid = create_ticket(client, "operational")
+        offer = client.post(
+            "/v1/dispatch/offer", headers=HEADERS, json={"queue_id": "n1"}
+        ).json()
+        assert offer["result"] == "offered"
+        accepted = client.post(
+            f"/v1/handoffs/{hid}/accept", headers=HEADERS,
+            json={"operator_id": "op-ana"},
+        )
+        assert accepted.status_code == 200, accepted.text
+        closed = client.post(
+            f"/v1/operators/op-ana/handoffs/{hid}/close", headers=HEADERS,
+        )
+        assert closed.status_code == 200, closed.text
+    with factory() as db:
+        events = db.scalars(
+            select(SessionEvent).where(SessionEvent.session_id == hid)
+            .order_by(SessionEvent.created_at, SessionEvent.id)
+        ).all()
+        assert {"QUEUED", "OFFERED", "ACCEPTED", "CLOSED"} == {
+            e.event_type for e in events
+        }
+        tagged = {
+            row["event_id"]: row
+            for row in db.execute(select(SESSION_EVENT_QUEUE_PROVENANCE)).mappings()
+        }
+        assert set(tagged) == {e.id for e in events}
+        assert all(entry["confidence"] == "VERIFIED" for entry in tagged.values())
+        assert len({entry["segment_id"] for entry in tagged.values()}) == 1
+    report = provenance_report(path)
+    assert report["status"] == "REPORT_READY"
+    assert report["event_coverage"] == {
+        "verified": 4, "undetermined": 0, "uncovered": 0,
+    }
+    assert report["safe_for_history_authorization"] is False
+
+
+def test_automatic_offer_and_timeout_events_are_attributed(tmp_path):
+    path, factory = setup_versioned(tmp_path)
+    password_text = (tmp_path / "demo-secrets.txt").read_text(encoding="utf-8")
+    password = next(
+        line.split("]: ", 1)[1] for line in password_text.splitlines()
+        if line.startswith("ana.demo [")
+    )
+    with TestClient(create_app(database_url=f"sqlite:///{path.as_posix()}",
+                               api_key="legacy-test-key")) as client:
+        auth = client.post("/v1/auth/login", json={
+            "username": "ana.demo", "password": password,
+        })
+        assert auth.status_code == 200, auth.text
+        hid = create_ticket(client, "autodispatch")
+        first_cycle = run_dispatch_cycle(factory)
+        assert first_cycle["offered"] == 1
+        with factory.begin() as db:
+            offer = db.scalar(
+                select(HandoffOffer).where(HandoffOffer.session_id == hid)
+            )
+            assert offer is not None
+            offer.expires_at = naive_utc() - timedelta(seconds=1)
+        second_cycle = run_dispatch_cycle(factory)
+        assert second_cycle["expired"] >= 1
+    with factory() as db:
+        events = db.scalars(
+            select(SessionEvent).where(SessionEvent.session_id == hid)
+        ).all()
+        assert {"QUEUED", "OFFERED_AUTO", "OFFER_EXPIRED"}.issubset(
+            {e.event_type for e in events}
+        )
+        tagged = {
+            row["event_id"]: row
+            for row in db.execute(select(SESSION_EVENT_QUEUE_PROVENANCE)).mappings()
+        }
+        assert all(event.id in tagged for event in events)
+        assert all(tagged[event.id]["confidence"] == "VERIFIED" for event in events)
+
+
+def test_readonly_legacy_audit_never_backfills_or_reads_message_content(tmp_path):
+    path = tmp_path / "legacy-audit.db"
+    factory, engine = make_session_factory(f"sqlite:///{path.as_posix()}")
+    provision(factory, tmp_path / "creds.txt")
+    engine.dispose()
+    with TestClient(create_app(database_url=f"sqlite:///{path.as_posix()}",
+                               api_key="legacy-test-key")) as client:
+        hid = create_ticket(client, "audit")
+        new_message(client, hid, "USER", "confidential-marker-only-for-test")
+
+    legacy_report = provenance_report(path)
+    assert legacy_report["status"] == "NOT_MIGRATED"
+    assert "confidential-marker-only-for-test" not in str(legacy_report)
+    adopt_existing(path, tmp_path / "backups-before", confirmed=True)
+    upgrade_existing(path, tmp_path / "backups-upgrade", confirmed=True)
+    before = provenance_report(path)
+    assert before["status"] == "REPORT_READY"
+    assert before["message_coverage"]["uncovered"] == 1
+    assert before["event_coverage"]["uncovered"] == 1
+    assert before["sessions_without_segments"] == 1
+    assert before["safe_for_history_authorization"] is False
+    after = provenance_report(path)
+    assert after == before
+    assert "confidential-marker-only-for-test" not in str(after)
