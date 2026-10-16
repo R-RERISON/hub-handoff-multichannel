@@ -168,3 +168,16 @@ def test_transferred_conversation_is_fail_closed_without_all_queue_grants(tmp_pa
         assert client.get(
             f"/v1/handoffs/{handoff_id}/timeline", headers=auditor
         ).status_code == 200
+
+
+def test_operator_transfer_catalog_does_not_expose_other_queue_load(tmp_path):
+    app, _, secrets = context(tmp_path)
+    with TestClient(app) as client:
+        ana = bearer(client, "ana.demo", secrets)
+        ticket(client, 90, "n2")
+        result = client.get("/v1/queues", headers=ana)
+        assert result.status_code == 200
+        assert {q["id"] for q in result.json()} == {"n1", "n2"}
+        assert all(q["waiting"] == 0 for q in result.json())
+        assert client.get("/v1/queues/n2/rotation", headers=ana).status_code == 403
+        assert client.get("/v1/dashboard", headers=ana).status_code == 403
