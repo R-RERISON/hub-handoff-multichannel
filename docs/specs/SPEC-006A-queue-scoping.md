@@ -86,6 +86,22 @@ O script **não imprime senhas nem bearer tokens**. Ele NÃO altera membership d
 
 A validação automatizada da branch no Windows resultou em **55 testes Python aprovados**, Ruff, 7 testes frontend e Vite aprovados no commit `1c6a00d`. O script adicional de homologação é novo e ainda exige execução local.
 
+## Hotfix de homologação — Transferência N1 → N2
+
+**Diagnóstico confirmado por captura de tela:** após SPEC-006A, o operador Ana recebia `GET /v1/queues` com somente N1, conforme a política correta de membership. Entretanto, `OperatorDesk.tsx` utilizava a mesma coleção para o seletor de **Transferir**; com isso N2 não aparecia e o teste ponta a ponta ficava bloqueado.
+
+**Correção implementada:**
+- `GET /v1/queues` **continua** mostrando apenas filas de associação do operador para distribuição; não ampliar este endpoint, sob risco de regressão de RBAC.
+- Novo `GET /v1/handoffs/{id}/transfer-targets`, exclusivo do operador responsável pelo atendimento e sujeito ao estado ACTIVE. Retorna filas diferentes da atual, da mesma operação; esta POC ainda não tem status/engine formal de habilitação de destinos, previsto para SPEC-007/008.
+- A Mesa carrega os destinos ao abrir o formulário de transferência, sem depender de `snapshot.queues`. Loading, ausência de destinos e seleções inválidas desativam Confirmar. Troca de atendimento fecha o formulário antigo.
+- `POST /v1/handoffs/{id}/transfer` passa a rejeitar auto-transferência para a mesma fila (422), além de continuar rejeitando fila de outra operação (422).
+- Testes Python: Ana N1 pode descobrir N2; Bruno/supervisor/auditor/admin não podem consultar destinos da sessão dela; transferência para N2 funciona sem associação N2; nunca incluir fila de outra operação; listagem de membership de Ana permanece N1.
+- Teste de arquitetura frontend verifica que o dropdown não usa mais `queues.map`.
+
+**Gates manuais adicionais:** no navegador da Ana abrir Transferir em atendimento N1 → **Suporte N2 aparece como destino**, e Suporte N1 não aparece como destino redundante. Transferir → o atendimento sai de Ana, fica QUEUED em N2 e é ofertado automaticamente a Bruno disponível; confirmar aceite e fechamento. Sem alteração do banco ou reset de contas necessário.
+
+**Status:** correção publicada na branch; os novos testes e o build ainda dependem de `.\\start.cmd --check` no Windows, e o fluxo deve ser homologado antes de promover a SPEC-006A.
+
 ## Próxima fatia: SPEC-006B
 
 1. Alembic (migration baseline segura para banco SQLite já populado, scripts backup/restore);
