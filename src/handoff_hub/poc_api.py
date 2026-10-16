@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from handoff_hub.auto_dispatch import run_dispatch_cycle
+from handoff_hub.demo_routing import DEFAULT_INTAKE_QUEUE_ID, configure_demo_routing
 from handoff_hub.operator_workflow import register_operator_workflow
 from handoff_hub.poc_auth import (
     Principal,
@@ -45,7 +46,7 @@ from handoff_hub.poc_db import (
 class HandoffCreate(BaseModel):
     operation_id: str = "demo"
     integration_id: str = "demo-bot"
-    queue_id: str = "n1"
+    queue_id: str = Field(default=DEFAULT_INTAKE_QUEUE_ID, min_length=1, max_length=60)
     external_conversation_id: str = Field(min_length=1, max_length=200)
     requester_label: str = Field(min_length=1, max_length=120)
     subject: str = Field(min_length=1, max_length=200)
@@ -180,10 +181,8 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
                 if db.get(Operator, oid) is None:
                     db.add(Operator(id=oid, operation_id="demo", name=name,
                                     presence="AVAILABLE", capacity=1))
-                if db.get(QueueMembership, ("n1", oid)) is None:
-                    db.add(QueueMembership(queue_id="n1", operator_id=oid))
-            if db.get(QueueMembership, ("n2", "op-bruno")) is None:
-                db.add(QueueMembership(queue_id="n2", operator_id="op-bruno"))
+            db.flush()
+            configure_demo_routing(db)
         return {"result": "demo_ready", "operation_id": "demo", "queue_id": "n1"}
 
     @app.get("/v1/dashboard", dependencies=[Depends(authenticate)])
