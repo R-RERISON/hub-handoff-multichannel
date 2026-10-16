@@ -95,6 +95,8 @@ def test_supervisor_grant_controls_queue_mutations(tmp_path):
         assert c.patch("/v1/queues/n1/members/op-bruno", headers=supervisor,
                        json={"enabled": True}).status_code == 200
         assert c.patch("/v1/operators/op-ana/capacity", headers=supervisor,
+                       json={"capacity": 2}).status_code == 200
+        assert c.patch("/v1/operators/op-bruno/capacity", headers=supervisor,
                        json={"capacity": 2}).status_code == 403
         assert ticket(c, supervisor, "attempt-n2", "n2").status_code == 404
         assert ticket(c, supervisor, "allowed-n1", "n1").status_code == 201
