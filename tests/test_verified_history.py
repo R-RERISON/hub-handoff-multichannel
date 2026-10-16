@@ -22,7 +22,6 @@ from handoff_hub.provenance_schema import (
     SESSION_QUEUE_SEGMENTS,
 )
 from handoff_hub.schema_admin import (
-    AUDIT_REVISION,
     PROVENANCE_REVISION,
     SECURITY_REVISION,
     _config,
