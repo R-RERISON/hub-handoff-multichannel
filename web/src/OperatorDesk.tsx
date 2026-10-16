@@ -40,6 +40,9 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
   const [reply,setReply] = useState('')
   const [targetQueue,setTargetQueue] = useState('n2')
   const [transferReason,setTransferReason] = useState('Encaminhamento para a equipe especializada')
+  const [transferOpen,setTransferOpen] = useState(false)
+  const [auditOpen,setAuditOpen] = useState(false)
+  const [mobilePanel,setMobilePanel] = useState<'work'|'chat'>('work')
   const [busy,setBusy] = useState(false)
   const [error,setError] = useState('')
   const [notice,setNotice] = useState('')
@@ -119,7 +122,11 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
       const result=await action()
       await reload()
       await onChanged()
-      if(select!==undefined)setSelectedId(select)
+      if(select!==undefined){
+        setSelectedId(select)
+        if(select)setMobilePanel('chat')
+      }
+      setTransferOpen(false)
       setNotice(success)
       return result
     }catch(e){setError((e as Error).message)}
@@ -143,7 +150,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
   const offerCount=work?.offers.length??0
   const activeCount=work?.active.length??0
 
-  return <div className="desk-layout">
+  return <div className="desk-layout desk-layout--compact" data-panel={mobilePanel}>
     {alertOffer && <div className="offer-overlay" role="presentation">
       <div className="offer-dialog" role="alertdialog" aria-modal="true"
         aria-labelledby="offer-dialog-title" aria-describedby="offer-dialog-text">
@@ -165,23 +172,20 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
       </div>
     </div>}
     <div className="desk-top">
-      <div>
-        <div className="desk-kicker"><Headset size={15}/> WORKSPACE INDEPENDENTE DO OPERADOR</div>
-        <h3>Mesa de atendimento</h3>
-        <p>Receba ofertas, assuma conversas e transfira atendimentos. Simulação local sem Teams.</p>
+      <div className="desk-heading">
+        <span className="desk-kicker"><Headset size={15}/> CENTRAL DE ATENDIMENTO</span>
+        <h3>Mesa do Operador</h3>
       </div>
       <div className="desk-identity">
-        {lockedIdentity?<><label>Operador autenticado</label>
-          <strong>{work?.operator.name??operators.find(o=>o.id===operatorId)?.name??operatorId}</strong>
-          <small>Identidade definida pela sessão, não pelo navegador</small>
-        </>:<><label htmlFor="desk-operator">Operador de demonstração</label>
-          <select id="desk-operator" value={operatorId} disabled={busy}
-            onChange={e=>setOperatorId(e.target.value)}>
+        {lockedIdentity?<strong>{work?.operator.name??operators.find(o=>o.id===operatorId)?.name??operatorId}</strong>
+          :<select aria-label="Operador de demonstração" id="desk-operator" value={operatorId}
+            disabled={busy} onChange={e=>setOperatorId(e.target.value)}>
             {operators.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}
-          </select></>}
-        {lockedIdentity&&<div className="desk-presence-editor">
-          <label htmlFor="self-presence">Minha disponibilidade</label>
-          <select id="self-presence" value={work?.operator.presence??'OFFLINE'} disabled={busy}
+          </select>}
+        <span className="desk-presence-inline">
+          <span className="online-dot"/> Presença
+          {lockedIdentity?<select id="self-presence" aria-label="Minha disponibilidade"
+            value={work?.operator.presence??'OFFLINE'} disabled={busy}
             onChange={e=>void execute(
               ()=>api('/v1/operators/'+operatorId+'/presence','PATCH',{presence:e.target.value}),
               'Disponibilidade atualizada.'
@@ -189,26 +193,31 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
             <option value="AVAILABLE">Disponível</option>
             <option value="AWAY">Em pausa</option>
             <option value="OFFLINE">Indisponível</option>
-          </select>
-        </div>}
+          </select>:<b>{work?.operator.presence??'OFFLINE'}</b>}
+        </span>
+        {lockedIdentity&&<button className="outline small desk-notification-button"
+          title="Ativar notificações do sistema operacional" disabled={browserAlerts||!('Notification' in window)}
+          onClick={async()=>{
+            if(!('Notification' in window))return
+            const permission=await Notification.requestPermission()
+            setBrowserAlerts(permission==='granted')
+          }}>{browserAlerts?'Notificações ativas':'Ativar alertas'}</button>}
+        <button className="outline small" title="Atualizar atendimento" disabled={busy}
+          onClick={()=>void reload()}><RefreshCw size={14}/> <span className="desk-refresh-label">Atualizar</span></button>
       </div>
     </div>
-    {error&&<div className="alert" role="alert"><ShieldAlert size={17}/>{error}<button onClick={()=>setError('')}>Fechar</button></div>}
-    {notice&&<div className="notice" role="status"><CheckCircle2 size={16}/>{notice}<button onClick={()=>setNotice('')}>×</button></div>}
-    {lockedIdentity&&<div className="desk-alert-controls">
-      <span>Novos atendimentos aparecem automaticamente nesta página.</span>
-      <button className="outline small" disabled={browserAlerts||!('Notification' in window)}
-        onClick={async()=>{
-          if(!('Notification' in window))return
-          const permission=await Notification.requestPermission()
-          setBrowserAlerts(permission==='granted')
-        }}>{browserAlerts?'Notificações do navegador ativadas':'Ativar notificações do navegador'}</button>
-    </div>}
-    <div className="desk-overview">
-      <div><span><Inbox size={16}/> Ofertas recebidas</span><strong>{offerCount}</strong></div>
-      <div><span><MessageSquareText size={16}/> Em andamento</span><strong>{activeCount}</strong></div>
-      <div><span><UserRoundCheck size={16}/> Presença</span><strong className="desk-presence">{work?.operator.presence==='AVAILABLE'?'Disponível':work?.operator.presence==='AWAY'?'Em pausa':'Offline'}</strong></div>
-      <button className="outline" disabled={busy} onClick={()=>void reload()}><RefreshCw size={15}/> Atualizar</button>
+    <div className="desk-feedback" aria-live="polite">
+      {error&&<div className="alert" role="alert"><ShieldAlert size={16}/>{error}
+        <button onClick={()=>setError('')}>Fechar</button></div>}
+      {notice&&<div className="notice" role="status"><CheckCircle2 size={15}/>{notice}
+        <button onClick={()=>setNotice('')}>×</button></div>}
+    </div>
+    <div className="desk-mobile-tabs" role="group" aria-label="Painel da Mesa do Operador">
+      <button className={mobilePanel==='work'?'selected':''} onClick={()=>setMobilePanel('work')}>
+        Atendimentos <span>{offerCount+activeCount}</span>
+      </button>
+      <button className={mobilePanel==='chat'?'selected':''} onClick={()=>setMobilePanel('chat')}
+        disabled={!selectedId}>Conversa</button>
     </div>
     <div className="desk-grid">
       <section className="panel desk-inbox">
