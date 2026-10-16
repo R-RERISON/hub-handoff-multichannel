@@ -43,13 +43,13 @@ from handoff_hub.poc_db import (
     utc_now,
 )
 from handoff_hub.provenance_writer import ProvenanceRecorder
-from handoff_hub.verified_history import register_verified_history
 from handoff_hub.queue_authorization import (
     change_grant,
     granted_queues,
     require_handoff,
     require_queue,
 )
+from handoff_hub.verified_history import register_verified_history
 
 
 class HandoffCreate(BaseModel):
