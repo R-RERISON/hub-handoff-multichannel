@@ -142,7 +142,9 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
     ) -> Principal:
         if (legacy_test_mode and api_key and x_poc_key
                 and hmac.compare_digest(api_key, x_poc_key)):
-            return Principal("legacy-tests", "ADMIN", "demo", None, "legacy")
+            principal = Principal("legacy-tests", "ADMIN", "demo", None, "legacy")
+            request.state.principal = principal
+            return principal
         principal = get_principal(factory, authorization)
         body = None
         if request.method in ("POST", "PATCH", "PUT"):
