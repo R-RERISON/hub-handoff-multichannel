@@ -101,3 +101,17 @@ test('supervisor route props match the page contracts', () => {
   assert.match(history, /type Props = \{tickets:Ticket\[\];api:Api\}/)
   assert.match(queues, /onChanged:\(\)=>Promise<void>/)
 })
+
+test('transfer choices are independent from operator queue membership', () => {
+  const desk = read('src/OperatorDesk.tsx')
+  const api = read('../src/handoff_hub/operator_workflow.py')
+  const auth = read('../src/handoff_hub/poc_auth.py')
+  assert.match(desk,/\/transfer-targets/)
+  assert.match(desk,/transferTargets\.map/)
+  assert.doesNotMatch(desk,/\{queues\.map\(q=><option/)
+  assert.match(desk,/transferTargets\.some\(q=>q\.id===targetQueue\)/)
+  assert.match(api,/@router\.get\("\/handoffs\/\{handoff_id\}\/transfer-targets"\)/)
+  assert.match(api,/Queue\.operation_id == handoff\.operation_id/)
+  assert.match(api,/Queue\.id != handoff\.queue_id/)
+  assert.match(auth,/transfer-targets/)
+})
