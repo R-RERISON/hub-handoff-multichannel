@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ArrowRightLeft, CheckCircle2, Clock3, Headset, Inbox, MessageSquareText,
-  RefreshCw, Send, ShieldAlert, UserRoundCheck, XCircle
+  RefreshCw, Send, ShieldAlert, XCircle
 } from 'lucide-react'
 
 type Operator = {id: string; name: string; presence: string; capacity: number; active: number; offered?: number}
