@@ -18,7 +18,6 @@ from sqlalchemy import func, select
 from handoff_hub.auto_dispatch import run_dispatch_cycle
 from handoff_hub.demo_routing import DEFAULT_INTAKE_QUEUE_ID, configure_demo_routing
 from handoff_hub.operator_workflow import register_operator_workflow
-from handoff_hub.provenance_writer import ProvenanceRecorder
 from handoff_hub.poc_auth import (
     Principal,
     assert_access,
@@ -43,6 +42,7 @@ from handoff_hub.poc_db import (
     make_session_factory,
     utc_now,
 )
+from handoff_hub.provenance_writer import ProvenanceRecorder
 from handoff_hub.queue_authorization import (
     change_grant,
     granted_queues,
