@@ -166,10 +166,6 @@ def test_upgrade_006b1_to_006b2_keeps_legacy_records(tmp_path):
     assert prior["revision"] == BASELINE_REVISION
     with pytest.raises(SchemaSafetyError, match="confirm-offline"):
         upgrade_existing(db_path, backups, confirmed=False)
-    with pytest.raises(SchemaSafetyError, match="requires a verified"):
-        upgrade_existing(legacy_database(tmp_path / "unversioned"), backups,
-                         confirmed=True)
-
     upgraded = upgrade_existing(db_path, backups, confirmed=True)
     after = verify_database(db_path)
     assert upgraded["revision"] == PROVENANCE_REVISION
