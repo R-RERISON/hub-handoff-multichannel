@@ -99,6 +99,9 @@ Assert-Queues 'Auditor' $auditor @('n1')
 # Real request with accented strings: ensures UTF-8 works under Windows PowerShell.
 $key = [guid]::NewGuid().ToString('N')
 $ticketHeaders = @{ Authorization = $admin.Authorization; 'Idempotency-Key' = $key }
+# Build accented text independently of the PS 5.1 file encoding.
+$subject = 'Solicita' + [char]0x00E7 + [char]0x00E3 + 'o de valida' +
+    [char]0x00E7 + [char]0x00E3 + 'o de permiss' + [char]0x00F5 + 'es N2'
 $ticket = Invoke-JsonApi -Uri "$ApiBaseUrl/v1/handoffs" `
     -Headers $ticketHeaders -Payload @{
         operation_id = 'demo'
@@ -106,7 +109,7 @@ $ticket = Invoke-JsonApi -Uri "$ApiBaseUrl/v1/handoffs" `
         queue_id = 'n2'
         external_conversation_id = "spec006a-$key"
         requester_label = 'Homologacao de auditoria'
-        subject = 'Solicitacao de validacao de permissoes N2'
+        subject = $subject
     }
 if ($ticket.queue_id -ne 'n2' -or -not $ticket.id) {
     throw 'REPROVADO: abertura do ticket N2 explicito'
