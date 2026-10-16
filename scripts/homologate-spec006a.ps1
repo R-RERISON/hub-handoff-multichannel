@@ -128,17 +128,34 @@ Assert-StatusDenied 'Auditor nao consulta outbox' {
 
 # Read-only diagnostic: do not automatically change operator membership/capacity.
 $rotation = Invoke-RestMethod -Uri "$ApiBaseUrl/v1/queues/n2/rotation" -Headers $admin
-$operators = @(Invoke-RestMethod -Uri "$ApiBaseUrl/v1/operators" -Headers $admin)
-$anaOnN2 = @($rotation.operators | Where-Object { $_.operator_id -eq 'op-ana' }).Count -gt 0
-$bruno = @($operators | Where-Object { $_.id -eq 'op-bruno' } | Select-Object -First 1)
+$operators = Invoke-RestMethod -Uri "$ApiBaseUrl/v1/operators" -Headers $admin
+$anaOnN2 = $false
+foreach ($member in $rotation.operators) {
+    if ($member.operator_id -eq 'op-ana') {
+        $anaOnN2 = $true
+        break
+    }
+}
+# PowerShell 5.1 can wrap a JSON array as a single pipeline item. Iterate the
+# collection directly so that .capacity refers to ONE operator, not all of them.
+$bruno = $null
+foreach ($operator in $operators) {
+    if ($operator.id -eq 'op-bruno') {
+        $bruno = $operator
+        break
+    }
+}
 Write-Host ("[INSPECAO] Ana membro de N2: " + $anaOnN2)
-if ($bruno.Count -gt 0) {
-    Write-Host ("[INSPECAO] Capacidade atual de Bruno: " + $bruno[0].capacity)
+if ($null -ne $bruno) {
+    Write-Host ("[INSPECAO] Capacidade atual de Bruno: " + $bruno.capacity)
+}
+else {
+    Write-Warning 'Nao foi possivel identificar Bruno na lista de operadores.'
 }
 if ($anaOnN2) {
     Write-Warning 'Ana pertence a N2. Verifique se o vinculo foi criado acidentalmente no teste.'
 }
-if ($bruno.Count -gt 0 -and $bruno[0].capacity -ne 1) {
+if ($null -ne $bruno -and $bruno.capacity -ne 1) {
     Write-Warning 'Capacidade de Bruno difere do seed 1. Restaurar apenas se nao houve ajuste intencional.'
 }
 
