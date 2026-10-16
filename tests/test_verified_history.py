@@ -2,8 +2,8 @@
 
 All data is synthetic and every DB is created under tmp_path.
 """
-from alembic import command
 import pytest
+from alembic import command
 from fastapi.testclient import TestClient
 from sqlalchemy import insert, select, text, update
 
