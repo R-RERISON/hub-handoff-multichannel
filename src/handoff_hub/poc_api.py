@@ -311,18 +311,26 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
                 op = db.get(Operator, oid)
                 if not op:
                     continue
-                occupied = db.scalar(
+                occupied_global = db.scalar(
                     select(func.count()).select_from(HandoffSession).where(
                         HandoffSession.operator_id == oid,
+                        HandoffSession.status.in_(("ACTIVE", "OFFERED")))
+                ) or 0
+                occupied_in_queue = db.scalar(
+                    select(func.count()).select_from(HandoffSession).where(
+                        HandoffSession.operator_id == oid,
+                        HandoffSession.queue_id == queue_id,
                         HandoffSession.status.in_(("ACTIVE", "OFFERED")))
                 ) or 0
                 turn = turns.get(oid)
                 members.append({
                     "operator_id": oid, "name": op.name,
                     "online": oid in live, "presence": op.presence,
-                    "occupied": occupied, "capacity": op.capacity,
+                    # Shared global capacity affects eligibility, but avoid
+                    # disclosing other queues' reservation counts.
+                    "occupied": occupied_in_queue, "capacity": op.capacity,
                     "eligible": oid in live and op.presence == "AVAILABLE"
-                    and occupied < op.capacity,
+                    and occupied_global < op.capacity,
                     "last_offered_at": turn.last_offered_at.isoformat()
                     if turn and turn.last_offered_at else None,
                     "total_offers": turn.total_offers if turn else 0,
