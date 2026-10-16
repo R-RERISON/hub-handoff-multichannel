@@ -241,7 +241,12 @@ class DispatchTurn(Base):
 
 
 def make_session_factory(database_url: str):
-    """SQLite single-node POC: SQLite serializes writers; SQL Server needs another strategy."""
+    """Initialize versioned SQLite schema; preserve nonpersistent in-memory tests."""
+    if database_url.startswith("sqlite") and ":memory:" not in database_url:
+        # Import lazily so migration metadata can import this ORM module safely.
+        from handoff_hub.db_migrations import upgrade_database
+
+        upgrade_database(database_url)
     engine = create_engine(database_url, connect_args={"timeout": 10}, future=True)
     if database_url.startswith("sqlite"):
         @event.listens_for(engine, "connect")
@@ -251,5 +256,6 @@ def make_session_factory(database_url: str):
             cursor.execute("PRAGMA busy_timeout=10000")
             cursor.execute("PRAGMA journal_mode=WAL")
             cursor.close()
-    Base.metadata.create_all(engine)
+    if ":memory:" in database_url:
+        Base.metadata.create_all(engine)
     return sessionmaker(bind=engine, autoflush=False, expire_on_commit=False), engine
