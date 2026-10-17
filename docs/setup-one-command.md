@@ -58,6 +58,26 @@ Para restaurar:
 
 Não compartilhar senha/token nem apontar o utilitário para o SQLite original.
 
+## Evidência de auditoria após revoke/restore
+
+Use o mesmo diretório TEMP, preferencialmente enquanto o laboratório ainda
+está disponível. A ferramenta consulta somente o SQLite 006b4, em modo
+read-only, sem tocar no banco original nem realizar requisições à API.
+
+```powershell
+$lab = Join-Path $env:TEMP 'handoff-qa-006b4-1ohg0707'
+.\.venv\Scripts\python.exe -m scripts.release_audit_evidence --lab $lab
+```
+
+`PASS` confirma quatro conjuntos de evidências: grants N1/N2 corretos,
+ciclo revogar/restaurar com diário, leituras verificadas LIST+DETAIL e ao
+menos uma negativa de acesso auditada. `INCOMPLETE` (exit code 2) indica
+quais cenários ainda não possuem evidência neste banco, sem presumir falha
+do backend. A saída não inclui IDs, senha, token ou texto da conversa.
+
+Procedimento completo de navegador e critérios de aceite em
+[PR #28 — Gates visuais finais](qa/PR-028-ui-final-gates.md).
+
 ## Execução habitual da POC original
 
 ```powershell
