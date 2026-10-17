@@ -45,7 +45,12 @@ Antes de qualquer desenvolvimento, leia CONSTITUTION.md, docs/architecture/overv
 - Instruções completas em `docs/local-development.md`.
 
 ## Inicializador local (padrão vigente)
-Usar `start.cmd` (na raiz) como entrada única para Python/FastAPI e React/Vite. `start.cmd --check` executa testes e build. Registrar instruções no `docs/setup-one-command.md`. Não utilizar GitHub Actions.
+Usar `start.cmd` na raiz como **entrada única** para FastAPI e React/Vite no mesmo terminal.
+- `start.cmd --lab` cria novo SQLite TEMP sintético Alembic 006b4 com credenciais próprias e inicia ambos os servidores para homologação. `start.cmd --lab --lab-dir <TEMP>` retoma exatamente o mesmo laboratório.
+- `start.cmd` sem `--lab` continua o comportamento habitual com o SQLite POC original; **não utilizar para homologação de migrações, RBAC ou auditoria sintética**.
+- `start.cmd --check` executa Python/Ruff/testes frontend e build. Não herdar `HANDOFF_DB_URL` no runtime da POC original nem nos gates.
+- Não usar `start.cmd --reset-users` na POC original para testes do laboratório, nem permitir cópia de credenciais entre modos.
+- Sempre documentar mudanças e evidências reais em `docs/setup-one-command.md` e no PR #28. Sem GitHub Actions.
 
 
 ## POC-004 — Contrato definitivo de workspaces
