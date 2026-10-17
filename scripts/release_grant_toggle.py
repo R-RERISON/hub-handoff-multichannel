@@ -125,17 +125,26 @@ def attest_running_backend(headers: dict[str, str], expected_id: str) -> None:
             response = live.get("/v1/auth/me", headers=headers)
     except httpx.ConnectError as exc:
         raise LabSafetyError(
-            "API local indisponivel na porta 8000; inicie o run-backend.ps1 "
-            "do laboratorio TEMP antes do teste"
+            "API local indisponivel na porta 8000; execute "
+            "start.cmd --lab --lab-dir <diretorio_TEMP> no mesmo laboratorio"
         ) from exc
     except httpx.HTTPError as exc:
         raise LabSafetyError(
             "Nao foi possivel consultar /v1/auth/me no servidor local"
         ) from exc
     if response.status_code != 200:
+        # Report only the HTTP status: never include Authorization, response
+        # bodies, database paths or account IDs in a diagnostic.
+        if response.status_code in (401, 403):
+            reason = "token TEMP recusado; backend possivelmente ligado a outro banco"
+        elif response.status_code == 404:
+            reason = "rota /v1/auth/me ausente; servidor inesperado ou desatualizado"
+        else:
+            reason = "endpoint de identidade indisponivel"
         raise LabSafetyError(
-            "API local nao reconhece a sessao do SQLite sintetico; "
-            "confirme que run-backend.ps1 aponta para este mesmo laboratorio"
+            f"GET /v1/auth/me retornou HTTP {response.status_code}: {reason}. "
+            "Reinicie usando start.cmd --lab --lab-dir <diretorio_TEMP> "
+            "e confirme que o caminho informado coincide com --lab."
         )
     try:
         identity = response.json()
@@ -147,7 +156,8 @@ def attest_running_backend(headers: dict[str, str], expected_id: str) -> None:
         or identity.get("role") != "AUDITOR"
     ):
         raise LabSafetyError(
-            "Identidade da API local nao corresponde ao banco de laboratorio"
+            "GET /v1/auth/me HTTP 200, mas identidade diverge da conta TEMP. "
+            "Confirme start.cmd --lab --lab-dir <diretorio_TEMP>."
         )
 
 
