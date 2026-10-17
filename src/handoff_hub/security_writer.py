@@ -56,9 +56,10 @@ def record_scoped_denial(factory, principal, *, queue_id: str, resource: str) ->
                 db, principal, action=f"HISTORY_{resource}_DENIED",
                 outcome="DENIED", queue_id=known_id,
             )
-    except Exception:
-        # Security policy must not depend on success of the denial log.
-        # Log only a generic diagnostic, never query parameters or SQL values.
+    # This is an intentional fail-open-for-logging boundary, NOT for authorization:
+    # a broken audit hook must never turn an already-denied 403/404 into HTTP 500.
+    except Exception:  # noqa: BLE001
+        # Do not log query parameters, identifiers, exception text or SQL values.
         LOGGER.error("Security decision audit persistence unavailable")
 
 
