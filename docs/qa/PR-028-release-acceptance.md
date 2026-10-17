@@ -87,3 +87,42 @@ Verificada a cadeia Git (`main` ancestral do head), ausência de merge automáti
 ### Correção identificada no Windows — 17/10/2026
 
 A primeira execução do preparador criou corretamente o banco sintético 006b4 com 22 tabelas, mas **interrompeu no seed**: `python -c` via PowerShell 5.1 perdeu as aspas da expressão f-string, causando `SyntaxError: invalid syntax` em `fsqlite:///`. Corrigido para criar e executar `seed-synthetic.py` dentro do diretório temporário, sem `-c`. A correção não altera o SQLite original, o FastAPI, o frontend ou as migrações. O novo script **ainda precisa ser reexecutado no Windows** para fechar o gate de preparação de laboratório; a pasta temporária da execução falha não deve ser reutilizada.
+
+
+## 6 — SEC-02/03: revogação/restauração real com API do laboratório
+
+**Ferramenta:** `scripts/release_grant_toggle.py`. Utiliza credenciais sintéticas sob `$env:TEMP` e verifica que o **ID da conta ADMIN na API é igual ao ID do banco temporário** antes de qualquer mutação; rejeita caminhos fora de `$env:TEMP\handoff-qa-006b4-*`. Nunca imprime senhas nem tokens. O comando modifica **somente** o grant `AUDITOR` da fila `n1` no banco sintético, por `PATCH /v1/admin/queue-grants`.
+
+1. Deixe os dois launchers do laboratório ativos (backend em 8000 e Vite em 5173), **sem iniciar `start.cmd`**. Mantenha o Auditor autenticado no navegador e com uma mensagem **sintética** N1 aberta em `Segmentos verificados`.
+2. Substitua o valor de `$lab` abaixo pelo diretório TEMP efetivamente criado pelo seu preparador (não utilize o caminho `data\handoff-poc.db`):
+
+```powershell
+$lab = Join-Path $env:TEMP 'handoff-qa-006b4-2912f1b7191a4648984c856d4e53b6a2'
+$python = '.\.venv\Scripts\python.exe'
+& $python scripts\release_grant_toggle.py --lab $lab --action status
+& $python scripts\release_grant_toggle.py --lab $lab --action revoke --confirm-synthetic
+if ($LASTEXITCODE -ne 0) { throw 'Revogação sintética falhou' }
+```
+
+3. No navegador do Auditor, **não faça logout nem recarregue a página**. Clique em **Atualizar permissões**. Resultado esperado: a seleção, a listagem e o conteúdo de N1 desaparecem **imediatamente ao clicar**, antes de a API devolver o novo conjunto de grants. Quando a resposta chegar, o seletor informa que não há fila concedida; nenhum histórico ou conteúdo privado deve ficar visível. O backend deve negar explicitamente N1 para o Auditor em chamadas subsequentes.
+4. Restaure o grant, ainda somente no laboratório:
+
+```powershell
+& $python scripts\release_grant_toggle.py --lab $lab --action restore --confirm-synthetic
+if ($LASTEXITCODE -ne 0) { throw 'Restauração sintética falhou' }
+```
+
+5. No navegador, clique **Atualizar permissões**. N1 deve voltar ao seletor e ser consultável, sem conferir permissão N2 ao Auditor. O script confere persistência e o incremento auditado `GRANT_REVOKED`/`GRANT_ENABLED`; a auditoria de cada consulta do histórico continua sendo responsabilidade do backend.
+
+**Não usar esse procedimento em `data/handoff-poc.db` e não compartilhar o arquivo `synthetic-credentials.txt`.** A ausência de WebSocket/SSE implica que conteúdo previamente carregado só será limpo quando houver uma ação de revalidação, troca de fila, nova consulta, logout ou navegação que remonte a tela; não afirmar revogação proativa em tempo real na interface.
+
+### Correções de UI decorrentes das capturas
+
+- Antes de consultar grants novamente, a UI limpa `queues`, `queueId`, `listing`, `selectedId`, `detail` e a paginação. Enquanto o resultado não chega, informa que está validando permissões.
+- Falha de `/v1/me/queues` esvazia permissões e conteúdo; erro no endpoint de listagem/detalhe mantém `detail=null`, sem conteúdo residual.
+- A barra lateral agora identifica `POC 0.5` e explica que `Conversas` conta apenas atendimentos correntes, não segmentos históricos.
+- Metadados de histórico usam texto maior, foco visível e painéis de altura mínima mais compacta. O acabamento precisa de nova avaliação em 390px, 1366×768 e 1920×1080 após a atualização.
+
+**Evidência existente:** cinco capturas mostram a mesma sessão N1→N2, os segmentos independentes (mensagens `bom dia`/ `claro`), a nota interna apenas na mesa do destinatário e confirmação de outbox local. Isso não comprova, isoladamente, a revogação em sessão nem paginação/teclado/responsividade.
+
+**Estado:** novas modificações de frontend, utilitário Python e testes estáticos publicados na branch candidata; os gates automatizados do novo SHA e o teste visual de revogação ainda estão pendentes. Não promover a `main` com base nos testes antigos.
