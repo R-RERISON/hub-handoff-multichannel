@@ -36,23 +36,35 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
   const [detailLoading,setDetailLoading] = useState(false)
   const [error,setError] = useState('')
   const [refreshKey,setRefreshKey] = useState(0)
+  const [grantsLoading,setGrantsLoading] = useState(true)
 
   useEffect(()=>{
     let cancelled=false
+    setGrantsLoading(true)
     api('/v1/me/queues').then(data=>{
       if(cancelled)return
       const available=data as GrantQueue[]
       setQueues(available)
-      setQueueId(current=>available.some(q=>q.id===current)?current:(available[0]?.id??''))
+      setQueueId(available[0]?.id??'')
     }).catch(()=>{
-      if(!cancelled)setError('Não foi possível consultar as filas concedidas.')
-    })
+      if(cancelled)return
+      // Fail closed in the VIEW too: no stale queue or message remains visible.
+      setQueues([])
+      setQueueId('')
+      setListing(null)
+      setSelectedId(null)
+      setDetail(null)
+      setError('Não foi possível validar as filas concedidas.')
+    }).finally(()=>{if(!cancelled)setGrantsLoading(false)})
     return ()=>{cancelled=true}
   },[api,refreshKey])
 
   useEffect(()=>{
-    if(!queueId){
+    if(!queueId||!queues.some(q=>q.id===queueId)){
       setListing(null)
+      setSelectedId(null)
+      setDetail(null)
+      setLoading(false)
       return
     }
     let cancelled=false
@@ -67,11 +79,15 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
         setListing(data as Listing)
       })
       .catch(()=>{
-        if(!cancelled)setError('Consulta indisponível ou permissão de fila revogada.')
+        if(cancelled)return
+        setListing(null)
+        setSelectedId(null)
+        setDetail(null)
+        setError('Consulta indisponível ou permissão de fila revogada.')
       })
       .finally(()=>{if(!cancelled)setLoading(false)})
     return ()=>{cancelled=true}
-  },[api,queueId,page,refreshKey])
+  },[api,queueId,queues,page,refreshKey])
 
   useEffect(()=>{
     if(!selectedId||!queueId){
@@ -87,7 +103,9 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
       '&message_page='+messagePage+'&event_page='+eventPage)
       .then(data=>{if(!cancelled)setDetail(data as VerifiedDetails)})
       .catch(()=>{
-        if(!cancelled)setError('O acesso ao segmento foi negado ou a concessão mudou.')
+        if(cancelled)return
+        setDetail(null)
+        setError('O acesso ao segmento foi negado ou a concessão mudou.')
       })
       .finally(()=>{if(!cancelled)setDetailLoading(false)})
     return ()=>{cancelled=true}
@@ -104,20 +122,30 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
     </section>
     <section className="verified-history-toolbar panel">
       <label htmlFor="verified-history-queue">Fila com acesso concedido</label>
-      <select id="verified-history-queue" value={queueId}
+      <select id="verified-history-queue" value={queueId} disabled={grantsLoading}
         onChange={e=>{
-          setQueueId(e.target.value);setPage(1)
+          setQueueId(e.target.value);setPage(1);setListing(null)
           setSelectedId(null);setDetail(null);setMessagePage(1);setEventPage(1)
         }}>
-        {queues.length===0&&<option value="">Nenhuma fila autorizada</option>}
+        {queues.length===0&&<option value="">{grantsLoading?'Validando concessões…':'Nenhuma fila autorizada'}</option>}
         {queues.map(q=><option value={q.id} key={q.id}>{q.name}</option>)}
       </select>
-      <button className="outline" type="button" onClick={()=>{
-        setPage(1);setSelectedId(null);setDetail(null)
-        setMessagePage(1);setEventPage(1);setRefreshKey(v=>v+1)
+      <button className="outline" type="button" disabled={grantsLoading} onClick={()=>{
+        // Never display previously fetched content while grants are being revalidated.
+        setQueues([]);setQueueId('');setListing(null);setSelectedId(null)
+        setDetail(null);setError('');setLoading(false);setDetailLoading(false)
+        setPage(1);setMessagePage(1);setEventPage(1)
+        setGrantsLoading(true);setRefreshKey(v=>v+1)
       }}><RefreshCw size={15}/> Atualizar permissões</button>
     </section>
     {error&&<div className="alert" role="alert">{error}</div>}
+    {grantsLoading&&<p className="verified-history-access-state" role="status">
+      Validando acesso às filas concedidas…
+    </p>}
+    {!grantsLoading&&!error&&queues.length===0&&
+      <p className="verified-history-access-state" role="status">
+        Nenhuma fila autorizada para consulta de histórico.
+      </p>}
     <div className="verified-history-warning" role="status">
       <LockKeyhole size={16}/>
       Visualização parcial: a ausência de itens aqui não significa ausência de mensagens no atendimento.
