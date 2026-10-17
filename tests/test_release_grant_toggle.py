@@ -4,12 +4,13 @@ These tests create disposable 006b4 databases; the real POC SQLite is never
 inspected, provisioned, migrated or modified by this suite.
 """
 import sqlite3
-from contextlib import closing
+from contextlib import closing, nullcontext
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from handoff_hub.poc_api import create_app
 from handoff_hub.poc_db import AuthUser, make_session_factory
 from handoff_hub.schema_admin import create_new
 from handoff_hub.security_schema import SECURITY_DECISIONS
@@ -123,8 +124,7 @@ def test_attestation_succeeds_between_two_app_instances_on_same_temp_db(
     tmp_path, monkeypatch,
 ):
     """End-to-end token crosses independently constructed SQLAlchemy engines."""
-    lab, path, factory = qa_lab(tmp_path, monkeypatch)
-    from handoff_hub.poc_api import create_app
+    lab, path, _factory = qa_lab(tmp_path, monkeypatch)
 
     browser_app = create_app(
         database_url=f"sqlite:///{path.as_posix()}",
@@ -134,7 +134,7 @@ def test_attestation_succeeds_between_two_app_instances_on_same_temp_db(
         def route_to_browser(*_args, **kwargs):
             assert kwargs["base_url"] == qa.API
             assert kwargs["trust_env"] is False
-            return browser
+            return nullcontext(browser)
 
         monkeypatch.setattr(qa.httpx, "Client", route_to_browser)
         result = qa.run(str(lab), "status", confirmed=False)
@@ -151,10 +151,6 @@ def test_attestation_different_lab_rejects_before_any_grant_write(
     other_dir = tmp_path / "unrelated-separate-lab"
     other_dir.mkdir()
     other_db = other_dir / "synthetic.db"
-    from handoff_hub.poc_api import create_app
-    from handoff_hub.schema_admin import create_new
-    from handoff_hub.poc_db import make_session_factory
-    from handoff_hub.seed_demo_auth import provision
 
     create_new(other_db, confirmed=True)
     factory_b, engine_b = make_session_factory(f"sqlite:///{other_db.as_posix()}")
@@ -169,7 +165,7 @@ def test_attestation_different_lab_rejects_before_any_grant_write(
     )
     with TestClient(browser_app) as wrong_backend:
         def route_to_wrong_backend(*_args, **_kwargs):
-            return wrong_backend
+            return nullcontext(wrong_backend)
 
         monkeypatch.setattr(qa.httpx, "Client", route_to_wrong_backend)
         with pytest.raises(qa.LabSafetyError, match="HTTP 401"):
