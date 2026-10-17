@@ -180,6 +180,8 @@ test('verified history clears sensitive view state before grant refresh', () => 
   assert.match(view,/Não foi possível validar as filas concedidas/)
   assert.match(view,/Nenhuma fila autorizada para consulta de histórico/)
   assert.match(view,/disabled=\{grantsLoading\}/)
+  assert.match(view,/preferredQueueRef\.current=queueId/)
+  assert.match(view,/available\.find\(q=>q\.id===preferredQueueRef\.current\)/)
   assert.match(view,/setListing\(null\)[\s\S]*?setSelectedId\(null\)[\s\S]*?setDetail\(null\)/)
 })
 
