@@ -8,7 +8,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from scripts import dev, lab_environment as lab
+from scripts import dev
+from scripts import lab_environment as lab
 
 
 def test_disposable_lab_is_created_and_reused_without_reset(tmp_path, monkeypatch):
