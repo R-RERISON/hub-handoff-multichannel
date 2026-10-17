@@ -12,6 +12,11 @@ $original = [System.IO.Path]::GetFullPath((Join-Path $root 'data\handoff-poc.db'
 if (-not (Test-Path -LiteralPath $python -PathType Leaf)) {
     throw 'Python .venv ausente. Execute .\start.cmd --setup-only primeiro.'
 }
+# Never let a running original-database server be mistaken for this QA lab.
+$listeners = @(Get-NetTCPConnection -LocalPort 8000,5173 -State Listen -ErrorAction SilentlyContinue)
+if ($listeners.Count -gt 0) {
+    throw 'Porta 8000/5173 ocupada: encerre instancias existentes antes de preparar o lab.'
+}
 
 # Keep ALL synthetic state outside the repository (including passwords).
 $lab = Join-Path ([System.IO.Path]::GetTempPath()) (
