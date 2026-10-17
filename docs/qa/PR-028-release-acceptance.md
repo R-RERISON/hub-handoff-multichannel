@@ -1,5 +1,7 @@
 # PR #28 — Plano de homologação manual e segurança da integração
 
+> **Atualização operacional de 17/10/2026:** o modo recomendado para todos os testes visuais é `start.cmd --lab` (um terminal para API e frontend). Os exemplos antigos com dois arquivos `run-backend.ps1`/`run-web.ps1` e o preparador PowerShell foram preservados como evidência histórica, **não são mais necessários**. `start.cmd` **sem** `--lab` continua abrindo a POC original.
+
 **Estado:** GATES MANUAIS PENDENTES. Este documento registra procedimentos, **não evidências executadas**.  
 **Ambiente:** Windows PowerShell 5.1+ / Python 3.12+ / Node/npm local. Sem GitHub Actions ou serviços externos.  
 **Candidato:** `feat/006b5b-security-decisions-journal`, revisão de banco **006b4** exclusiva do laboratório sintético.
@@ -9,7 +11,7 @@
 - **Jamais executar** `adopt`, `stamp`, `upgrade`, `upgrade-audit`, `upgrade-security`, `create` ou `--reset-users` em `data/handoff-poc.db`.
 - O banco original deve ser usado **somente** em `schema_admin inspect` e `provenance_dry_run`.
 - Os scripts de release usam `tempfile.TemporaryDirectory` e `$env:TEMP` para banco e credenciais **independentes**. Não se aplica migração no original.
-- **Não iniciar o launcher `start.cmd` para o laboratório temporário:** o launcher possui provisionamento padrão de contas em `data/demo-credentials.txt` e não isola esse arquivo quando `HANDOFF_DB_URL` é sobrescrito. Use os dois launchers temporários gerados pelo script abaixo.
+- **Usar `start.cmd --lab` para homologação sintética:** cria SQLite 006b4 e credenciais em TEMP e inicia FastAPI + Vite no mesmo terminal. **Nunca** usar `start.cmd` sem `--lab` para testar segurança no SQLite temporário, pois esse modo usa a POC original.
 - Encerrar qualquer execução anterior nas portas 8000/5173 antes dos testes browser.
 
 ## 1 — Gate automatizado reproduzível (novo)
@@ -38,15 +40,17 @@ if ($LASTEXITCODE -ne 0) { throw 'Gate 006b4 sintetico reprovado' }
 | `schema_admin inspect` no original | `integrity=ok`, `revision=null`, `table_count=17` |
 | `provenance_dry_run` no original | `rows_written=0`, `backfill_applied=false`, `safe_for_history_authorization=false` |
 
-## 2 — Preparar laboratório visual sem tocar no original
+## 2 — Preparar laboratório visual sem tocar no original (método vigente)
 
 ```powershell
-.\scripts\prepare-main-integration-lab.ps1
+.\start.cmd --lab
 ```
+
+O comando único prepara banco, contas e credenciais TEMP, inicia API + Vite e abre o navegador. Para **retomar** a mesma massa de dados depois do Ctrl+C, execute `start.cmd --lab --lab-dir "<diretório TEMP informado na tela>"`. `start.cmd` sem `--lab` continua sendo a POC original.
 
 O script cria um diretório **novo** sob `$env:TEMP\handoff-qa-006b4-<GUID>`, com `synthetic.db`, `synthetic-credentials.txt`, `seed-synthetic.py`, `run-backend.ps1` e `run-web.ps1`. O seed Python é executado a partir do arquivo temporário (não via `python -c`), evitando perda de aspas no Windows PowerShell 5.1. Valida revision `006b4_security_decisions` e 22 tabelas. **Não** gera os arquivos no projeto, não imprime senhas e **não executa** o launcher padrão.
 
-Abra **dois terminais** PowerShell separados e execute os caminhos completos dos launchers exibidos pelo script. No navegador: `http://127.0.0.1:5173`. Leia as contas locais em `synthetic-credentials.txt` (não publicar). O backend usa `HANDOFF_DB_URL` apenas dentro do processo desse terminal; ambos os serviços ficam em `127.0.0.1`.
+O fluxo legado `prepare-main-integration-lab.ps1` ainda existe para referência, mas **não é necessário no modo atual**. Se usado isoladamente, os dois launchers temporários gerados continuam opcionais; recomenda-se `start.cmd --lab`. No navegador: `http://127.0.0.1:5173`. Leia as contas locais em `synthetic-credentials.txt` (não publicar). O backend usa `HANDOFF_DB_URL` apenas dentro do processo desse terminal; ambos os serviços ficam em `127.0.0.1`.
 
 Caso um serviço antigo esteja usando 8000/5173, **encerre-o**, sem reaproveitar um backend que pode estar apontando para o banco original.
 
@@ -93,7 +97,7 @@ A primeira execução do preparador criou corretamente o banco sintético 006b4 
 
 **Ferramenta:** `scripts/release_grant_toggle.py`. Utiliza credenciais sintéticas sob `$env:TEMP` e verifica que o **ID da conta ADMIN na API é igual ao ID do banco temporário** antes de qualquer mutação; rejeita caminhos fora de `$env:TEMP\handoff-qa-006b4-*`. Nunca imprime senhas nem tokens. O comando modifica **somente** o grant `AUDITOR` da fila `n1` no banco sintético, por `PATCH /v1/admin/queue-grants`.
 
-1. Deixe os dois launchers do laboratório ativos (backend em 8000 e Vite em 5173), **sem iniciar `start.cmd`**. Mantenha o Auditor autenticado no navegador e com uma mensagem **sintética** N1 aberta em `Segmentos verificados`.
+1. Mantenha `start.cmd --lab --lab-dir <diretório>` ativo no mesmo terminal (API em 8000, Vite em 5173); **não inicie `start.cmd` sem `--lab`**. Mantenha o Auditor autenticado no navegador e com uma mensagem **sintética** N1 aberta em `Segmentos verificados`.
 2. Substitua o valor de `$lab` abaixo pelo diretório TEMP efetivamente criado pelo seu preparador (não utilize o caminho `data\handoff-poc.db`):
 
 ```powershell
@@ -136,6 +140,6 @@ O gate automático no HEAD `f3a94b2` concluiu **111/111 Pytest (96.78s), Ruff, 1
 
 Diagnósticos permitidos são literais/limitados (`API local indisponivel na porta 8000`, `API local nao reconhece a sessao do SQLite sintetico`, operação TEMP devolveu HTTP específico, etc.), sem credenciais, tokens, sessão ou resposta da API. Os testes automatizados adicionais exercitam rejeição de diretório fora do TEMP, bloqueio de escrita quando a atestação falha, revogação e restauração transacionais no banco sintético, e 401 de uma API diferente.
 
-**Pré-condições de execução:** manter `run-backend.ps1` e `run-web.ps1` do **mesmo** laboratório em execução, com a porta 8000 do backend temporário. Não iniciar `start.cmd` durante a homologação. Se houver falha, enviar apenas a mensagem de diagnóstico sanitizada do utilitário, nunca `synthetic-credentials.txt`.
+**Pré-condições de execução:** usar preferencialmente **um único `start.cmd --lab --lab-dir <diretório TEMP>`** ativo com ambos os serviços. Nunca iniciar `start.cmd` sem `--lab` durante a homologação, pois ele usa o SQLite original. Se houver falha, enviar apenas a mensagem de diagnóstico sanitizada do utilitário, nunca `synthetic-credentials.txt`.
 
 **Estado:** nova correção e testes ainda não homologados no Windows. Não promover à `main`.
