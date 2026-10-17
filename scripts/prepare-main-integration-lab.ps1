@@ -63,25 +63,23 @@ $rootQuoted = $root.Replace("'", "''")
 $dbQuoted = $db.Replace('\', '/').Replace("'", "''")
 $pythonQuoted = $python.Replace("'", "''")
 $webQuoted = (Join-Path $root 'web').Replace("'", "''")
-$backend = @"
+$backend = @'
 Set-StrictMode -Version Latest
-\$ErrorActionPreference = 'Stop'
-\$env:HANDOFF_DB_URL = 'sqlite:///$dbQuoted'
-Set-Location -LiteralPath '$rootQuoted'
-& '$pythonQuoted' -m uvicorn handoff_hub.main:app --host 127.0.0.1 --port 8000
-"@
-$web = @"
+$ErrorActionPreference = 'Stop'
+$env:HANDOFF_DB_URL = 'sqlite:///{DB}'
+Set-Location -LiteralPath '{ROOT}'
+& '{PYTHON}' -m uvicorn handoff_hub.main:app --host 127.0.0.1 --port 8000
+'@
+$web = @'
 Set-StrictMode -Version Latest
-\$ErrorActionPreference = 'Stop'
-Set-Location -LiteralPath '$webQuoted'
+$ErrorActionPreference = 'Stop'
+Set-Location -LiteralPath '{WEB}'
 & npm.cmd run dev
-"@
-
-# PowerShell here-strings interpolate $variables: insert literal $ with backtick.
-$backend = $backend.Replace('\$ErrorActionPreference', '`$ErrorActionPreference').Replace(
-    '\$env:HANDOFF_DB_URL', '`$env:HANDOFF_DB_URL'
+'@
+$backend = $backend.Replace('{DB}', $dbQuoted).Replace('{ROOT}', $rootQuoted).Replace(
+    '{PYTHON}', $pythonQuoted
 )
-$web = $web.Replace('\$ErrorActionPreference', '`$ErrorActionPreference')
+$web = $web.Replace('{WEB}', $webQuoted)
 $backendPath = Join-Path $lab 'run-backend.ps1'
 $webPath = Join-Path $lab 'run-web.ps1'
 [System.IO.File]::WriteAllText($backendPath, $backend, [System.Text.UTF8Encoding]::new($false))
