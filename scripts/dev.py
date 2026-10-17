@@ -56,10 +56,12 @@ def fingerprint(paths: list[Path]) -> str:
     return digest.hexdigest()
 
 
-def run_command(argv: list[str], cwd: Path = ROOT) -> None:
+def run_command(
+    argv: list[str], cwd: Path = ROOT, env: dict[str, str] | None = None,
+) -> None:
     report("Executando: " + " ".join(argv))
     try:
-        subprocess.run(argv, cwd=cwd, check=True)
+        subprocess.run(argv, cwd=cwd, check=True, env=env)
     except FileNotFoundError as exc:
         raise LauncherError(f"Ferramenta nao encontrada: {argv[0]}") from exc
     except subprocess.CalledProcessError as exc:
@@ -198,6 +200,30 @@ def stop_children(children: list[tuple[str, subprocess.Popen[str]]]) -> None:
             proc.wait()
 
 
+def prepare_lab_from_venv(python: str, lab_dir: str | None) -> dict:
+    """Use installed venv dependencies; never import SQLAlchemy in system launcher."""
+    command = [python, "-m", "scripts.lab_environment"]
+    command += ["resume", "--lab-dir", lab_dir] if lab_dir else ["create"]
+    try:
+        result = subprocess.run(
+            command, cwd=ROOT, text=True, capture_output=True, check=True,
+        )
+        details = json.loads(result.stdout.strip())
+        if (
+            not details.get("directory")
+            or not details.get("database_url", "").startswith("sqlite:///")
+            or not details.get("credentials")
+        ):
+            raise ValueError("Incomplete TEMP laboratory description")
+        return details
+    except (FileNotFoundError, subprocess.CalledProcessError, ValueError) as exc:
+        # Hide raw stderr: it can contain paths, SQL, or incidental data.
+        raise LauncherError(
+            "Laboratorio 006b4 recusado ou nao inicializado; "
+            "confira caminho TEMP e versao do schema."
+        ) from exc
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Gerenciador local do Handoff Hub POC")
     parser.add_argument("--setup-only", action="store_true", help="Instala dependencias e sai")
@@ -205,15 +231,31 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--reset-users", action="store_true", help="Rotaciona senhas locais")
     parser.add_argument("--check", action="store_true", help="Executa pytest, Ruff e build do frontend")
     parser.add_argument("--no-browser", action="store_true", help="Nao abre navegador automaticamente")
+    parser.add_argument(
+        "--lab", action="store_true",
+        help="Cria banco/contas sinteticas 006b4 e inicia API+Web no mesmo terminal",
+    )
+    parser.add_argument(
+        "--lab-dir", help="Retoma um laboratorio TEMP 006b4 existente (requer --lab)",
+    )
     args = parser.parse_args(argv)
+    if args.lab_dir and not args.lab:
+        parser.error("--lab-dir so pode ser usado com --lab")
+    if args.lab and (args.setup_only or args.setup_users or args.reset_users or args.check):
+        parser.error("--lab e incompativel com setup/reset/check; use --lab isoladamente")
     children: list[tuple[str, subprocess.Popen[str]]] = []
     try:
         python, npm = ensure_dependencies()
+        # Never inherit caller's HANDOFF_DB_URL for the regular POC commands.
+        # --lab is the ONLY path that sets a temporary SQLite explicitly.
+        base_env = dict(os.environ)
+        base_env.pop("HANDOFF_DB_URL", None)
+        base_env.pop("HANDOFF_POC_KEY", None)
         if args.setup_users or args.reset_users:
             cmd = [python, "-m", "handoff_hub.seed_demo_auth"]
             if args.reset_users:
                 cmd.append("--reset-users")
-            run_command(cmd)
+            run_command(cmd, env=base_env)
             return 0
         if args.check:
             run_command([python, "-m", "pytest", "-q"])
@@ -227,24 +269,38 @@ def main(argv: list[str] | None = None) -> int:
         for name, port in [("FastAPI", 8000), ("Vite", 5173)]:
             if port_in_use(port):
                 raise LauncherError(f"Porta {port} ocupada ({name}). Encerre a instancia anterior e tente novamente.")
-        # POC accounts and random passwords live ONLY in ignored local data.
-        run_command([python, "-m", "handoff_hub.seed_demo_auth"])
-        # Runtime logins now use per-user sessions; the shared legacy key is
-        # deliberately absent from the launched services.
-        env = dict(os.environ)
-        env.pop("HANDOFF_POC_KEY", None)
+        env = dict(base_env)
+        if args.lab:
+            lab = prepare_lab_from_venv(python, args.lab_dir)
+            env["HANDOFF_DB_URL"] = lab["database_url"]
+            report("Modo QA 006b4: somente SQLite sintetico em TEMP.")
+            report("  Lab: " + lab["directory"])
+            report("  Credenciais TEMP: " + lab["credentials"])
+            report("  Use --lab --lab-dir <diretorio> para retomar sem recriar dados.")
+        else:
+            # Preserve the original one-command POC behavior only in normal mode.
+            run_command([python, "-m", "handoff_hub.seed_demo_auth"], env=base_env)
+            report("Modo POC: SQLite local existente (nao versionado).")
         env["PYTHONUNBUFFERED"] = "1"
+        api_command = [
+            python, "-m", "uvicorn", "handoff_hub.main:app",
+            "--host", "127.0.0.1", "--port", "8000",
+        ]
+        if not args.lab:
+            api_command.append("--reload")
         report("Iniciando API e interface no mesmo terminal...")
-        children.append(("API", spawn("API", [python, "-m", "uvicorn", "handoff_hub.main:app",
-                                             "--host", "127.0.0.1", "--port", "8000", "--reload"], ROOT, env)))
+        children.append(("API", spawn("API", api_command, ROOT, env)))
         children.append(("WEB", spawn("WEB", [npm, "run", "dev"], WEB, env)))
         wait_for_services(children)
         report("Servicos iniciados:")
         report("  Web: " + FRONTEND_URL)
         report("  API: " + BACKEND_URL + "/docs")
         report("  Login individual: admin.demo, supervisor.demo, auditor.demo, ana.demo, bruno.demo")
-        report("  Senhas locais em data/demo-credentials.txt (arquivo fora do Git)")
+        if not args.lab:
+            report("  Senhas locais em data/demo-credentials.txt (arquivo fora do Git)")
         report("Use Ctrl+C para encerrar os dois servicos.")
+        if args.lab:
+            report("  Banco e credenciais TEMP preservados apos Ctrl+C; descarte manual ao final.")
         if not args.no_browser:
             webbrowser.open(FRONTEND_URL)
         while True:
