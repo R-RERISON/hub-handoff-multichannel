@@ -1,8 +1,8 @@
-"""Single-command local dev launcher for the Handoff Hub SQLite POC.
+"""Single-command Handoff launcher for both regular POC and isolated QA lab.
 
-Starts FastAPI and Vite in one console, provisions missing dependencies,
-keeps the POC key on the local machine, and shuts down children together.
-Run via start.cmd on Windows, or python scripts/dev.py elsewhere.
+start.cmd --lab creates or resumes a disposable versioned SQLite 006b4 lab,
+then launches FastAPI and Vite in one terminal. Plain start.cmd preserves the
+original POC startup and never performs Alembic migrations.
 """
 
 from __future__ import annotations
@@ -258,9 +258,10 @@ def main(argv: list[str] | None = None) -> int:
             run_command(cmd, env=base_env)
             return 0
         if args.check:
-            run_command([python, "-m", "pytest", "-q"])
-            run_command([python, "-m", "ruff", "check", "src", "tests"])
-            run_command([npm, "run", "build"], cwd=WEB)
+            # Test invocations must not inherit a workstation's alternate DB URL.
+            run_command([python, "-m", "pytest", "-q"], env=base_env)
+            run_command([python, "-m", "ruff", "check", "src", "tests"], env=base_env)
+            run_command([npm, "run", "build"], cwd=WEB, env=base_env)
             report("Pytest, Ruff e frontend build aprovados.")
             return 0
         if args.setup_only:
