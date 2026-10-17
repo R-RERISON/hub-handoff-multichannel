@@ -4,9 +4,8 @@ Never uses the original POC SQLite. Never prints credentials, access tokens,
 user IDs or request bodies. This is a manual browser-QA helper, not a production
 administration command.
 
-Example:
-  python scripts/release_grant_toggle.py --lab "$env:TEMP/handoff-qa-006b4-..." \\
-      --action revoke --confirm-synthetic
+Example (PowerShell; API TEMP running on 127.0.0.1:8000):
+  python scripts/release_grant_toggle.py --lab "$env:TEMP/handoff-qa-006b4-..." --action revoke --confirm-synthetic
 """
 from __future__ import annotations
 
@@ -18,7 +17,9 @@ from contextlib import closing
 from pathlib import Path
 
 import httpx
+from fastapi.testclient import TestClient
 
+from handoff_hub.poc_api import create_app
 from handoff_hub.schema_admin import SECURITY_REVISION, verify_database
 
 API = "http://127.0.0.1:8000"
@@ -74,7 +75,7 @@ def password(path: Path, username: str) -> str:
     return matches[0]
 
 
-def bearer(client: httpx.Client, credentials: Path, username: str,
+def bearer(client: TestClient, credentials: Path, username: str,
            expected_id: str) -> dict[str, str]:
     response = client.post("/v1/auth/login", json={
         "username": username, "password": password(credentials, username),
@@ -111,6 +112,45 @@ def count_events(db_path: Path, target_id: str, action: str) -> int:
         ).fetchone()[0])
 
 
+def attest_running_backend(headers: dict[str, str], expected_id: str) -> None:
+    """Only READ the live API; never try a password or PATCH against an unknown DB.
+
+    The bearer is minted *in the chosen temporary SQLite* via TestClient.
+    An unrelated localhost server cannot validate it, even if it has the
+    same synthetic usernames. All mutations happen via TestClient against
+    the explicit temporary db_path, never via the live server.
+    """
+    try:
+        with httpx.Client(base_url=API, timeout=6, trust_env=False) as live:
+            response = live.get("/v1/auth/me", headers=headers)
+    except httpx.ConnectError as exc:
+        raise LabSafetyError(
+            "API local indisponivel na porta 8000; inicie o run-backend.ps1 "
+            "do laboratorio TEMP antes do teste"
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise LabSafetyError(
+            "Nao foi possivel consultar /v1/auth/me no servidor local"
+        ) from exc
+    if response.status_code != 200:
+        raise LabSafetyError(
+            "API local nao reconhece a sessao do SQLite sintetico; "
+            "confirme que run-backend.ps1 aponta para este mesmo laboratorio"
+        )
+    try:
+        identity = response.json()
+    except ValueError as exc:
+        raise LabSafetyError("API local retornou perfil invalido") from exc
+    if (
+        identity.get("id") != expected_id
+        or identity.get("username") != TARGET
+        or identity.get("role") != "AUDITOR"
+    ):
+        raise LabSafetyError(
+            "Identidade da API local nao corresponde ao banco de laboratorio"
+        )
+
+
 def run(lab: str, action: str, confirmed: bool) -> dict:
     db_path, credentials = lab_files(lab)
     if action != "status" and not confirmed:
@@ -121,11 +161,20 @@ def run(lab: str, action: str, confirmed: bool) -> dict:
     event_type = "GRANT_ENABLED" if expected_grant else "GRANT_REVOKED"
     earlier_events = count_events(db_path, target_id, event_type)
 
-    with httpx.Client(base_url=API, timeout=15, trust_env=False) as client:
-        admin = bearer(client, credentials, ADMIN, admin_id)
-        auditor = bearer(client, credentials, TARGET, target_id)
+    # Login and PATCH are bound explicitly to the verified TEMP database.
+    # A different process on port 8000 can never receive passwords or grants.
+    url = f"sqlite:///{db_path.as_posix()}"
+    app = create_app(database_url=url, api_key="isolated-grant-qa-only")
+    with TestClient(app, raise_server_exceptions=False) as local:
+        admin = bearer(local, credentials, ADMIN, admin_id)
+        auditor = bearer(local, credentials, TARGET, target_id)
+
+        # Assert the browser's API uses this SAME temp DB before any PATCH.
+        # Failed attestation sends only a temporary bearer via a READ request.
+        attest_running_backend(auditor, target_id)
+
         if action != "status":
-            response = client.patch("/v1/admin/queue-grants", headers=admin, json={
+            response = local.patch("/v1/admin/queue-grants", headers=admin, json={
                 "user_id": target_id,
                 "queue_id": QUEUE,
                 "role": "AUDITOR",
@@ -133,12 +182,11 @@ def run(lab: str, action: str, confirmed: bool) -> dict:
             })
             if response.status_code != 200:
                 raise LabSafetyError(
-                    "API rejected synthetic grant operation with HTTP "
-                    + str(response.status_code)
+                    "TEMP grant operation rejected with HTTP " + str(response.status_code)
                 )
-        grants = client.get("/v1/me/queues", headers=auditor)
+        grants = local.get("/v1/me/queues", headers=auditor)
         if grants.status_code != 200:
-            raise LabSafetyError("Cannot verify current auditor queue scope")
+            raise LabSafetyError("Cannot verify current auditor queue scope in TEMP")
         has_n1 = QUEUE in {q["id"] for q in grants.json()}
         after = count_grants(db_path, target_id)
 
@@ -172,9 +220,13 @@ def main() -> None:
     args = parser.parse_args()
     try:
         result = run(args.lab, args.action, args.confirm_synthetic)
-    except (LabSafetyError, OSError, sqlite3.Error, httpx.HTTPError) as exc:
-        # No credentials, tokens, user IDs, SQL parameters or HTTP body in errors.
-        raise SystemExit("REPROVADO: synthetic lab validation/operation failed") from None
+    except LabSafetyError as exc:
+        # Only purpose-built, static diagnostics: no tokens, passwords or DB IDs.
+        raise SystemExit("REPROVADO: " + str(exc)) from None
+    except (OSError, sqlite3.Error, httpx.HTTPError):
+        raise SystemExit(
+            "REPROVADO: falha de arquivo, SQLite ou rede no laboratorio sintetico"
+        ) from None
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
