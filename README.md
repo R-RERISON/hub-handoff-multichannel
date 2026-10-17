@@ -6,6 +6,21 @@
 
 **Gates automáticos comprovados no commit `052e197`:** 111/111 Pytest, Ruff, 11/11 arquitetura frontend, TypeScript e Vite aprovados no Windows. **Depois desse commit foram adicionados utilitários de QA; o SHA atualizado ainda precisa de nova execução.** Validação manual de UI, revogação e banco sintético permanece pendente.
 
+## Inicialização atual em um único terminal
+
+```powershell
+.\start.cmd --lab            # RECOMENDADO: cria banco TEMP 006b4 e sobe API+Vite
+.\start.cmd --check          # testes Python/Ruff/Frontend/TypeScript/Vite
+.\start.cmd                  # POC original (sem migração, fora do laboratório)
+```
+
+Para retomar o mesmo laboratório sem perder atendimentos sintéticos, use
+`start.cmd --lab --lab-dir "<caminho TEMP impresso na primeira execução>"`.
+O modo QA isola `synthetic.db` e `synthetic-credentials.txt` sob `$env:TEMP`,
+sem gravar no SQLite original, e encerra ambos os serviços com **Ctrl+C**.
+Não misturar `--lab` com `--reset-users` ou usar o modo normal durante
+testes de segurança. Guia vigente: [Inicialização unificada](docs/setup-one-command.md).
+
 ## Executar / validar sem alterar o banco original
 
 ```powershell
@@ -15,7 +30,7 @@
 .\.venv\Scripts\python.exe -m handoff_hub.provenance_dry_run
 ```
 
-O `release_probe.py` usa exclusivamente SQLite e contas descartáveis em `$env:TEMP`. Para **homologação visual isolada**, execute `.\scripts\prepare-main-integration-lab.ps1` e siga os caminhos de inicialização gerados, sem invocar `start.cmd` no banco sintético. Procedimento detalhado: [PR #28 — Plano de homologação](docs/qa/PR-028-release-acceptance.md).
+O `release_probe.py` usa exclusivamente SQLite e contas descartáveis em `$env:TEMP`. Para **homologação visual isolada**, execute `.\start.cmd --lab` (ou com `--lab-dir` para retomar), que já sobe API e interface no mesmo terminal. O script PowerShell antigo é opcional/legado. Procedimento detalhado: [PR #28 — Plano de homologação](docs/qa/PR-028-release-acceptance.md).
 
 Para iniciar a POC **existente** normalmente em localhost, `.\start.cmd` utiliza `data/handoff-poc.db` e credenciais individuais em `data/demo-credentials.txt`. Não compartilhar senhas, Bearer tokens ou dados reais. Para produção corporativa ainda faltam Entra ID/OIDC, SQL Server, integração Teams, retenção LGPD e garantias de imutabilidade da auditoria.
 
