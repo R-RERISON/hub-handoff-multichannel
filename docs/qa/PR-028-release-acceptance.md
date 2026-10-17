@@ -126,3 +126,16 @@ if ($LASTEXITCODE -ne 0) { throw 'Restauração sintética falhou' }
 **Evidência existente:** cinco capturas mostram a mesma sessão N1→N2, os segmentos independentes (mensagens `bom dia`/ `claro`), a nota interna apenas na mesa do destinatário e confirmação de outbox local. Isso não comprova, isoladamente, a revogação em sessão nem paginação/teclado/responsividade.
 
 **Estado:** novas modificações de frontend, utilitário Python e testes estáticos publicados na branch candidata; os gates automatizados do novo SHA e o teste visual de revogação ainda estão pendentes. Não promover a `main` com base nos testes antigos.
+
+
+### Windows — falha do primeiro `release_grant_toggle.py` e correção de segurança
+
+O gate automático no HEAD `f3a94b2` concluiu **111/111 Pytest (96.78s), Ruff, 13/13 arquitetura frontend, TypeScript/Vite** e `release_probe.py=PASS` (2 reads, 4 decisões de segurança; SQLite TEMP 006b4, sem payload sensível). A execução de `release_grant_toggle.py --action revoke` falhou com diagnóstico excessivamente genérico. **Não há comprovação de que o grant tenha sido revogado** nessa tentativa.
+
+**Correção da ferramenta:** novas versões fazem LOGIN via FastAPI `TestClient` explicitamente ligado ao banco `$lab/synthetic.db` (credenciais permanecem locais). Antes de qualquer PATCH, usam o token sintético recém-criado para fazer **somente GET `/v1/auth/me`** em `127.0.0.1:8000`; a API precisa reconhecer esse token e devolver o mesmo ID, username e papel AUDITOR do banco. Um backend da POC original, mesmo com mesmos usernames, não possui essa sessão sintética e é rejeitado **antes de qualquer mutação**, sem tentativa de senha no original. O PATCH administrativo é executado pelo `TestClient` **diretamente no banco TEMP**; sucesso é corroborado por `queue_role_grants` e por `security_decisions`.
+
+Diagnósticos permitidos são literais/limitados (`API local indisponivel na porta 8000`, `API local nao reconhece a sessao do SQLite sintetico`, operação TEMP devolveu HTTP específico, etc.), sem credenciais, tokens, sessão ou resposta da API. Os testes automatizados adicionais exercitam rejeição de diretório fora do TEMP, bloqueio de escrita quando a atestação falha, revogação e restauração transacionais no banco sintético, e 401 de uma API diferente.
+
+**Pré-condições de execução:** manter `run-backend.ps1` e `run-web.ps1` do **mesmo** laboratório em execução, com a porta 8000 do backend temporário. Não iniciar `start.cmd` durante a homologação. Se houver falha, enviar apenas a mensagem de diagnóstico sanitizada do utilitário, nunca `synthetic-credentials.txt`.
+
+**Estado:** nova correção e testes ainda não homologados no Windows. Não promover à `main`.
