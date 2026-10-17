@@ -143,3 +143,26 @@ Diagnósticos permitidos são literais/limitados (`API local indisponivel na por
 **Pré-condições de execução:** usar preferencialmente **um único `start.cmd --lab --lab-dir <diretório TEMP>`** ativo com ambos os serviços. Nunca iniciar `start.cmd` sem `--lab` durante a homologação, pois ele usa o SQLite original. Se houver falha, enviar apenas a mensagem de diagnóstico sanitizada do utilitário, nunca `synthetic-credentials.txt`.
 
 **Estado:** nova correção e testes ainda não homologados no Windows. Não promover à `main`.
+
+
+### 17/10/2026 — Diagnóstico de atestação com `start.cmd --lab`
+
+O laboratório `handoff-qa-006b4-1ohg0707` foi criado por `start.cmd --lab` e o usuário executou, posteriormente, `release_grant_toggle.py --action status` e `--action restore --confirm-synthetic`. Ambos foram **REPROVADOS ANTES DO PATCH** com `API local nao reconhece a sessao do SQLite sintetico`. Não há evidência de alteração de grant; o bloqueio preventivo está correto. **Ainda não foi comprovado se a porta 8000 executava o laboratório correto no momento do teste.**
+
+Correção **diagnóstica**: o utilitário agora inclui o HTTP status literal de `GET /v1/auth/me` (`401/403`: token TEMP não reconhecido, possível banco diferente; `404`: servidor inesperado/rota ausente; demais: endpoint indisponível), sem corpo da resposta, token, password, usuário ou caminho real. Instruções atualizadas para `start.cmd --lab --lab-dir`, não `run-backend.ps1`.
+
+Dois testes novos exercitam a atestação **de verdade** entre instâncias FastAPI distintas com engines SQLAlchemy independentes: mesma base TEMP deve aceitar sessão sintética; base TEMP diferente (mesmos usernames, mas contas/sessões distintas) deve retornar 401 e impedir o PATCH. O utilitário **não reduz o requisito de atestação**. Revisão Windows pendente.
+
+Procedimento objetivo de reteste:
+
+```powershell
+# Encerre quaisquer processos nas portas 8000/5173 antes de iniciar.
+# Terminal A: manter aberto e confirmar que aparece lab 1ohg0707
+.\start.cmd --lab --lab-dir "$env:TEMP\handoff-qa-006b4-1ohg0707"
+
+# Terminal B: executar apenas STATUS ate obter PASS
+$lab = Join-Path $env:TEMP 'handoff-qa-006b4-1ohg0707'
+.\.venv\Scripts\python.exe scripts\release_grant_toggle.py --lab $lab --action status
+```
+
+Se retornar `HTTP 401` ou `403`, conferir o diretório exibido no terminal A, identificar o processo que escuta na porta 8000 e validar que nenhum outro servidor está ligado a um SQLite diferente. **Não executar revoke/restore enquanto STATUS não for PASS.** Apenas depois disso seguir SEC-02/SEC-03 com a UI do Auditor aberta.
