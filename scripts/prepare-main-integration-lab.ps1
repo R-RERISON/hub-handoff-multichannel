@@ -51,7 +51,14 @@ try:
 finally:
     engine.dispose()
 '@
-& $python -c $seed $db $credentials
+# PowerShell 5.1/Windows native argument quoting strips quotes inside
+# python -c strings (e.g. f"sqlite:///..." becomes fsqlite:///...).
+# Execute a real UTF-8 file under TEMP, never inline code through argv.
+$seedPath = Join-Path $lab 'seed-synthetic.py'
+[System.IO.File]::WriteAllText(
+    $seedPath, $seed, (New-Object System.Text.UTF8Encoding($false))
+)
+& $python $seedPath $db $credentials
 if ($LASTEXITCODE -ne 0) { throw 'Falha no seed exclusivamente sintetico.' }
 
 $schemaOutput = & $python -m handoff_hub.schema_admin --database $db inspect
