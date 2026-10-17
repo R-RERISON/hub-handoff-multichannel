@@ -2,11 +2,11 @@
 
 These tests never resolve, inspect or mutate data/handoff-poc.db.
 """
-from pathlib import Path
-
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from handoff_hub.poc_api import create_app
+from handoff_hub.poc_db import AuthUser, make_session_factory
 from scripts import lab_environment as environment
 from scripts import release_audit_evidence as evidence
 
@@ -100,9 +100,6 @@ def test_report_passes_actual_read_deny_revoke_restore_cycle(tmp_path, monkeypat
             params={"queue_id": "n2"}, headers=auditor,
         )
         assert denied.status_code == 404
-
-        from handoff_hub.poc_db import AuthUser, make_session_factory
-        from sqlalchemy import select
 
         factory, engine = make_session_factory(lab.database_url)
         try:
