@@ -56,7 +56,7 @@ finally:
 # Execute a real UTF-8 file under TEMP, never inline code through argv.
 $seedPath = Join-Path $lab 'seed-synthetic.py'
 [System.IO.File]::WriteAllText(
-    $seedPath, $seed, (New-Object System.Text.UTF8Encoding($false))
+    $seedPath, $seed, [System.Text.UTF8Encoding]::new($false)
 )
 & $python $seedPath $db $credentials
 if ($LASTEXITCODE -ne 0) { throw 'Falha no seed exclusivamente sintetico.' }
