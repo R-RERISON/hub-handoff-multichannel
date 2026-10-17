@@ -1,65 +1,101 @@
-# Execução local — Handoff Hub POC 0.5 / SPEC-006B-5.2
+# Inicialização em um comando — Handoff Hub POC 0.5 / QA 006b4
 
-**Escopo:** simulação localhost. Sem Teams real, autenticação corporativa, SQL Server ou dados de produção.
+**Interface única:** `start.cmd`, executado na raiz do repositório. FastAPI e Vite iniciam
+no **mesmo terminal**, com logs `[API]` / `[WEB]`. `Ctrl+C` encerra ambos.
+Somente localhost (`127.0.0.1:8000` e `127.0.0.1:5173`).
 
-## Primeiro acesso
+## Homologação segura — recomendado
 
-No PowerShell, na raiz do projeto:
+```powershell
+.\start.cmd --lab
+```
+
+O launcher prepara automaticamente um **NOVO** SQLite versionado
+`006b4_security_decisions` com **22 tabelas** e cinco identidades sintéticas, cria
+credenciais aleatórias em `$env:TEMP\handoff-qa-006b4-<id>\synthetic-credentials.txt`,
+inicia FastAPI e React/Vite na mesma janela e abre o navegador. Ele imprime
+apenas a localização do diretório e do arquivo de credenciais, **não as senhas**.
+O banco da POC original não é lido, adotado, migrado nem usado para seed neste modo.
+
+Para executar novamente no **mesmo** laboratório e preservar histórico, usuários
+e grants, copie o diretório mostrado ao inicializar:
+
+```powershell
+.\start.cmd --lab --lab-dir "$env:TEMP\handoff-qa-006b4-<id>"
+```
+
+O nome entre `<id>` é um exemplo; substitua pelo diretório real.
+`--lab-dir` **não** cria, reseta ou migra banco algum. O utilitário recusa
+qualquer caminho que não seja diretório `handoff-qa-006b4-*` filho direto de
+`$env:TEMP`, qualquer SQLite sem revisão 006b4/22 tabelas/5 identidades/2 filas
+e symlinks para arquivos externos.
+
+Abra `synthetic-credentials.txt` localmente em um editor, sem publicá-lo.
+O launcher não aceita chave de API compartilhada no runtime do laboratório.
+`start.cmd --lab --no-browser` mantém o início unificado, sem abrir aba.
+
+### Revalidação do Auditor — somente em laboratório
+
+Com `start.cmd --lab --lab-dir ...` em execução e uma mensagem sintética N1
+visível na sessão do Auditor:
+
+```powershell
+$lab = Join-Path $env:TEMP "handoff-qa-006b4-<id>"
+.\.venv\Scripts\python.exe scripts\release_grant_toggle.py --lab $lab --action status
+.\.venv\Scripts\python.exe scripts\release_grant_toggle.py --lab $lab --action revoke --confirm-synthetic
+```
+
+O utilitário confere o token do banco temporário **por um GET somente leitura**
+contra a API ativa e faz alterações **somente** no SQLite sintético explicitamente
+selecionado. No navegador do Auditor, clicar em **Atualizar permissões** deve
+esvaziar imediatamente as mensagens carregadas e remover N1.
+
+Para restaurar:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\release_grant_toggle.py --lab $lab --action restore --confirm-synthetic
+```
+
+Não compartilhar senha/token nem apontar o utilitário para o SQLite original.
+
+## Execução habitual da POC original
 
 ```powershell
 .\start.cmd
 ```
 
-O launcher prepara dependências se necessário, executa o seed **idempotente** das cinco contas de demonstração, inicia FastAPI em `127.0.0.1:8000` e React/Vite em `127.0.0.1:5173` no mesmo terminal e abre a interface. Cada perfil autentica com **usuário e senha individuais**.
+**Sem `--lab`**, o comportamento histórico é preservado: FastAPI e Vite
+iniciam juntos, usando apenas `data/handoff-poc.db` e as credenciais individuais
+já mantidas em `data/demo-credentials.txt`, ignorado pelo Git. O launcher
+não executa migrações Alembic no banco POC original. `--setup-users` e
+`--reset-users` operam exclusivamente no modo POC habitual; **nunca são parte
+dos gates do laboratório TEMP**.
 
-As senhas são geradas somente no ambiente local e escritas no arquivo ignorado pelo Git `data/demo-credentials.txt`. **Não** são uma chave compartilhada, não se deve enviá-las por chat, imprimir em evidências nem publicar o banco ou screenshots com segredos.
+Mesmo que a sessão PowerShell tenha herdado `HANDOFF_DB_URL` ou
+`HANDOFF_POC_KEY`, a execução habitual remove essas variáveis antes de iniciar
+a API ou executar o seed, evitando apontar inadvertidamente para outro banco.
+Para não tocar no SQLite original durante homologação, escolha **`--lab`**.
 
-Contas: `admin.demo`, `supervisor.demo`, `auditor.demo`, `ana.demo`, `bruno.demo`. `--reset-users` é uma operação de rotação de credenciais com revogação de sessões e **não** deve ser usada como parte do gate de QA sem planejamento.
-
-```powershell
-.\start.cmd --setup-only   # apenas dependências
-.\start.cmd --no-browser   # inicia serviços sem abrir navegador
-.\start.cmd --check        # Pytest, Ruff, testes frontend, TypeScript e Vite
-```
-
-A API e a interface encerram ao pressionar Ctrl+C no terminal do launcher. Não criar instâncias paralelas nas portas 8000/5173.
-
-## Preservação do SQLite existente
-
-O banco em `data/handoff-poc.db` é a **POC original**, sem Alembic, com 17 tabelas. O launcher **não** aplica a migração `006b1`/`006b2`/`006b3`/`006b4`. Usar apenas diagnósticos read-only:
+## Testes e ferramentas
 
 ```powershell
-.\.venv\Scripts\python.exe -m handoff_hub.schema_admin inspect
-.\.venv\Scripts\python.exe -m handoff_hub.provenance_dry_run
+.\start.cmd --setup-only  # dependências apenas
+.\start.cmd --check       # Pytest, Ruff, testes frontend, TypeScript e Vite
+.\.venv\Scripts\python.exe scripts\release_probe.py  # banco TEMP 006b4 autocontido
+.\.venv\Scripts\python.exe -m handoff_hub.schema_admin inspect  # POC original read-only
+.\.venv\Scripts\python.exe -m handoff_hub.provenance_dry_run  # POC original read-only
 ```
 
-**Não executar** `adopt`, `stamp`, `upgrade`, `upgrade-audit`, `upgrade-security` ou `create` sobre o banco original. Sem inferência de proveniência para histórico legado.
+`--check`, `--setup-only`, `--setup-users` e `--reset-users` não podem
+ser combinados com `--lab`. O launcher recusa portas 8000 e 5173 já ocupadas,
+sem matar ou conectar-se silenciosamente a outro servidor. As contas de laboratório
+são criadas somente na primeira inicialização de cada diretório TEMP.
 
-## Homologação da integração na main (PR #28)
+## Restrições de release
 
-O gate automatizado e o laboratório visual usam somente bancos descartáveis:
-
-```powershell
-.\start.cmd --check
-.\.venv\Scripts\python.exe scripts\release_probe.py
-.\scripts\prepare-main-integration-lab.ps1
-```
-
-O `release_probe.py` cria, exercita e remove um SQLite temporário 006b4 com credenciais sintéticas, sem serviços externos. O script `prepare-main-integration-lab.ps1` prepara outro SQLite sob `$env:TEMP` e informa **dois launchers temporários** para abrir API e Vite em terminais diferentes, com credenciais de laboratório guardadas no próprio diretório temporário.
-
-**Não usar `start.cmd` para o laboratório sintético**, pois o seu provisionamento de credenciais usa por padrão `data/demo-credentials.txt`, mesmo com `HANDOFF_DB_URL` personalizado. Encerrar os serviços anteriores antes de executar o laboratório. Procedimentos, critérios e matriz de aceite: [PR-028-release-acceptance.md](qa/PR-028-release-acceptance.md).
-
-## Git
-
-Enquanto PR #28 estiver Draft, trabalhar na branch `feat/006b5b-security-decisions-journal`:
-
-```powershell
-git status --short
-git fetch origin
-git switch feat/006b5b-security-decisions-journal
-git merge --ff-only origin/feat/006b5b-security-decisions-journal
-```
-
-Se a branch ainda não existir localmente, criá-la com `git switch --create feat/006b5b-security-decisions-journal --track origin/feat/006b5b-security-decisions-journal`.
-
-Após o PR ser revisado e aprovado, confirmar o estado da `main` antes de trocar a orientação acima. Não executar GitHub Actions, não mesclar PRs antigos indiscriminadamente e não expor esta POC fora do `127.0.0.1`.
+- Sem GitHub Actions, Teams real, OIDC/Entra ID ou SQL Server na POC local.
+- Não executar `adopt`, `stamp`, `upgrade*` ou `create` no SQLite POC original.
+- `Ctrl+C` encerra API/Vite, **mas não apaga** os dados do laboratório TEMP; remover
+  o diretório de testes manualmente ao concluir a homologação e encerrar processos.
+- `docs/qa/PR-028-release-acceptance.md` contém os gates UX, RBAC e auditoria para
+  consolidação na `main`. PR #28 permanece Draft até homologação.
