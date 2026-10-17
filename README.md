@@ -1,3 +1,30 @@
+# Handoff Hub Multichannel — Candidato de integração POC 0.5 / SPEC-006B-5.2
+
+**Status (17/10/2026):** desenvolvimento na branch `feat/006b5b-security-decisions-journal`; integração na `main` proposta no [PR #28](https://github.com/R-RERISON/hub-handoff-multichannel/pull/28), **ainda Draft e NÃO mergeado**. POC localhost, **não produção**.
+
+**Contrato atual:** FastAPI + SQLite + React/Vite; login individual e RBAC por perfil/operação/fila, worker de distribuição automática, Mesa do Operador, supervisão, auditoria e histórico parcial `RUNTIME/VERIFIED`. O SQLite POC **original de 17 tabelas permanece não versionado**, íntegro e sem migração automática. Migrações Alembic `006b1`→`006b4` são explícitas e restritas a bancos autorizados de laboratório. **Não executar `adopt`/`stamp`/`upgrade` no original**.
+
+**Gates automáticos comprovados no commit `052e197`:** 111/111 Pytest, Ruff, 11/11 arquitetura frontend, TypeScript e Vite aprovados no Windows. **Depois desse commit foram adicionados utilitários de QA; o SHA atualizado ainda precisa de nova execução.** Validação manual de UI, revogação e banco sintético permanece pendente.
+
+## Executar / validar sem alterar o banco original
+
+```powershell
+.\start.cmd --check
+.\.venv\Scripts\python.exe scripts\release_probe.py
+.\.venv\Scripts\python.exe -m handoff_hub.schema_admin inspect
+.\.venv\Scripts\python.exe -m handoff_hub.provenance_dry_run
+```
+
+O `release_probe.py` usa exclusivamente SQLite e contas descartáveis em `$env:TEMP`. Para **homologação visual isolada**, execute `.\scripts\prepare-main-integration-lab.ps1` e siga os caminhos de inicialização gerados, sem invocar `start.cmd` no banco sintético. Procedimento detalhado: [PR #28 — Plano de homologação](docs/qa/PR-028-release-acceptance.md).
+
+Para iniciar a POC **existente** normalmente em localhost, `.\start.cmd` utiliza `data/handoff-poc.db` e credenciais individuais em `data/demo-credentials.txt`. Não compartilhar senhas, Bearer tokens ou dados reais. Para produção corporativa ainda faltam Entra ID/OIDC, SQL Server, integração Teams, retenção LGPD e garantias de imutabilidade da auditoria.
+
+## Histórico de implementação (seções abaixo)
+
+As seções POC-002/003/004/005 e 006B-1 abaixo documentam a evolução histórica e podem mencionar **fluxos ou comandos superados** (por exemplo, chave compartilhada, distribuição manual e antigas branches). **Não utilizá-las como guia operacional vigente**; consulte o procedimento atual acima.
+
+---
+
 ## SPEC-006B-1 — Migração versionada segura (em homologação)
 
 Esta branch incorpora Alembic para **instalações novas** e um utilitário explícito para **adotar o schema de SQLite POC-006A existente**, com verificação de estrutura, backup consistente e SHA-256. O `start.cmd` **não migra automaticamente** o banco existente.
