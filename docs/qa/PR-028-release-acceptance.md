@@ -44,7 +44,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Gate 006b4 sintetico reprovado' }
 .\scripts\prepare-main-integration-lab.ps1
 ```
 
-O script cria um diretório **novo** sob `$env:TEMP\handoff-qa-006b4-<GUID>`, com `synthetic.db`, `synthetic-credentials.txt`, `run-backend.ps1` e `run-web.ps1`. Valida revision `006b4_security_decisions` e 22 tabelas. **Não** gera os arquivos no projeto, não imprime senhas e **não executa** o launcher padrão.
+O script cria um diretório **novo** sob `$env:TEMP\handoff-qa-006b4-<GUID>`, com `synthetic.db`, `synthetic-credentials.txt`, `seed-synthetic.py`, `run-backend.ps1` e `run-web.ps1`. O seed Python é executado a partir do arquivo temporário (não via `python -c`), evitando perda de aspas no Windows PowerShell 5.1. Valida revision `006b4_security_decisions` e 22 tabelas. **Não** gera os arquivos no projeto, não imprime senhas e **não executa** o launcher padrão.
 
 Abra **dois terminais** PowerShell separados e execute os caminhos completos dos launchers exibidos pelo script. No navegador: `http://127.0.0.1:5173`. Leia as contas locais em `synthetic-credentials.txt` (não publicar). O backend usa `HANDOFF_DB_URL` apenas dentro do processo desse terminal; ambos os serviços ficam em `127.0.0.1`.
 
@@ -82,3 +82,8 @@ Caso um serviço antigo esteja usando 8000/5173, **encerre-o**, sem reaproveitar
 Verificada a cadeia Git (`main` ancestral do head), ausência de merge automático e isolamento do schema em `006b4`. Ainda falta inspeção final completa de mudanças em 104 arquivos, análise de concorrência, revisão visual e confirmação dos gates deste novo SHA. **Nenhuma homologação visual foi realizada pelo assistente.**
 
 **Não transformar a aprovação destes gates em declaração de prontidão corporativa:** OIDC/Entra ID, SQL Server, Teams, retenção LGPD e imutabilidade/WORM permanecem fora do escopo desta POC.
+
+
+### Correção identificada no Windows — 17/10/2026
+
+A primeira execução do preparador criou corretamente o banco sintético 006b4 com 22 tabelas, mas **interrompeu no seed**: `python -c` via PowerShell 5.1 perdeu as aspas da expressão f-string, causando `SyntaxError: invalid syntax` em `fsqlite:///`. Corrigido para criar e executar `seed-synthetic.py` dentro do diretório temporário, sem `-c`. A correção não altera o SQLite original, o FastAPI, o frontend ou as migrações. O novo script **ainda precisa ser reexecutado no Windows** para fechar o gate de preparação de laboratório; a pasta temporária da execução falha não deve ser reutilizada.
