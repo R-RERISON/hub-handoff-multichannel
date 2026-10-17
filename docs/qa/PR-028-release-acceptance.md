@@ -2,7 +2,7 @@
 
 > **Atualização operacional de 17/10/2026:** o modo recomendado para todos os testes visuais é `start.cmd --lab` (um terminal para API e frontend). Os exemplos antigos com dois arquivos `run-backend.ps1`/`run-web.ps1` e o preparador PowerShell foram preservados como evidência histórica, **não são mais necessários**. `start.cmd` **sem** `--lab` continua abrindo a POC original.
 
-**Estado:** GATES MANUAIS PENDENTES. Este documento registra procedimentos, **não evidências executadas**.  
+**Estado:** gates automatizados aprovados no commit `c52f241`; SEC-02 revogação backend/UX aprovada; SEC-03 restauração backend e STATUS posterior aprovados. **SEC-03 UX e demais gates manuais permanecem pendentes de evidência**. Incrementos após `c52f241` ainda exigem novo gate Windows.  
 **Ambiente:** Windows PowerShell 5.1+ / Python 3.12+ / Node/npm local. Sem GitHub Actions ou serviços externos.  
 **Candidato:** `feat/006b5b-security-decisions-journal`, revisão de banco **006b4** exclusiva do laboratório sintético.
 
@@ -35,7 +35,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Gate 006b4 sintetico reprovado' }
 
 | Gate | Aprovação |
 |---|---|
-| Pytest completo, Ruff, 11 frontend architecture, TypeScript, Vite | Todos aprovados no SHA final |
+| Pytest completo, Ruff, 13 frontend architecture, TypeScript, Vite | Todos aprovados no SHA final |
 | `release_probe.py` | JSON `result=PASS`, `database_scope=EPHEMERAL_SYNTHETIC_ONLY`, `table_count=22` |
 | `schema_admin inspect` no original | `integrity=ok`, `revision=null`, `table_count=17` |
 | `provenance_dry_run` no original | `rows_written=0`, `backfill_applied=false`, `safe_for_history_authorization=false` |
@@ -48,7 +48,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Gate 006b4 sintetico reprovado' }
 
 O comando único prepara banco, contas e credenciais TEMP, inicia API + Vite e abre o navegador. Para **retomar** a mesma massa de dados depois do Ctrl+C, execute `start.cmd --lab --lab-dir "<diretório TEMP informado na tela>"`. `start.cmd` sem `--lab` continua sendo a POC original.
 
-O script cria um diretório **novo** sob `$env:TEMP\handoff-qa-006b4-<GUID>`, com `synthetic.db`, `synthetic-credentials.txt`, `seed-synthetic.py`, `run-backend.ps1` e `run-web.ps1`. O seed Python é executado a partir do arquivo temporário (não via `python -c`), evitando perda de aspas no Windows PowerShell 5.1. Valida revision `006b4_security_decisions` e 22 tabelas. **Não** gera os arquivos no projeto, não imprime senhas e **não executa** o launcher padrão.
+O `start.cmd --lab` cria um diretório **novo** sob `$env:TEMP\handoff-qa-006b4-<id>`, com `synthetic.db` e `synthetic-credentials.txt`; valida revisão `006b4_security_decisions` e 22 tabelas. **Não** grava credenciais no repositório e inicia a API e o Vite no mesmo terminal. Somente o preparador PowerShell legado gera `seed-synthetic.py`, `run-backend.ps1` e `run-web.ps1`.
 
 O fluxo legado `prepare-main-integration-lab.ps1` ainda existe para referência, mas **não é necessário no modo atual**. Se usado isoladamente, os dois launchers temporários gerados continuam opcionais; recomenda-se `start.cmd --lab`. No navegador: `http://127.0.0.1:5173`. Leia as contas locais em `synthetic-credentials.txt` (não publicar). O backend usa `HANDOFF_DB_URL` apenas dentro do processo desse terminal; ambos os serviços ficam em `127.0.0.1`.
 
@@ -73,13 +73,47 @@ Caso um serviço antigo esteja usando 8000/5173, **encerre-o**, sem reaproveitar
 
 **Observação de segurança:** o UI não pode fazer revogação de grant pelo operador/auditor; fazer alteração somente como ADMIN, e apenas no banco sintético. Não colar tokens Bearer nem dados privados em screenshots. O backend é a autoridade final; limpeza de estado no frontend é defesa adicional.
 
+## 3.1 — AUD-01 e SEC-01: evidências persistidas exclusivamente em TEMP
+
+**Ferramenta não intrusiva:** `python -m scripts.release_audit_evidence`. Executa apenas
+`verify_database` e leituras SQLite `mode=ro` / `PRAGMA query_only`, com validação
+estrita do diretório TEMP e revisão 006b4. Não faz login, requisição HTTP, seed,
+migração, PATCH, nem imprime senhas, tokens, IDs, conteúdos, histórico ou nomes
+reais de usuários.
+
+```powershell
+$lab = Join-Path $env:TEMP "handoff-qa-006b4-1ohg0707"
+.\.venv\Scripts\python.exe -m scripts.release_audit_evidence --lab $lab
+$gateExitCode = $LASTEXITCODE
+Write-Host "AUD-01 exit code: $gateExitCode"
+```
+
+A saída contém exclusivamente contagens e flags de gate (sem identificadores
+individuais): `security_grant_cycle`, `final_auditor_scope`,
+`history_read_journal` (LIST e DETAIL para N1 do Auditor) e
+`denied_access_journal`. **PASS** exige todos os quatro critérios; se faltar
+algum dado, retorna `INCOMPLETE`, explica-o em `pending` e encerra com
+código **2**. Isso NÃO significa necessariamente falha do produto: pode indicar
+que um cenário ainda não foi executado neste laboratório. Falha de diretório
+ou banco recusa a execução sem abrir o SQLite POC original.
+
+Evidências Windows já informadas: `REVOKE` PASS, 1 `GRANT_REVOKED`,
+`RESTORE` PASS, 1 `GRANT_ENABLED`, `STATUS` posterior PASS com
+`auditor_has_n1=true` e sem novo evento de grant. A remoção do histórico
+quando o Auditor clica em `Atualizar permissões` foi confirmada manualmente.
+**Ainda falta** verificar e registrar SEC-03 na UI após restauração (N1
+reaparece, N2 permanece vedada) e executar o relatório AUD-01.
+
+**Não** executar `--reset-users` nem alterações de grant para conseguir
+contagens artificiais; evidências devem refletir testes reais da sessão.
+
 ## 4 — Evidência e critérios de bloqueio da `main`
 
 - Anexar ao PR #28 a saída dos gates, capturas de UX **sem senhas, tokens ou dados reais**, resolução utilizada, perfis e identificação dos testes aprovados.
 - Qualquer falha em RBAC, isolamento por fila, persistência de auditoria obrigatória ou alteração do SQLite original **bloqueia merge**.
 - Se houver apenas divergência cosmética, registrar como issue separada com prioridade/risco e decisão explícita, sem declarar gate completo aprovado.
 - Se houver erro do probe ou teste manual, anexar somente mensagem de falha sanitizada. Não alterar o banco original para reproduzir o problema.
-- Após os testes, encerrar API/Vite com Ctrl+C **nos dois terminais** e remover a pasta `handoff-qa-006b4-...` do `$env:TEMP`, que contém as credenciais sintéticas.
+- Após os testes, encerrar API/Vite com Ctrl+C **no terminal único do `start.cmd --lab`** e remover a pasta `handoff-qa-006b4-...` do `$env:TEMP` somente quando não precisar mais dos testes sintéticos.
 
 ## 5 — Estado da revisão de código
 
