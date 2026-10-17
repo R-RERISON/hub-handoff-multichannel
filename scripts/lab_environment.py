@@ -5,6 +5,8 @@ are accepted. This module must never adopt/stamp/upgrade the original POC DB.
 """
 from __future__ import annotations
 
+import argparse
+import json
 import shutil
 import tempfile
 from dataclasses import dataclass
@@ -91,3 +93,26 @@ def prepare_lab() -> LabEnvironment:
         shutil.rmtree(directory)
         raise
     return LabEnvironment(directory, database, credentials, created=True)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="TEMP-only QA laboratory")
+    parser.add_argument("action", choices=("create", "resume"))
+    parser.add_argument("--lab-dir")
+    args = parser.parse_args()
+    if args.action == "resume" and not args.lab_dir:
+        parser.error("resume requires --lab-dir")
+    if args.action == "create" and args.lab_dir:
+        parser.error("create does not take --lab-dir")
+    lab = validate_lab(args.lab_dir) if args.action == "resume" else prepare_lab()
+    # No password or token is ever printed by the lab initializer.
+    print(json.dumps({
+        "directory": str(lab.directory),
+        "database_url": lab.database_url,
+        "credentials": str(lab.credentials),
+        "created": lab.created,
+    }, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()
