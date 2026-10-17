@@ -36,18 +36,24 @@ def test_placeholder_is_not_used_as_a_secret(tmp_path: Path, monkeypatch) -> Non
 
 
 def test_check_runs_all_local_gates(monkeypatch) -> None:
-    commands: list[tuple[tuple[str, ...], Path]] = []
+    commands: list[tuple[tuple[str, ...], Path, dict[str, str] | None]] = []
+    monkeypatch.setenv("HANDOFF_DB_URL", "sqlite:///must-not-be-inherited.db")
+    monkeypatch.setenv("HANDOFF_POC_KEY", "must-not-be-inherited")
     monkeypatch.setattr(dev, "ensure_dependencies", lambda: ("python", "npm"))
-    monkeypatch.setattr(
-        dev, "run_command",
-        lambda args, cwd=dev.ROOT: commands.append((tuple(args), cwd)),
-    )
+
+    def capture_command(args, cwd=dev.ROOT, env=None):
+        commands.append((tuple(args), cwd, env))
+
+    monkeypatch.setattr(dev, "run_command", capture_command)
     assert dev.main(["--check"]) == 0
-    assert commands == [
+    assert [(args, cwd) for args, cwd, _ in commands] == [
         (("python", "-m", "pytest", "-q"), dev.ROOT),
         (("python", "-m", "ruff", "check", "src", "tests"), dev.ROOT),
         (("npm", "run", "build"), dev.WEB),
     ]
+    assert all(env is not None for _, _, env in commands)
+    assert all("HANDOFF_DB_URL" not in env for _, _, env in commands)
+    assert all("HANDOFF_POC_KEY" not in env for _, _, env in commands)
 
 
 def test_setup_only_never_starts_services(monkeypatch) -> None:
