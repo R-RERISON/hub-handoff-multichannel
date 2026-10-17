@@ -7,6 +7,7 @@ import sqlite3
 from contextlib import closing
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from handoff_hub.poc_db import AuthUser, make_session_factory
@@ -112,7 +113,70 @@ def test_release_grant_attestation_denies_unrecognized_live_server(monkeypatch):
             return FakeResponse()
 
     monkeypatch.setattr(qa.httpx, "Client", FakeClient)
-    with pytest.raises(qa.LabSafetyError, match="nao reconhece"):
+    with pytest.raises(qa.LabSafetyError, match="HTTP 401"):
         qa.attest_running_backend(
             {"Authorization": "Bearer TEMP_ONLY"}, "synthetic-account",
         )
+
+
+def test_attestation_succeeds_between_two_app_instances_on_same_temp_db(
+    tmp_path, monkeypatch,
+):
+    """End-to-end token crosses independently constructed SQLAlchemy engines."""
+    lab, path, factory = qa_lab(tmp_path, monkeypatch)
+    from handoff_hub.poc_api import create_app
+
+    browser_app = create_app(
+        database_url=f"sqlite:///{path.as_posix()}",
+        api_key="qa-shared-db-only",
+    )
+    with TestClient(browser_app) as browser:
+        def route_to_browser(*_args, **kwargs):
+            assert kwargs["base_url"] == qa.API
+            assert kwargs["trust_env"] is False
+            return browser
+
+        monkeypatch.setattr(qa.httpx, "Client", route_to_browser)
+        result = qa.run(str(lab), "status", confirmed=False)
+        assert result["result"] == "PASS"
+        assert result["auditor_has_n1"] is True
+        assert result["grant_events_added"] == 0
+
+
+def test_attestation_different_lab_rejects_before_any_grant_write(
+    tmp_path, monkeypatch,
+):
+    """Same usernames in another temp DB must never authorize target change."""
+    lab_a, path_a, factory_a = qa_lab(tmp_path, monkeypatch)
+    other_dir = tmp_path / "unrelated-separate-lab"
+    other_dir.mkdir()
+    other_db = other_dir / "synthetic.db"
+    from handoff_hub.poc_api import create_app
+    from handoff_hub.schema_admin import create_new
+    from handoff_hub.poc_db import make_session_factory
+    from handoff_hub.seed_demo_auth import provision
+
+    create_new(other_db, confirmed=True)
+    factory_b, engine_b = make_session_factory(f"sqlite:///{other_db.as_posix()}")
+    try:
+        provision(factory_b, other_dir / "credentials.txt")
+    finally:
+        engine_b.dispose()
+
+    browser_app = create_app(
+        database_url=f"sqlite:///{other_db.as_posix()}",
+        api_key="qa-other-db-only",
+    )
+    with TestClient(browser_app) as wrong_backend:
+        def route_to_wrong_backend(*_args, **_kwargs):
+            return wrong_backend
+
+        monkeypatch.setattr(qa.httpx, "Client", route_to_wrong_backend)
+        with pytest.raises(qa.LabSafetyError, match="HTTP 401"):
+            qa.run(str(lab_a), "revoke", confirmed=True)
+    with factory_a() as db:
+        target = db.scalar(select(AuthUser.id).where(
+            AuthUser.username == "auditor.demo",
+        ))
+        assert qa.count_grants(path_a, target) == 1
+        assert db.execute(select(SECURITY_DECISIONS)).all() == []
