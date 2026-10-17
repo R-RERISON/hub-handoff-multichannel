@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { LockKeyhole, RefreshCw, ShieldCheck } from 'lucide-react'
 import type { Api, ChatMessage } from './types'
 import { formatTime } from './types'
@@ -37,6 +37,7 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
   const [error,setError] = useState('')
   const [refreshKey,setRefreshKey] = useState(0)
   const [grantsLoading,setGrantsLoading] = useState(true)
+  const preferredQueueRef = useRef('')
 
   useEffect(()=>{
     let cancelled=false
@@ -45,7 +46,7 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
       if(cancelled)return
       const available=data as GrantQueue[]
       setQueues(available)
-      setQueueId(available[0]?.id??'')
+      setQueueId(available.find(q=>q.id===preferredQueueRef.current)?.id??available[0]?.id??'')
     }).catch(()=>{
       if(cancelled)return
       // Fail closed in the VIEW too: no stale queue or message remains visible.
@@ -124,6 +125,7 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
       <label htmlFor="verified-history-queue">Fila com acesso concedido</label>
       <select id="verified-history-queue" value={queueId} disabled={grantsLoading}
         onChange={e=>{
+          preferredQueueRef.current=e.target.value
           setQueueId(e.target.value);setPage(1);setListing(null)
           setSelectedId(null);setDetail(null);setMessagePage(1);setEventPage(1)
         }}>
@@ -132,6 +134,7 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
       </select>
       <button className="outline" type="button" disabled={grantsLoading} onClick={()=>{
         // Never display previously fetched content while grants are being revalidated.
+        preferredQueueRef.current=queueId
         setQueues([]);setQueueId('');setListing(null);setSelectedId(null)
         setDetail(null);setError('');setLoading(false);setDetailLoading(false)
         setPage(1);setMessagePage(1);setEventPage(1)
