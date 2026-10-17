@@ -169,3 +169,26 @@ test('verified history details paginate messages and events independently', () =
   assert.match(api, /\.limit\(page_size \+ 1\)/)
   assert.doesNotMatch(view, /'POST'|"POST"/)
 })
+
+
+test('verified history clears sensitive view state before grant refresh', () => {
+  const view = read('src/workspaces/ScopedVerifiedHistory.tsx')
+  assert.match(view,/setQueues\(\[\]\);setQueueId\(''\);setListing\(null\);setSelectedId\(null\)/)
+  assert.match(view,/setDetail\(null\);setError\(''\);setLoading\(false\)/)
+  assert.match(view,/setGrantsLoading\(true\);setRefreshKey\(v=>v\+1\)/)
+  assert.match(view,/!queueId\|\|!queues\.some\(q=>q\.id===queueId\)/)
+  assert.match(view,/Não foi possível validar as filas concedidas/)
+  assert.match(view,/Nenhuma fila autorizada para consulta de histórico/)
+  assert.match(view,/disabled=\{grantsLoading\}/)
+  assert.match(view,/setListing\(null\)[\s\S]*?setSelectedId\(null\)[\s\S]*?setDetail\(null\)/)
+})
+
+test('supervisor release QA displays current POC version and live-only counter semantics', () => {
+  const app = read('src/App.tsx')
+  const css = read('src/styles.css')
+  assert.match(app, /POC 0\.5 · Sem integração Teams/)
+  assert.doesNotMatch(app, /POC 0\.4 · Sem integração Teams/)
+  assert.match(app, /countMeaning="Quantidade de atendimentos correntes; não inclui o histórico verificado"/)
+  assert.match(css, /\.verified-history-layout \.history-details\{[\s\S]*?min-height:340px/)
+  assert.match(css, /\.verified-history-layout \.history-ticket:focus-visible/)
+})
