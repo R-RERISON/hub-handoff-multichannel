@@ -2,7 +2,7 @@
 
 > **Atualização operacional de 17/10/2026:** o modo recomendado para todos os testes visuais é `start.cmd --lab` (um terminal para API e frontend). Os exemplos antigos com dois arquivos `run-backend.ps1`/`run-web.ps1` e o preparador PowerShell foram preservados como evidência histórica, **não são mais necessários**. `start.cmd` **sem** `--lab` continua abrindo a POC original.
 
-**Estado:** gates automatizados aprovados no commit `c52f241`; SEC-02 revogação backend/UX aprovada; SEC-03 restauração backend e STATUS posterior aprovados. **SEC-03 UX e demais gates manuais permanecem pendentes de evidência**. Incrementos após `c52f241` ainda exigem novo gate Windows.  
+**Estado (18/10/2026):** gate automatizado `start.cmd --check` aprovado no commit `d591b2f` (**125 Pytest aprovados, 1 skipped, Ruff, 13 testes frontend, TypeScript e Vite**). SEC-01 API e AUD-01 journals aprovados no laboratório 006b4 (`audit_release_result=PASS`, 1 LIST, 1 DETAIL, 2 negativas 404), com backend atestado. SEC-02 backend/UX PASS; SEC-03 backend/STATUS PASS, **SEC-03 UI ainda pendente**. As alterações posteriores a `d591b2f` ainda precisam do gate Windows no SHA final.  
 **Ambiente:** Windows PowerShell 5.1+ / Python 3.12+ / Node/npm local. Sem GitHub Actions ou serviços externos.  
 **Candidato:** `feat/006b5b-security-decisions-journal`, revisão de banco **006b4** exclusiva do laboratório sintético.
 
@@ -66,10 +66,10 @@ Caso um serviço antigo esteja usando 8000/5173, **encerre-o**, sem reaproveitar
 | UX-06 | Paginação de mensagens e eventos | Controles independentes, rótulos claros, nenhum avanço para página inexistente | PENDENTE |
 | UX-07 | Teclado: Tab, Shift+Tab, Enter, Space e foco visível | Botões, seleção de fila e paginação acessíveis; nenhum controle inacessível | PENDENTE |
 | UX-08 | Resoluções: 1366×768, 1920×1080 e largura 390px | Sem cortes de controles, textos sobrepostos ou scroll horizontal indevido | PENDENTE |
-| SEC-01 | Auditor N1 tenta abrir N2; ou usa ID de outra fila | API devolve 404 sem conteúdo/IDs de outra fila; o browser não mantém payload exibido após nova negativa | PENDENTE |
-| SEC-02 | ADMIN revoga grant N1 do AUDITOR durante sessão ativa; usuário atualiza | Próxima consulta bloqueia; mensagens previamente carregadas não permanecem exibidas após a tentativa negada | PENDENTE |
-| SEC-03 | ADMIN restaura grant; auditor recarrega | Acesso volta a funcionar, sem atravessar fila; logs exibem `GRANT_REVOKED` / `GRANT_ENABLED` | PENDENTE |
-| AUD-01 | Verificar `schema_admin --database <synthetic.db> inspect` | `history_access_audit` e `security_decisions` possuem linhas de acesso; original não tem essas tabelas | PENDENTE |
+| SEC-01 | Auditor N1 tenta abrir N2; ou usa ID de outra fila | API devolve 404 sem conteúdo/IDs de outra fila; o browser não mantém payload exibido após nova negativa | API PASS (LIST+DETAIL 404); UX pendente |
+| SEC-02 | ADMIN revoga grant N1 do AUDITOR durante sessão ativa; usuário atualiza | Próxima consulta bloqueia; mensagens previamente carregadas não permanecem exibidas após a tentativa negada | PASS backend + UI, usuário confirmou |
+| SEC-03 | ADMIN restaura grant; auditor recarrega | Acesso volta a funcionar, sem atravessar fila; logs exibem `GRANT_REVOKED` / `GRANT_ENABLED` | Backend + STATUS PASS; UI pendente |
+| AUD-01 | Verificar `schema_admin --database <synthetic.db> inspect` | `history_access_audit` e `security_decisions` possuem linhas de acesso; original não tem essas tabelas | Journals sintéticos PASS; inspeção original separada pendente |
 
 **Observação de segurança:** o UI não pode fazer revogação de grant pelo operador/auditor; fazer alteração somente como ADMIN, e apenas no banco sintético. Não colar tokens Bearer nem dados privados em screenshots. O backend é a autoridade final; limpeza de estado no frontend é defesa adicional.
 
@@ -102,7 +102,8 @@ Evidências Windows já informadas: `REVOKE` PASS, 1 `GRANT_REVOKED`,
 `auditor_has_n1=true` e sem novo evento de grant. A remoção do histórico
 quando o Auditor clica em `Atualizar permissões` foi confirmada manualmente.
 **Ainda falta** verificar e registrar SEC-03 na UI após restauração (N1
-reaparece, N2 permanece vedada) e executar o relatório AUD-01.
+reaparece, N2 permanece vedada). AUD-01 foi executado posteriormente,
+em 18/10/2026, e retornou PASS (1 LIST, 1 DETAIL, 2 DENIED).
 
 **Não** executar `--reset-users` nem alterações de grant para conseguir
 contagens artificiais; evidências devem refletir testes reais da sessão.
@@ -246,3 +247,25 @@ continuam sujeitos à matriz `docs/qa/PR-028-ui-final-gates.md`.
 **Estado:** runner e testes adicionais publicados na branch candidata,
 mas **não foram executados ainda no Windows**. Manter PR Draft e `main`
 intocada até receber evidências.
+
+
+### 18/10/2026 — Evidências de AUD-01 e SEC-01 concluídas no laboratório
+
+O usuário executou, em `TEMP_SYNTHETIC_006B4_ONLY`, o cenário opt-in
+`scripts.release_audit_scenarios` e obteve `result=PASS`,
+`live_api_attested=true`, LIST N1=200, DETAIL N1=200,
+LIST N2=404 e DETAIL N2=404. O runner registrou 1 nova leitura LIST,
+1 nova leitura DETAIL e 2 decisões DENIED. A verificação estritamente
+read-only subsequente `scripts.release_audit_evidence` retornou
+`result=PASS` com os quatro gates internos PASS, `pending=[]`,
+`auditor_has_n1=true`, `auditor_has_n2=false`, 1 evento de
+revogação e 1 de restauração. Foi declarada ausência de alterações no
+banco original em ambos os relatórios. **Isso não substitui os gates
+manuais de interface nem a inspeção separada do banco original.**
+
+**UX-06 revisão posterior ao gate:** o código React de paginação passou
+a limpar imediatamente o estado de lista/detalhe ao navegar, a marcar
+loading antes de requisitar a página seguinte, a bloquear botões de
+paginação durante carregamento e a expor rótulos acessíveis. O teste
+de contrato frontend foi ampliado de 13 para 14 casos. **Esta revisão
+ainda depende de novo `start.cmd --check` e teste manual no navegador.**
