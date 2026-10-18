@@ -7,6 +7,16 @@
 **Input**: reorganização do Handoff Hub Multichannel em features SPECKIT rastreáveis.
 **Dependencies**: 006C baseline segura; 007 para gestão administrativa, antes de canal real
 
+## Objective, scope and behavior contract
+
+**Objective:** Validar identidade humana e técnica corporativa, revogação e isolamento de tenant/operação/fila.
+
+**Functional contract:** Fluxos OIDC e tokens de integração são verificados por issuer/audience/tenant/exp; grants não são inferidos automaticamente.
+
+**Rollback and failure behavior:** Token incorreto ou chaves indisponíveis resultam em deny; ambiente de produção não faz fallback para contas demo.
+
+**Limit:** os critérios de aceite nesta SPEC definem comportamento; decisões de stack e forma de implementação ficam em [plan.md](plan.md). A etapa de planejamento não executa nem aprova runtime.
+
 ## User Scenarios & Testing
 
 ### User Story 1 — Entrar com identidade corporativa (Priority: P1)

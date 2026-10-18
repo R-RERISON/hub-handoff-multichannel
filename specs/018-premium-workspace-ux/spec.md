@@ -7,6 +7,16 @@
 **Input**: reorganização do Handoff Hub Multichannel em features SPECKIT rastreáveis.
 **Dependencies**: 006C primeiro; demais SPECs consomem componentes e padrões
 
+## Objective, scope and behavior contract
+
+**Objective:** Fornecer experiência premium homogênea e acessível sem fundir os portais nem comprometer segurança.
+
+**Functional contract:** Design tokens e padrões de shell/componentes definem estados de loading/erro/sem dados, a11y e três viewports homologados.
+
+**Rollback and failure behavior:** Falha de fetch, revogação e troca de fila limpam dados stale; layout deve preservar ações essenciais sem overflow.
+
+**Limit:** os critérios de aceite nesta SPEC definem comportamento; decisões de stack e forma de implementação ficam em [plan.md](plan.md). A etapa de planejamento não executa nem aprova runtime.
+
 ## User Scenarios & Testing
 
 ### User Story 1 — Atender em qualquer viewport suportado (Priority: P1)

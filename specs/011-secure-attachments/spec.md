@@ -7,6 +7,16 @@
 **Input**: reorganização do Handoff Hub Multichannel em features SPECKIT rastreáveis.
 **Dependencies**: 006B VERIFIED, 009 histórico e 016 regras de retenção antes de produção
 
+## Objective, scope and behavior contract
+
+**Objective:** Viabilizar anexos autenticados com quarentena, segurança de conteúdo e origem segmentada.
+
+**Functional contract:** Upload valida bytes e MIME real; downloads exigem status CLEAN e escopo; bytes privados com referência opaca.
+
+**Rollback and failure behavior:** Falha de scanner deixa mídia QUARANTINED; grants revogados bloqueiam mídia sem expor link público.
+
+**Limit:** os critérios de aceite nesta SPEC definem comportamento; decisões de stack e forma de implementação ficam em [plan.md](plan.md). A etapa de planejamento não executa nem aprova runtime.
+
 ## User Scenarios & Testing
 
 ### User Story 1 — Enviar print permitido (Priority: P1)

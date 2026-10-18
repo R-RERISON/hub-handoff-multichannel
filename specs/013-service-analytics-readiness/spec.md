@@ -7,6 +7,16 @@
 **Input**: reorganização do Handoff Hub Multichannel em features SPECKIT rastreáveis.
 **Dependencies**: 008 supervisão; 009 evidência; 010 monitoria para métricas de auxílio; 012 canal para métricas E2E
 
+## Objective, scope and behavior contract
+
+**Objective:** Definir operação sustentada com métricas reproduzíveis, SLAs e telemetria útil à gestão.
+
+**Functional contract:** Eventos duráveis originam fórmulas de indicadores por escopo; telemetria com IDs não pessoais, alertas e provas de restauração.
+
+**Rollback and failure behavior:** Falha de processo ou atraso não é ocultada por cache; alertas indicam degradação sem conter texto de conversas.
+
+**Limit:** os critérios de aceite nesta SPEC definem comportamento; decisões de stack e forma de implementação ficam em [plan.md](plan.md). A etapa de planejamento não executa nem aprova runtime.
+
 ## User Scenarios & Testing
 
 ### User Story 1 — Revisar SLA e backlog (Priority: P1)

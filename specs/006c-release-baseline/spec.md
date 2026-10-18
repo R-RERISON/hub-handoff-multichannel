@@ -7,6 +7,16 @@
 **Input**: solicitação de consolidação do Handoff Hub via Spec Kit e reconciliação da arquitetura existente.
 **Dependencies**: PR #28 Draft, banco TEMP 006b4, Constituição v1.1
 
+## Objective, scope and behavior contract
+
+**Objective:** Concluir um gate de release reproduzível, com evidência SHA e decisão humana, sem permitir migração ou merge automático.
+
+**Functional contract:** Registro GateEvidence com estado, SHA, cenário, ambiente, perfil e viewport; decisão ReleaseDecision assinada por responsável e vinculada ao PR #28.
+
+**Rollback and failure behavior:** Qualquer gate de segurança falho ou mudança de SHA força BLOCKED/REVALIDATE; o release não produz mutação no SQLite original.
+
+**Limit:** os critérios de aceite nesta SPEC definem comportamento; decisões de stack e forma de implementação ficam em [plan.md](plan.md). A etapa de planejamento não executa nem aprova runtime.
+
 ## User Scenarios & Testing
 
 ### User Story 1 — Decidir a promoção com evidências (Priority: P1)

@@ -7,6 +7,16 @@
 **Input**: solicitação de consolidação do Handoff Hub via Spec Kit e reconciliação da arquitetura existente.
 **Dependencies**: 006C para desenvolvimento integrado; SPEC-006A/006B para grants e esquema; SPEC-018 para UX
 
+## Objective, scope and behavior contract
+
+**Objective:** Administrar o ciclo de vida de filas, operações, equipes e grants com rastreabilidade e segregação de funções.
+
+**Functional contract:** Operações de criação/edição/ativação/pausa/arquivamento são autorizadas por escopo e devolvem estado confirmado; alterações geram AdministrativeChangeEvent.
+
+**Rollback and failure behavior:** Em conflito de edição, negar ou reconciliar sem gravar parcialmente; manter entidades arquivadas e histórico íntegro.
+
+**Limit:** os critérios de aceite nesta SPEC definem comportamento; decisões de stack e forma de implementação ficam em [plan.md](plan.md). A etapa de planejamento não executa nem aprova runtime.
+
 ## User Scenarios & Testing
 
 ### User Story 1 — Gerenciar filas e operação (Priority: P1)

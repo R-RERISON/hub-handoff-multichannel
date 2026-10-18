@@ -7,6 +7,16 @@
 **Input**: reorganização do Handoff Hub Multichannel em features SPECKIT rastreáveis.
 **Dependencies**: 012 Embedded comprovado, 014, 015, 016; capability matrix de 011
 
+## Objective, scope and behavior contract
+
+**Objective:** Expandir canais por adapters independentes mantendo identidades e capacidades próprias.
+
+**Functional contract:** Registro de bots/aplicativos expõe capabilities e escopo, cada canal mantém credenciais/conversation IDs distintos.
+
+**Rollback and failure behavior:** Capacidade ausente gera falha explícita e status rastreável, sem falsa entrega; rollback por canal.
+
+**Limit:** os critérios de aceite nesta SPEC definem comportamento; decisões de stack e forma de implementação ficam em [plan.md](plan.md). A etapa de planejamento não executa nem aprova runtime.
+
 ## User Scenarios & Testing
 
 ### User Story 1 — Conversar no app nativo (Priority: P1)

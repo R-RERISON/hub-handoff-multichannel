@@ -7,6 +7,16 @@
 **Input**: solicitação de consolidação do Handoff Hub via Spec Kit e reconciliação da arquitetura existente.
 **Dependencies**: 006B-4.x/5.x, 007, 008 para controles de fila
 
+## Objective, scope and behavior contract
+
+**Objective:** Oferecer consulta auditável e exportação de evidências de conversas estritamente por segmento VERIFIED.
+
+**Functional contract:** Busca, detalhe e exportação exigem grant sobre segmento/tempo e journal de acesso; manifesto inclui escopo, filtros, integridade e justificativa.
+
+**Rollback and failure behavior:** Falha de journal de leitura bloqueia conteúdo; exportação não concluída expira sem liberar bytes; nenhum backfill de UNKNOWN.
+
+**Limit:** os critérios de aceite nesta SPEC definem comportamento; decisões de stack e forma de implementação ficam em [plan.md](plan.md). A etapa de planejamento não executa nem aprova runtime.
+
 ## User Scenarios & Testing
 
 ### User Story 1 — Pesquisar e examinar evidência (Priority: P1)

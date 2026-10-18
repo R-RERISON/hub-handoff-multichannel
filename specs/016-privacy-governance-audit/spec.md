@@ -7,6 +7,16 @@
 **Input**: reorganização do Handoff Hub Multichannel em features SPECKIT rastreáveis.
 **Dependencies**: 006B journaling, 009 evidência; política aprovada antes de dados reais
 
+## Objective, scope and behavior contract
+
+**Objective:** Formalizar retenção, descarte, proteção e verificabilidade de auditoria conforme decisão de compliance.
+
+**Functional contract:** Política versionada liga classificação, prazo, legal hold e evento de descarte; journal verificável demonstra integridade.
+
+**Rollback and failure behavior:** Falha de política ou integridade bloqueia descarte/entrega indevida; journal atual não pode ser anunciado como WORM.
+
+**Limit:** os critérios de aceite nesta SPEC definem comportamento; decisões de stack e forma de implementação ficam em [plan.md](plan.md). A etapa de planejamento não executa nem aprova runtime.
+
 ## User Scenarios & Testing
 
 ### User Story 1 — Aplicar retenção e descarte (Priority: P1)

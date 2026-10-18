@@ -7,6 +7,16 @@
 **Input**: solicitação de consolidação do Handoff Hub via Spec Kit e reconciliação da arquitetura existente.
 **Dependencies**: 006B, 007, 008 e leitura live restrita
 
+## Objective, scope and behavior contract
+
+**Objective:** Criar apoio bidirecional privado entre operador e monitor sem interferir no canal do cliente.
+
+**Functional contract:** Pedido durável, claim atômico, troca de orientação interna e ACK/cópia de rascunho são eventos independentes da mensagem do usuário.
+
+**Rollback and failure behavior:** Falha de notificação mantém pedido persistido e reprocessável; transferência/revogação restringe acesso imediatamente.
+
+**Limit:** os critérios de aceite nesta SPEC definem comportamento; decisões de stack e forma de implementação ficam em [plan.md](plan.md). A etapa de planejamento não executa nem aprova runtime.
+
 ## User Scenarios & Testing
 
 ### User Story 1 — Solicitar auxílio durante atendimento (Priority: P1)

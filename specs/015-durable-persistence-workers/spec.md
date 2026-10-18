@@ -7,6 +7,16 @@
 **Input**: reorganização do Handoff Hub Multichannel em features SPECKIT rastreáveis.
 **Dependencies**: 006C, 006B Alembic opt-in; 014 para acessos corporativos antes de produção
 
+## Objective, scope and behavior contract
+
+**Objective:** Migrar estratégia transacional para persistência de produção e execução confiável dos workers.
+
+**Functional contract:** Migrações versionadas, constraints, leasing, outbox e recuperação sustentam estado transacional em SQL Server.
+
+**Rollback and failure behavior:** Falha de migration, deadlock e crash mantêm esquema/dados íntegros; o SQLite original nunca é usado como alvo de upgrade de release.
+
+**Limit:** os critérios de aceite nesta SPEC definem comportamento; decisões de stack e forma de implementação ficam em [plan.md](plan.md). A etapa de planejamento não executa nem aprova runtime.
+
 ## User Scenarios & Testing
 
 ### User Story 1 — Despachar sob concorrência multi-instância (Priority: P1)

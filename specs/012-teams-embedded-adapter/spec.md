@@ -7,6 +7,16 @@
 **Input**: reorganização do Handoff Hub Multichannel em features SPECKIT rastreáveis.
 **Dependencies**: 014 IAM de integrações, 015 durabilidade e trabalhadores, 016 proteção de dados; 011 opcional para fase mídia
 
+## Objective, scope and behavior contract
+
+**Objective:** Realizar handoff de mensagens reais no bot Teams original com entrega idempotente e comprovada.
+
+**Functional contract:** Contrato versionado de inbound/outbound/ACK, integration scope, correlation IDs, inbox/outbox, retry e DLQ.
+
+**Rollback and failure behavior:** Indisponibilidade do bot original não perde mensagem nem gera DELIVERED fictício; feature flag reverte roteamento sem apagar backlog.
+
+**Limit:** os critérios de aceite nesta SPEC definem comportamento; decisões de stack e forma de implementação ficam em [plan.md](plan.md). A etapa de planejamento não executa nem aprova runtime.
+
 ## User Scenarios & Testing
 
 ### User Story 1 — Handoff real mantendo o canal original (Priority: P1)

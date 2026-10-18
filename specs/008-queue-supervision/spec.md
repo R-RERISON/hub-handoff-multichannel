@@ -7,6 +7,16 @@
 **Input**: solicitação de consolidação do Handoff Hub via Spec Kit e reconciliação da arquitetura existente.
 **Dependencies**: 007, 006A/006B, 018
 
+## Objective, scope and behavior contract
+
+**Objective:** Permitir que supervisores configurem suas filas e acompanhem indicadores sem atravessar limites N1/N2.
+
+**Functional contract:** Dashboard/ações delegadas são filtrados no backend por operação, fila, período e grant e paginados depois de aplicar escopo.
+
+**Rollback and failure behavior:** Na revogação, troca de fila ou falha de fetch, invalidar e ocultar estado de fila anterior; nenhuma mutação cruzada.
+
+**Limit:** os critérios de aceite nesta SPEC definem comportamento; decisões de stack e forma de implementação ficam em [plan.md](plan.md). A etapa de planejamento não executa nem aprova runtime.
+
 ## User Scenarios & Testing
 
 ### User Story 1 — Supervisionar uma fila concedida (Priority: P1)
