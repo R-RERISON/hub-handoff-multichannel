@@ -194,3 +194,17 @@ test('supervisor release QA displays current POC version and live-only counter s
   assert.match(css, /\.verified-history-layout \.history-details\{[\s\S]*?min-height:340px/)
   assert.match(css, /\.verified-history-layout \.history-ticket:focus-visible/)
 })
+
+
+test('verified paging clears stale content before fetching and labels controls', () => {
+  const view = read('src/workspaces/ScopedVerifiedHistory.tsx')
+  assert.match(view, /aria-pressed=\{selectedId===t\.session_id\}/)
+  assert.match(view, /aria-live="polite"/)
+  assert.match(view, /aria-label="Paginação de atendimentos verificados"/)
+  assert.match(view, /disabled=\{loading\|\|page<=1\}/)
+  assert.match(view, /disabled=\{loading\|\|listing\.next_page===null\}/)
+  assert.match(view, /setListing\(null\);setLoading\(true\)/)
+  assert.match(view, /setDetail\(null\);setDetailLoading\(true\);setMessagePage\(v=>v[+-]1\)/)
+  assert.match(view, /setDetail\(null\);setDetailLoading\(true\);setEventPage\(v=>v[+-]1\)/)
+  assert.match(view, /if\(!selectedId\|\|!queueId\)\{\s*setDetail\(null\)\s*setDetailLoading\(false\)/)
+})
