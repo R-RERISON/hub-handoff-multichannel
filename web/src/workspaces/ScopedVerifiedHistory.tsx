@@ -66,6 +66,7 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
       setSelectedId(null)
       setDetail(null)
       setLoading(false)
+      setDetailLoading(false)
       return
     }
     let cancelled=false
@@ -93,6 +94,7 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
   useEffect(()=>{
     if(!selectedId||!queueId){
       setDetail(null)
+      setDetailLoading(false)
       return
     }
     let cancelled=false
@@ -163,14 +165,16 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
       <section className="panel history-sidebar">
         <header className="verified-history-panel-title">
           <b>Atendimentos com evidência verificada</b>
-          <small>Página {listing.page} · IDs restritos à fila selecionada</small>
+          <small aria-live="polite">Página {listing.page} · IDs restritos à fila selecionada</small>
         </header>
         <div className="history-list">
           {listing.tickets.map(t=><button key={t.session_id} type="button"
             className={'history-ticket '+(selectedId===t.session_id?'selected':'')}
+            aria-pressed={selectedId===t.session_id}
             onClick={()=>{
               setMessagePage(1);setEventPage(1)
-              setSelectedId(t.session_id);setDetail(null)
+              setDetail(null);setDetailLoading(true)
+              setSelectedId(t.session_id)
             }}>
             <strong>Sessão {t.session_id.slice(0,8)}…</strong>
             <small>Início do segmento: {formatTime(t.segment_started_at)}</small>
@@ -179,15 +183,22 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
             Nenhum segmento com evidência comprovada nesta página.
           </p>}
         </div>
-        <div className="verified-history-pagination">
-          <button type="button" className="outline" disabled={page<=1} onClick={()=>{
-            setPage(v=>v-1);setSelectedId(null);setDetail(null)
-            setMessagePage(1);setEventPage(1)
-          }}>Anterior</button>
-          <button type="button" className="outline" disabled={listing.next_page===null}
+        <div className="verified-history-pagination" role="navigation"
+          aria-label="Paginação de atendimentos verificados">
+          <button type="button" className="outline" disabled={loading||page<=1}
+            aria-label="Página anterior de atendimentos"
             onClick={()=>{
-              setPage(v=>v+1);setSelectedId(null);setDetail(null)
-              setMessagePage(1);setEventPage(1)
+              setListing(null);setLoading(true)
+              setSelectedId(null);setDetail(null);setDetailLoading(false)
+              setMessagePage(1);setEventPage(1);setPage(v=>v-1)
+            }}>Anterior</button>
+          <button type="button" className="outline"
+            disabled={loading||listing.next_page===null}
+            aria-label="Próxima página de atendimentos"
+            onClick={()=>{
+              setListing(null);setLoading(true)
+              setSelectedId(null);setDetail(null);setDetailLoading(false)
+              setMessagePage(1);setEventPage(1);setPage(v=>v+1)
             }}>
             Próxima
           </button>
@@ -216,14 +227,18 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
           </p>}
         </div>
         <div className="verified-history-detail-pages" aria-label="Paginação de mensagens verificadas">
-          <strong>Mensagens · página {detail.message_page}</strong>
+          <strong aria-live="polite">Mensagens · página {detail.message_page}</strong>
           <button type="button" className="outline"
             aria-label="Página anterior de mensagens" disabled={detailLoading||messagePage<=1}
-            onClick={()=>setMessagePage(v=>v-1)}>Anterior</button>
+            onClick={()=>{
+              setDetail(null);setDetailLoading(true);setMessagePage(v=>v-1)
+            }}>Anterior</button>
           <button type="button" className="outline"
             aria-label="Próxima página de mensagens"
             disabled={detailLoading||detail.message_next_page===null}
-            onClick={()=>setMessagePage(v=>v+1)}>Próxima</button>
+            onClick={()=>{
+              setDetail(null);setDetailLoading(true);setMessagePage(v=>v+1)
+            }}>Próxima</button>
         </div>
         <div className="history-events"><b>Eventos comprovados</b>
           {detail.events.map((e,i)=><span key={i}>
@@ -234,14 +249,18 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
           </p>}
         </div>
         <div className="verified-history-detail-pages" aria-label="Paginação de eventos verificados">
-          <strong>Eventos · página {detail.event_page}</strong>
+          <strong aria-live="polite">Eventos · página {detail.event_page}</strong>
           <button type="button" className="outline"
             aria-label="Página anterior de eventos" disabled={detailLoading||eventPage<=1}
-            onClick={()=>setEventPage(v=>v-1)}>Anterior</button>
+            onClick={()=>{
+              setDetail(null);setDetailLoading(true);setEventPage(v=>v-1)
+            }}>Anterior</button>
           <button type="button" className="outline"
             aria-label="Próxima página de eventos"
             disabled={detailLoading||detail.event_next_page===null}
-            onClick={()=>setEventPage(v=>v+1)}>Próxima</button>
+            onClick={()=>{
+              setDetail(null);setDetailLoading(true);setEventPage(v=>v+1)
+            }}>Próxima</button>
         </div></>}
         </>}
       </section>
