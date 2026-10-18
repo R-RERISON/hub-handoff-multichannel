@@ -17,9 +17,11 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 
 from handoff_hub.poc_api import create_app
+from handoff_hub.schema_admin import SchemaSafetyError
 from scripts.lab_environment import LabSafetyError, validate_lab
 from scripts.release_audit_evidence import collect
 from scripts.release_grant_toggle import (
+    LabSafetyError as AttestationSafetyError,
     attest_running_backend,
     bearer,
     identities,
@@ -160,10 +162,10 @@ def main() -> None:
     args = parser.parse_args()
     try:
         result = run(args.lab, args.confirm_synthetic)
-    except LabSafetyError as exc:
+    except (LabSafetyError, AttestationSafetyError) as exc:
         # Only static errors and numeric HTTP status codes are exposed.
         raise SystemExit("REPROVADO: " + str(exc)) from None
-    except (OSError, sqlite3.Error, ValueError, KeyError, TypeError):
+    except (SchemaSafetyError, OSError, sqlite3.Error, ValueError, KeyError, TypeError):
         raise SystemExit(
             "REPROVADO: falha de laboratorio TEMP ou contrato de API sintetica"
         ) from None
