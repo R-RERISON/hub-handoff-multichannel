@@ -240,7 +240,8 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
               setDetail(null);setDetailLoading(true);setMessagePage(v=>v+1)
             }}>Próxima</button>
         </div>
-        <div className="history-events"><b>Eventos comprovados</b>
+        <div className="history-events" role="region" aria-label="Eventos comprovados" tabIndex={0}>
+          <b>Eventos comprovados</b>
           {detail.events.map((e,i)=><span key={i}>
             {e.type} · {e.actor} · {formatTime(e.at)}
           </span>)}

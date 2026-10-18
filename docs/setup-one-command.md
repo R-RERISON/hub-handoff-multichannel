@@ -78,6 +78,22 @@ do backend. A saída não inclui IDs, senha, token ou texto da conversa.
 Procedimento completo de navegador e critérios de aceite em
 [PR #28 — Gates visuais finais](qa/PR-028-ui-final-gates.md).
 
+### Rodada Windows de 2026-10-18
+
+Na base `6da3061` com correção local do painel de eventos, `start.cmd --check`
+aprovou **132 testes Python, 1 ignorado, 15 contratos frontend, Ruff,
+TypeScript e Vite**. A fixture de paginação, o release probe e AUD-01 passaram
+no laboratório TEMP. UX-06 e teclado do histórico verificado foram exercitados
+no navegador; a correção limita a área de eventos com rolagem acessível, sem
+recortar a paginação inferior.
+
+Isso não libera a `main`: UX-08 completo (capturas com viewport estável e Mesa
+do Operador) e os demais cenários visuais pendentes continuam obrigatórios.
+Resultados, dimensões reais, limites e indisponibilidade de publicação no
+PR #28 estão no [registro de execução](qa/PR-028-ui-final-gates.md#execução-local-windows--2026-10-18).
+As alterações desta rodada são entregues na branch
+`feat/006b5b-security-decisions-journal`, sem integração na `main`.
+
 ## Completar evidências AUD-01 e SEC-01 (laboratório TEMP)
 
 Quando `release_audit_evidence` retornar `INCOMPLETE` para as leituras

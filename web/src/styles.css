@@ -842,6 +842,14 @@ body{background:var(--hub-bg)}
 .verified-history-layout .history-messages{
   min-height:160px;max-height:400px
 }
+.verified-history-layout .history-details__header,
+.verified-history-layout .verified-history-detail-pages{flex-shrink:0}
+.verified-history-layout .history-events{
+  max-height:180px;overflow-y:auto;flex-shrink:0
+}
+.verified-history-layout .history-events:focus-visible{
+  outline:3px solid #438fe2;outline-offset:-3px
+}
 .verified-history-layout .history-ticket strong{font-size:13px}
 .verified-history-layout .history-ticket small,
 .verified-history-panel-title small{font-size:11px;color:#526e86}

@@ -85,6 +85,18 @@ de UX, não substitui o HTTP 404 de SEC-01.
 
 ## Protocolo de evidências e regressões
 
+### Ajuste UX-06: eventos volumosos sem cortar controles
+
+Invariante: as duas paginações do detalhe permanecem dentro do painel limitado;
+o volume de eventos não pode empurrar a paginação inferior para uma região
+recortada por `overflow:hidden`. A área de eventos tem rolagem interna, foco
+visível e nome acessível, sem alterar dados, autorização ou páginas da API.
+
+Aceite: com 25 eventos na primeira página, o painel não tem conteúdo recortado,
+ambas as paginações podem ser acionadas com mouse e teclado e a região
+`Eventos comprovados` pode ser rolada pelo teclado. Validar geometria no
+navegador real, além do contrato estático frontend e de `start.cmd --check`.
+
 Um gate recebe `PASS`, `FAIL`, `BLOCKED` ou `NOT_RUN`, com: data,
 commit, navegador, viewport, papel autenticado, cenário de teste, resultado
 observado e referência à captura (sem segredos). Toda falha de segurança ou
@@ -93,6 +105,55 @@ vazamento cross-queue impede release, mesmo com build verde.
 Se um gate falhar, abrir correção específica e repetir:
 `start.cmd --check`, `release_probe.py`, cenário negativo de RBAC e
 reteste visual pertinente. Não aprovar `main` automaticamente.
+
+## Execução local Windows — 2026-10-18
+
+Base `6da3061`, branch `feat/006b5b-security-decisions-journal`, mais a
+correção de rolagem descrita acima, entregue nesta branch.
+Somente o laboratório TEMP retomado pelo launcher; banco original preservado.
+Navegador integrado do VS Code: Chromium 150 / Electron 43, Windows.
+Papel autenticado nos cenários abaixo: `auditor.demo`.
+
+| Cenário | Resultado | Observação executada |
+|---|---|---|
+| Regressão após correção | PASS | 132 Pytest aprovados, 1 ignorado; Ruff; 15/15 contratos frontend; TypeScript e Vite |
+| Fixture UX-06 | PASS | 27 sessões, 27 mensagens e 27 eventos QA adicionados exclusivamente ao TEMP; API atestada |
+| Release probe após correção | PASS | 22 tabelas 006b4, 2 leituras auditadas, 4 decisões; bloqueio entre filas, revogação, rollback, negativa 404 e ausência de conteúdo sensível nos journals |
+| SEC-03 / UI | PASS | Revogar N1, atualizar permissões: filas e histórico removidos; restaurar N1 e atualizar: somente N1 reaparece e detalhe volta a ser consultável |
+| UX-06 / A | PASS | Lista com 25 itens na página 1 e 3 na página 2; sem repetição; ida/volta preserva itens; limites desabilitados; detalhe removido ao trocar a lista |
+| UX-06 / B | PASS | Mensagens 25/2; eventos permanecem na mesma página; retorno e limites conferidos |
+| UX-06 / C | PASS | Eventos 25/3, incluindo o evento inicial além dos 27 eventos QA; página de mensagens não muda; retorno e limites conferidos |
+| Conteúdo antigo durante fetch | PASS | Requisições de lista e detalhe retidas por 1 segundo no navegador; lista/detalhe antigos ausentes durante carregamento |
+| UX-07 / histórico verificado | PASS | Tab, Shift+Tab, Enter e Space; ordem seletor/atualização/tickets/paginação; controles desabilitados ignorados; foco visível; eventos roláveis pelo teclado |
+| Negativa autenticada de escopo | PASS | Requisição do Auditor para segmento N1 sob escopo não autorizado N2 retorna 404; sem divulgar token ou corpo. Não equivale ao cenário manual de selecionar um ID de sessão N2 |
+| AUD-01 após revoke/restore | PASS | Quatro gates internos aprovados, Auditor com N1 sem N2, sem pendências; leitura read-only |
+| UX-08 completo | BLOCKED | Medições de geometria disponíveis, mas capturas nas três resoluções e Mesa do Operador ainda não homologadas |
+| UX-02 e UX-05 visuais | NOT_RUN | Alternância do Supervisor e transferência entre filas não reexecutadas nesta rodada |
+
+Os testes interativos de paginação e as capturas usam viewport real
+**1058×595**. Capturas sintéticas locais da sessão: `ux06-list-p1.png`,
+`ux06-list-p2.png`, `ux06-detail-p2.png` e `ux06-controls-p1.png`; não são
+arquivos versionados nem evidência de outras resoluções.
+
+Defeito reproduzido antes da correção: em 1366×768, detalhe com altura útil
+638 px e conteúdo de 761 px, recortado pelo painel. Depois da correção,
+`scrollHeight = clientHeight = 638` em 1366×768 e 1920×1080; paginação de
+eventos dentro do painel, eventos com rolagem interna e teclado funcional.
+Em 390×844 foi medido `document.scrollWidth = 390`, com controles de histórico
+dentro da largura. Essas medições **não aprovam UX-08**: a captura no navegador
+integrado reajusta o viewport (por exemplo, de 390×844 para 274×595).
+Repetir a inspeção visual em navegador com viewport estável, incluindo a Mesa
+do Operador autenticada, antes de fechar o gate.
+
+Rollback da correção: desfazer apenas as regras de dimensionamento/rolagem,
+a região acessível de eventos e o contrato frontend correspondente desta
+rodada, sem alterar backend, schema ou dados. Repetir `start.cmd --check` e
+manter UX-06 bloqueado até novo reteste. Não há migração de banco a reverter.
+
+A consulta ao PR #28 pelo conector GitHub retornou 404 nesta sessão; não foi
+possível publicar um comentário com estas evidências no PR. As evidências
+seguem versionadas nesta branch, sem merge nem mudança de estado do PR.
+A `main` continua sem alterações.
 
 ## Próxima fronteira depois do PR #28
 

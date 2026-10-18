@@ -7,6 +7,15 @@ import { test } from 'node:test'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (path) => readFileSync(resolve(root,path),'utf8')
 
+test('verified events scroll without clipping paging controls and support keyboard focus', () => {
+  const css = read('src/styles.css')
+  const history = read('src/workspaces/ScopedVerifiedHistory.tsx')
+  assert.match(css, /\.verified-history-layout \.history-events\s*\{[^}]*max-height:180px;overflow-y:auto;flex-shrink:0/)
+  assert.match(css, /\.verified-history-layout \.history-details__header,\s*\.verified-history-layout \.verified-history-detail-pages\{flex-shrink:0\}/)
+  assert.match(css, /\.verified-history-layout \.history-events:focus-visible\s*\{[^}]*outline:3px solid/)
+  assert.match(history, /className="history-events" role="region" aria-label="Eventos comprovados" tabIndex=\{0\}/)
+})
+
 test('a POC has distinct URLs for all workspaces', () => {
   const app = read('src/App.tsx')
   for (const path of [
