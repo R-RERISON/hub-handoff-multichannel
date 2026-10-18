@@ -1,3 +1,8 @@
+<!-- HUB-PROGRAM-TRACKER-2026-10-18 -->
+> **Planejamento de programa (proposta, 18/10/2026):** [MASTER-TRACKER](program/MASTER-TRACKER.md) · [Gates](program/RELEASE-GATES.md) · [Crosswalk](program/SPEC-CROSSWALK.md) · [Workflow Spec Kit](program/SPECKIT-WORKFLOW.md). O conteúdo abaixo é **roadmap histórico da POC** e pode conter nomenclatura/pendências anteriores à SPEC-006B; não interpretá-lo como estado de implementação atual. A proposta só se torna plano de referência após revisão do PR de documentação.
+
+---
+
 ## POC-005 — RBAC local, filas e alertas automáticos
 
 Branch feat/005-rbac-auto-dispatch. Backend: usuários individuais, tokens opacos, papéis e ownership; login com lockout, heartbeat e revogação; worker periódico SQLite com distribuição FIFO e rodízio por fila, ofertas persistidas, cooldown, capacidade, membros e auditoria. Frontend: login por papel, Mesa do Operador autenticada, popup e alertas opcionais, supervisão com ordem e vinculação de operadores, ajuste de capacidade.
