@@ -78,6 +78,28 @@ do backend. A saída não inclui IDs, senha, token ou texto da conversa.
 Procedimento completo de navegador e critérios de aceite em
 [PR #28 — Gates visuais finais](qa/PR-028-ui-final-gates.md).
 
+## Completar evidências AUD-01 e SEC-01 (laboratório TEMP)
+
+Quando `release_audit_evidence` retornar `INCOMPLETE` para as leituras
+`LIST`/`DETAIL` ou negativas `DENIED`, execute o runner **mutável e
+explícito** abaixo. Ele atesta a API de `start.cmd --lab --lab-dir $lab`
+na porta 8000, cria **um atendimento e uma mensagem 100% sintéticos no
+banco TEMP**, e realiza LIST/DETAIL autorizados e duas negativas 404 com
+o Bearer do Auditor. Não altera grants e não solicita tokens manualmente.
+
+```powershell
+# Com start.cmd --lab --lab-dir $lab ativo em outro terminal:
+.\.venv\Scripts\python.exe -m scripts.release_audit_scenarios --lab $lab --confirm-synthetic
+if ($LASTEXITCODE -ne 0) { throw "Execucao sintética de auditoria reprovada" }
+.\.venv\Scripts\python.exe -m scripts.release_audit_evidence --lab $lab
+```
+
+O primeiro comando **grava dados sintéticos de QA e journals no laboratório**;
+o segundo permanece **estritamente read-only**. Não chamar esse runner na
+POC original, nem em outras pastas fora de `$env:TEMP\handoff-qa-006b4-*`.
+Consultar `docs/qa/PR-028-release-acceptance.md` para todas as evidências
+e pendências visuais.
+
 ## Execução habitual da POC original
 
 ```powershell
