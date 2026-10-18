@@ -7,6 +7,15 @@ import { test } from 'node:test'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (path) => readFileSync(resolve(root,path),'utf8')
 
+test('verified events scroll without clipping paging controls and support keyboard focus', () => {
+  const css = read('src/styles.css')
+  const history = read('src/workspaces/ScopedVerifiedHistory.tsx')
+  assert.match(css, /\.verified-history-layout \.history-events\s*\{[^}]*max-height:180px;overflow-y:auto;flex-shrink:0/)
+  assert.match(css, /\.verified-history-layout \.history-details__header,\s*\.verified-history-layout \.verified-history-detail-pages\{flex-shrink:0\}/)
+  assert.match(css, /\.verified-history-layout \.history-events:focus-visible\s*\{[^}]*outline:3px solid/)
+  assert.match(history, /className="history-events" role="region" aria-label="Eventos comprovados" tabIndex=\{0\}/)
+})
+
 test('a POC has distinct URLs for all workspaces', () => {
   const app = read('src/App.tsx')
   for (const path of [
@@ -168,4 +177,43 @@ test('verified history details paginate messages and events independently', () =
   assert.match(api, /page_size: int = Query\(default=25, ge=1, le=50\)/)
   assert.match(api, /\.limit\(page_size \+ 1\)/)
   assert.doesNotMatch(view, /'POST'|"POST"/)
+})
+
+
+test('verified history clears sensitive view state before grant refresh', () => {
+  const view = read('src/workspaces/ScopedVerifiedHistory.tsx')
+  assert.match(view,/setQueues\(\[\]\);setQueueId\(''\);setListing\(null\);setSelectedId\(null\)/)
+  assert.match(view,/setDetail\(null\);setError\(''\);setLoading\(false\)/)
+  assert.match(view,/setGrantsLoading\(true\);setRefreshKey\(v=>v\+1\)/)
+  assert.match(view,/!queueId\|\|!queues\.some\(q=>q\.id===queueId\)/)
+  assert.match(view,/Não foi possível validar as filas concedidas/)
+  assert.match(view,/Nenhuma fila autorizada para consulta de histórico/)
+  assert.match(view,/disabled=\{grantsLoading\}/)
+  assert.match(view,/preferredQueueRef\.current=queueId/)
+  assert.match(view,/available\.find\(q=>q\.id===preferredQueueRef\.current\)/)
+  assert.match(view,/setListing\(null\)[\s\S]*?setSelectedId\(null\)[\s\S]*?setDetail\(null\)/)
+})
+
+test('supervisor release QA displays current POC version and live-only counter semantics', () => {
+  const app = read('src/App.tsx')
+  const css = read('src/styles.css')
+  assert.match(app, /POC 0\.5 · Sem integração Teams/)
+  assert.doesNotMatch(app, /POC 0\.4 · Sem integração Teams/)
+  assert.match(app, /countMeaning="Quantidade de atendimentos correntes; não inclui o histórico verificado"/)
+  assert.match(css, /\.verified-history-layout \.history-details\{[\s\S]*?min-height:340px/)
+  assert.match(css, /\.verified-history-layout \.history-ticket:focus-visible/)
+})
+
+
+test('verified paging clears stale content before fetching and labels controls', () => {
+  const view = read('src/workspaces/ScopedVerifiedHistory.tsx')
+  assert.match(view, /aria-pressed=\{selectedId===t\.session_id\}/)
+  assert.match(view, /aria-live="polite"/)
+  assert.match(view, /aria-label="Paginação de atendimentos verificados"/)
+  assert.match(view, /disabled=\{loading\|\|page<=1\}/)
+  assert.match(view, /disabled=\{loading\|\|listing\.next_page===null\}/)
+  assert.match(view, /setListing\(null\);setLoading\(true\)/)
+  assert.match(view, /setDetail\(null\);setDetailLoading\(true\);setMessagePage\(v=>v[+-]1\)/)
+  assert.match(view, /setDetail\(null\);setDetailLoading\(true\);setEventPage\(v=>v[+-]1\)/)
+  assert.match(view, /if\(!selectedId\|\|!queueId\)\{\s*setDetail\(null\)\s*setDetailLoading\(false\)/)
 })

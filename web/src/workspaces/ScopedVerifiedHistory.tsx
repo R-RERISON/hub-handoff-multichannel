@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { LockKeyhole, RefreshCw, ShieldCheck } from 'lucide-react'
 import type { Api, ChatMessage } from './types'
 import { formatTime } from './types'
@@ -36,23 +36,37 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
   const [detailLoading,setDetailLoading] = useState(false)
   const [error,setError] = useState('')
   const [refreshKey,setRefreshKey] = useState(0)
+  const [grantsLoading,setGrantsLoading] = useState(true)
+  const preferredQueueRef = useRef('')
 
   useEffect(()=>{
     let cancelled=false
+    setGrantsLoading(true)
     api('/v1/me/queues').then(data=>{
       if(cancelled)return
       const available=data as GrantQueue[]
       setQueues(available)
-      setQueueId(current=>available.some(q=>q.id===current)?current:(available[0]?.id??''))
+      setQueueId(available.find(q=>q.id===preferredQueueRef.current)?.id??available[0]?.id??'')
     }).catch(()=>{
-      if(!cancelled)setError('Não foi possível consultar as filas concedidas.')
-    })
+      if(cancelled)return
+      // Fail closed in the VIEW too: no stale queue or message remains visible.
+      setQueues([])
+      setQueueId('')
+      setListing(null)
+      setSelectedId(null)
+      setDetail(null)
+      setError('Não foi possível validar as filas concedidas.')
+    }).finally(()=>{if(!cancelled)setGrantsLoading(false)})
     return ()=>{cancelled=true}
   },[api,refreshKey])
 
   useEffect(()=>{
-    if(!queueId){
+    if(!queueId||!queues.some(q=>q.id===queueId)){
       setListing(null)
+      setSelectedId(null)
+      setDetail(null)
+      setLoading(false)
+      setDetailLoading(false)
       return
     }
     let cancelled=false
@@ -67,15 +81,20 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
         setListing(data as Listing)
       })
       .catch(()=>{
-        if(!cancelled)setError('Consulta indisponível ou permissão de fila revogada.')
+        if(cancelled)return
+        setListing(null)
+        setSelectedId(null)
+        setDetail(null)
+        setError('Consulta indisponível ou permissão de fila revogada.')
       })
       .finally(()=>{if(!cancelled)setLoading(false)})
     return ()=>{cancelled=true}
-  },[api,queueId,page,refreshKey])
+  },[api,queueId,queues,page,refreshKey])
 
   useEffect(()=>{
     if(!selectedId||!queueId){
       setDetail(null)
+      setDetailLoading(false)
       return
     }
     let cancelled=false
@@ -87,7 +106,9 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
       '&message_page='+messagePage+'&event_page='+eventPage)
       .then(data=>{if(!cancelled)setDetail(data as VerifiedDetails)})
       .catch(()=>{
-        if(!cancelled)setError('O acesso ao segmento foi negado ou a concessão mudou.')
+        if(cancelled)return
+        setDetail(null)
+        setError('O acesso ao segmento foi negado ou a concessão mudou.')
       })
       .finally(()=>{if(!cancelled)setDetailLoading(false)})
     return ()=>{cancelled=true}
@@ -104,20 +125,32 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
     </section>
     <section className="verified-history-toolbar panel">
       <label htmlFor="verified-history-queue">Fila com acesso concedido</label>
-      <select id="verified-history-queue" value={queueId}
+      <select id="verified-history-queue" value={queueId} disabled={grantsLoading}
         onChange={e=>{
-          setQueueId(e.target.value);setPage(1)
+          preferredQueueRef.current=e.target.value
+          setQueueId(e.target.value);setPage(1);setListing(null)
           setSelectedId(null);setDetail(null);setMessagePage(1);setEventPage(1)
         }}>
-        {queues.length===0&&<option value="">Nenhuma fila autorizada</option>}
+        {queues.length===0&&<option value="">{grantsLoading?'Validando concessões…':'Nenhuma fila autorizada'}</option>}
         {queues.map(q=><option value={q.id} key={q.id}>{q.name}</option>)}
       </select>
-      <button className="outline" type="button" onClick={()=>{
-        setPage(1);setSelectedId(null);setDetail(null)
-        setMessagePage(1);setEventPage(1);setRefreshKey(v=>v+1)
+      <button className="outline" type="button" disabled={grantsLoading} onClick={()=>{
+        // Never display previously fetched content while grants are being revalidated.
+        preferredQueueRef.current=queueId
+        setQueues([]);setQueueId('');setListing(null);setSelectedId(null)
+        setDetail(null);setError('');setLoading(false);setDetailLoading(false)
+        setPage(1);setMessagePage(1);setEventPage(1)
+        setGrantsLoading(true);setRefreshKey(v=>v+1)
       }}><RefreshCw size={15}/> Atualizar permissões</button>
     </section>
     {error&&<div className="alert" role="alert">{error}</div>}
+    {grantsLoading&&<p className="verified-history-access-state" role="status">
+      Validando acesso às filas concedidas…
+    </p>}
+    {!grantsLoading&&!error&&queues.length===0&&
+      <p className="verified-history-access-state" role="status">
+        Nenhuma fila autorizada para consulta de histórico.
+      </p>}
     <div className="verified-history-warning" role="status">
       <LockKeyhole size={16}/>
       Visualização parcial: a ausência de itens aqui não significa ausência de mensagens no atendimento.
@@ -132,14 +165,16 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
       <section className="panel history-sidebar">
         <header className="verified-history-panel-title">
           <b>Atendimentos com evidência verificada</b>
-          <small>Página {listing.page} · IDs restritos à fila selecionada</small>
+          <small aria-live="polite">Página {listing.page} · IDs restritos à fila selecionada</small>
         </header>
         <div className="history-list">
           {listing.tickets.map(t=><button key={t.session_id} type="button"
             className={'history-ticket '+(selectedId===t.session_id?'selected':'')}
+            aria-pressed={selectedId===t.session_id}
             onClick={()=>{
               setMessagePage(1);setEventPage(1)
-              setSelectedId(t.session_id);setDetail(null)
+              setDetail(null);setDetailLoading(true)
+              setSelectedId(t.session_id)
             }}>
             <strong>Sessão {t.session_id.slice(0,8)}…</strong>
             <small>Início do segmento: {formatTime(t.segment_started_at)}</small>
@@ -148,15 +183,22 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
             Nenhum segmento com evidência comprovada nesta página.
           </p>}
         </div>
-        <div className="verified-history-pagination">
-          <button type="button" className="outline" disabled={page<=1} onClick={()=>{
-            setPage(v=>v-1);setSelectedId(null);setDetail(null)
-            setMessagePage(1);setEventPage(1)
-          }}>Anterior</button>
-          <button type="button" className="outline" disabled={listing.next_page===null}
+        <div className="verified-history-pagination" role="navigation"
+          aria-label="Paginação de atendimentos verificados">
+          <button type="button" className="outline" disabled={loading||page<=1}
+            aria-label="Página anterior de atendimentos"
             onClick={()=>{
-              setPage(v=>v+1);setSelectedId(null);setDetail(null)
-              setMessagePage(1);setEventPage(1)
+              setListing(null);setLoading(true)
+              setSelectedId(null);setDetail(null);setDetailLoading(false)
+              setMessagePage(1);setEventPage(1);setPage(v=>v-1)
+            }}>Anterior</button>
+          <button type="button" className="outline"
+            disabled={loading||listing.next_page===null}
+            aria-label="Próxima página de atendimentos"
+            onClick={()=>{
+              setListing(null);setLoading(true)
+              setSelectedId(null);setDetail(null);setDetailLoading(false)
+              setMessagePage(1);setEventPage(1);setPage(v=>v+1)
             }}>
             Próxima
           </button>
@@ -185,16 +227,21 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
           </p>}
         </div>
         <div className="verified-history-detail-pages" aria-label="Paginação de mensagens verificadas">
-          <strong>Mensagens · página {detail.message_page}</strong>
+          <strong aria-live="polite">Mensagens · página {detail.message_page}</strong>
           <button type="button" className="outline"
             aria-label="Página anterior de mensagens" disabled={detailLoading||messagePage<=1}
-            onClick={()=>setMessagePage(v=>v-1)}>Anterior</button>
+            onClick={()=>{
+              setDetail(null);setDetailLoading(true);setMessagePage(v=>v-1)
+            }}>Anterior</button>
           <button type="button" className="outline"
             aria-label="Próxima página de mensagens"
             disabled={detailLoading||detail.message_next_page===null}
-            onClick={()=>setMessagePage(v=>v+1)}>Próxima</button>
+            onClick={()=>{
+              setDetail(null);setDetailLoading(true);setMessagePage(v=>v+1)
+            }}>Próxima</button>
         </div>
-        <div className="history-events"><b>Eventos comprovados</b>
+        <div className="history-events" role="region" aria-label="Eventos comprovados" tabIndex={0}>
+          <b>Eventos comprovados</b>
           {detail.events.map((e,i)=><span key={i}>
             {e.type} · {e.actor} · {formatTime(e.at)}
           </span>)}
@@ -203,14 +250,18 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
           </p>}
         </div>
         <div className="verified-history-detail-pages" aria-label="Paginação de eventos verificados">
-          <strong>Eventos · página {detail.event_page}</strong>
+          <strong aria-live="polite">Eventos · página {detail.event_page}</strong>
           <button type="button" className="outline"
             aria-label="Página anterior de eventos" disabled={detailLoading||eventPage<=1}
-            onClick={()=>setEventPage(v=>v-1)}>Anterior</button>
+            onClick={()=>{
+              setDetail(null);setDetailLoading(true);setEventPage(v=>v-1)
+            }}>Anterior</button>
           <button type="button" className="outline"
             aria-label="Próxima página de eventos"
             disabled={detailLoading||detail.event_next_page===null}
-            onClick={()=>setEventPage(v=>v+1)}>Próxima</button>
+            onClick={()=>{
+              setDetail(null);setDetailLoading(true);setEventPage(v=>v+1)
+            }}>Próxima</button>
         </div></>}
         </>}
       </section>

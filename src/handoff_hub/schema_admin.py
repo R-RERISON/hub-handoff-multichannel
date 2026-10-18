@@ -23,11 +23,13 @@ from sqlalchemy.engine import URL
 from handoff_hub.audit_schema import HISTORY_ACCESS_AUDIT
 from handoff_hub.poc_db import Base
 from handoff_hub.provenance_schema import PROVENANCE_TABLES
+from handoff_hub.security_schema import SECURITY_DECISIONS
 
 BASELINE_REVISION = "006b1_poc_baseline"
 PROVENANCE_REVISION = "006b2_queue_provenance"
 AUDIT_REVISION = "006b3_history_access_audit"
-LATEST_REVISION = AUDIT_REVISION
+SECURITY_REVISION = "006b4_security_decisions"
+LATEST_REVISION = SECURITY_REVISION
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DB = PROJECT_ROOT / "data" / "handoff-poc.db"
 DEFAULT_BACKUPS = PROJECT_ROOT / "data" / "backups"
@@ -70,15 +72,17 @@ def verify_database(path: Path) -> dict:
         if existing_version:
             rows = db.execute("SELECT version_num FROM alembic_version").fetchall()
             if len(rows) != 1 or rows[0][0] not in (
-                BASELINE_REVISION, PROVENANCE_REVISION, AUDIT_REVISION,
+                BASELINE_REVISION, PROVENANCE_REVISION, AUDIT_REVISION, SECURITY_REVISION,
             ):
                 raise SchemaSafetyError("Unexpected Alembic revision: manual review required")
             version = rows[0][0]
         signature_tables = list(Base.metadata.sorted_tables)
-        if version in (PROVENANCE_REVISION, AUDIT_REVISION):
+        if version in (PROVENANCE_REVISION, AUDIT_REVISION, SECURITY_REVISION):
             signature_tables.extend(PROVENANCE_TABLES)
-        if version == AUDIT_REVISION:
+        if version in (AUDIT_REVISION, SECURITY_REVISION):
             signature_tables.append(HISTORY_ACCESS_AUDIT)
+        if version == SECURITY_REVISION:
+            signature_tables.append(SECURITY_DECISIONS)
         expected_tables = {table.name for table in signature_tables}
         if actual_tables != expected_tables:
             missing = sorted(expected_tables - actual_tables)
@@ -280,6 +284,41 @@ def upgrade_audit_existing(database: Path, backup_dir: Path, *, confirmed: bool)
     }
 
 
+def upgrade_security_existing(database: Path, backup_dir: Path, *, confirmed: bool) -> dict:
+    """Opt-in 006B-3 → 006B-4 with offline verified backup."""
+    if not confirmed:
+        raise SchemaSafetyError("Explicit --confirm-offline is required")
+    before = verify_database(database)
+    if before["revision"] != AUDIT_REVISION:
+        raise SchemaSafetyError(
+            "Security upgrade requires verified 006b3_history_access_audit revision"
+        )
+    backup_path, digest = verified_backup(database, backup_dir)
+    try:
+        command.upgrade(_config(database), SECURITY_REVISION)
+        after = verify_database(database)
+        if after["revision"] != SECURITY_REVISION:
+            raise SchemaSafetyError("Security migration revision mismatch")
+        if any(after["row_counts"].get(table) != count
+               for table, count in before["row_counts"].items()):
+            raise SchemaSafetyError("Security migration changed existing row counts")
+        if after["row_counts"][SECURITY_DECISIONS.name] != 0:
+            raise SchemaSafetyError("New security journal unexpectedly contains rows")
+    except Exception as exc:
+        raise SchemaSafetyError(
+            f"Security upgrade failed; preserve original and backup: {backup_path}; "
+            f"original error: {exc}"
+        ) from exc
+    return {
+        "action": "security_upgraded",
+        "revision": SECURITY_REVISION,
+        "backup": str(backup_path),
+        "backup_sha256": digest,
+        "preserved_rows": before["row_counts"],
+        "security_table_empty": True,
+    }
+
+
 def create_new(database: Path, *, confirmed: bool) -> dict:
     if not confirmed:
         raise SchemaSafetyError("Explicit --confirm-offline is required")
@@ -302,7 +341,7 @@ def main(argv: list[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="action", required=True)
     subparsers.add_parser("inspect", help="Read-only strict schema verification")
     subparsers.add_parser("backup", help="Consistent verified SQLite backup")
-    for action in ("adopt", "create", "upgrade", "upgrade-audit"):
+    for action in ("adopt", "create", "upgrade", "upgrade-audit", "upgrade-security"):
         subparsers.add_parser(action).add_argument(
             "--confirm-offline", action="store_true",
             help="I confirm API, Vite and dispatcher are stopped",
@@ -323,6 +362,9 @@ def main(argv: list[str] | None = None) -> int:
         elif args.action == "upgrade-audit":
             result = upgrade_audit_existing(args.database, args.backup_dir,
                                             confirmed=args.confirm_offline)
+        elif args.action == "upgrade-security":
+            result = upgrade_security_existing(args.database, args.backup_dir,
+                                               confirmed=args.confirm_offline)
         else:
             result = create_new(args.database, confirmed=args.confirm_offline)
         print(json.dumps(result, indent=2, ensure_ascii=False))

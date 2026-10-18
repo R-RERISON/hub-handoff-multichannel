@@ -1,3 +1,51 @@
+# Handoff Hub Multichannel — Candidato de integração POC 0.5 / SPEC-006B-5.2
+
+**Status (17/10/2026):** desenvolvimento na branch `feat/006b5b-security-decisions-journal`; integração na `main` proposta no [PR #28](https://github.com/R-RERISON/hub-handoff-multichannel/pull/28), **ainda Draft e NÃO mergeado**. POC localhost, **não produção**.
+
+**Contrato atual:** FastAPI + SQLite + React/Vite; login individual e RBAC por perfil/operação/fila, worker de distribuição automática, Mesa do Operador, supervisão, auditoria e histórico parcial `RUNTIME/VERIFIED`. O SQLite POC **original de 17 tabelas permanece não versionado**, íntegro e sem migração automática. Migrações Alembic `006b1`→`006b4` são explícitas e restritas a bancos autorizados de laboratório. **Não executar `adopt`/`stamp`/`upgrade` no original**.
+
+**Gates automáticos comprovados no commit `052e197`:** 111/111 Pytest, Ruff, 11/11 arquitetura frontend, TypeScript e Vite aprovados no Windows. **Depois desse commit foram adicionados utilitários de QA; o SHA atualizado ainda precisa de nova execução.** Validação manual de UI, revogação e banco sintético permanece pendente.
+
+## Inicialização atual em um único terminal
+
+```powershell
+.\start.cmd --lab            # RECOMENDADO: cria banco TEMP 006b4 e sobe API+Vite
+.\start.cmd --check          # testes Python/Ruff/Frontend/TypeScript/Vite
+.\start.cmd                  # POC original (sem migração, fora do laboratório)
+```
+
+Para retomar o mesmo laboratório sem perder atendimentos sintéticos, use
+`start.cmd --lab --lab-dir "<caminho TEMP impresso na primeira execução>"`.
+O modo QA isola `synthetic.db` e `synthetic-credentials.txt` sob `$env:TEMP`,
+sem gravar no SQLite original, e encerra ambos os serviços com **Ctrl+C**.
+Não misturar `--lab` com `--reset-users` ou usar o modo normal durante
+testes de segurança. Guia vigente: [Inicialização unificada](docs/setup-one-command.md).
+
+## Executar / validar sem alterar o banco original
+
+```powershell
+.\start.cmd --check
+.\.venv\Scripts\python.exe scripts\release_probe.py
+.\.venv\Scripts\python.exe -m handoff_hub.schema_admin inspect
+.\.venv\Scripts\python.exe -m handoff_hub.provenance_dry_run
+```
+
+O `release_probe.py` usa exclusivamente SQLite e contas descartáveis em `$env:TEMP`. Para **homologação visual isolada**, execute `.\start.cmd --lab` (ou com `--lab-dir` para retomar), que já sobe API e interface no mesmo terminal. O script PowerShell antigo é opcional/legado. Procedimento detalhado: [PR #28 — Plano de homologação](docs/qa/PR-028-release-acceptance.md).
+
+Para iniciar a POC **existente** normalmente em localhost, `.\start.cmd` utiliza `data/handoff-poc.db` e credenciais individuais em `data/demo-credentials.txt`. Não compartilhar senhas, Bearer tokens ou dados reais. Para produção corporativa ainda faltam Entra ID/OIDC, SQL Server, integração Teams, retenção LGPD e garantias de imutabilidade da auditoria.
+
+## Desenvolvimento orientado a especificações (Spec Kit)
+
+O repositório inclui [GitHub Spec Kit](https://github.com/github/spec-kit) com skills para GitHub Copilot e scripts PowerShell. Para mudanças novas, inicie uma feature delimitada com `/speckit-specify`, refine ambiguidades com `/speckit-clarify` quando necessário e siga com `/speckit-plan`, `/speckit-tasks`, `/speckit-analyze`, `/speckit-implement` e `/speckit-converge`. Revise cada artefato antes de avançar e execute `.\start.cmd --check` para validar a implementação.
+
+As novas features Spec Kit ficam em `specs/`. As especificações históricas existentes em `docs/specs/` não são recriadas nem movidas. `CONSTITUTION.md` é a fonte normativa; `.specify/memory/constitution.md` aplica essas regras ao fluxo SDD. Veja [AGENTS.md](AGENTS.md) e [inicialização local](docs/setup-one-command.md).
+
+## Histórico de implementação (seções abaixo)
+
+As seções POC-002/003/004/005 e 006B-1 abaixo documentam a evolução histórica e podem mencionar **fluxos ou comandos superados** (por exemplo, chave compartilhada, distribuição manual e antigas branches). **Não utilizá-las como guia operacional vigente**; consulte o procedimento atual acima.
+
+---
+
 ## SPEC-006B-1 — Migração versionada segura (em homologação)
 
 Esta branch incorpora Alembic para **instalações novas** e um utilitário explícito para **adotar o schema de SQLite POC-006A existente**, com verificação de estrutura, backup consistente e SHA-256. O `start.cmd` **não migra automaticamente** o banco existente.

@@ -27,12 +27,12 @@ function Logo() {
   </div>
 }
 
-function ActiveLink({to,icon,label,count}:{
-  to:string;icon:ReactNode;label:string;count?:number
+function ActiveLink({to,icon,label,count,countMeaning}:{
+  to:string;icon:ReactNode;label:string;count?:number;countMeaning?:string
 }) {
   return <NavLink to={to} end={to==='/supervisao'} className={({isActive})=>'nav '+(isActive?'active':'')}>
     {icon}<span>{label}</span>
-    {count!==undefined&&<em>{count}</em>}
+    {count!==undefined&&<em title={countMeaning} aria-label={countMeaning??String(count)}>{count}</em>}
   </NavLink>
 }
 
@@ -272,7 +272,8 @@ export default function App() {
       <Logo/>
       <span className="sidebar-title">CENTRAL DE SUPERVISÃO</span>
       <ActiveLink to="/supervisao" icon={<ChartNoAxesCombined size={18}/>} label="Visão geral"/>
-      <ActiveLink to="/supervisao/conversas" icon={<MessageSquareText size={18}/>} label="Conversas" count={snapshot.handoffs.length}/>
+      <ActiveLink to="/supervisao/conversas" icon={<MessageSquareText size={18}/>} label="Conversas" count={snapshot.handoffs.length}
+        countMeaning="Quantidade de atendimentos correntes; não inclui o histórico verificado"/>
       {user?.role!=='AUDITOR'&&<>
         <ActiveLink to="/supervisao/filas" icon={<Layers size={18}/>} label="Filas" count={waiting+offered}/>
         <ActiveLink to="/supervisao/equipe" icon={<Users size={18}/>} label="Equipe"/>
@@ -284,7 +285,7 @@ export default function App() {
       <span className="sidebar-title">OUTROS ESPAÇOS</span>
       {user?.role==='ADMIN'&&<NavLink className="nav nav--external" to="/inicio"><ArrowLeftRight size={18}/><span>Escolher espaço</span><ArrowRight size={14}/></NavLink>}
       <div className="sidebar-bottom"><span className="online-dot"/> API local · SQLite
-        <small>POC 0.4 · Sem integração Teams</small></div>
+        <small>POC 0.5 · Sem integração Teams</small></div>
     </aside>
     <main className="supervisor-main">
       <header className="portal-topbar">
