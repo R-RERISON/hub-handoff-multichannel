@@ -61,3 +61,12 @@ Usar `start.cmd` na raiz como **entrada única** para FastAPI e React/Vite no me
 - Novo fluxo: autenticação local → escolha de portal → navegação contextual. Isso **não substitui RBAC**.
 - Testes obrigatórios via `.\start.cmd --check`: Pytest, Ruff, `npm run test:architecture`, TypeScript e Vite. Não usar GitHub Actions.
 - Workspace novo não pode esconder comandos essenciais abaixo do viewport. Validar múltiplas resoluções e acesso por teclado.
+
+## Spec Kit — fluxo SDD para mudanças novas
+
+- A constituição normativa do projeto é `CONSTITUTION.md`; `.specify/memory/constitution.md` a operacionaliza para o Spec Kit. Mantenha ambas alinhadas.
+- Use as skills Copilot instaladas em `.github/skills/`: `/speckit-specify`, `/speckit-clarify` quando houver ambiguidade material, `/speckit-plan`, `/speckit-tasks`, `/speckit-analyze`, `/speckit-implement` e `/speckit-converge`.
+- Trabalhe em incrementos delimitados e revise os artefatos antes de implementar. Não gere uma especificação retroativa de todo o sistema.
+- Novos artefatos de feature seguem o diretório `specs/` criado pelo Spec Kit. Preserve as especificações e decisões históricas existentes em `docs/specs/`.
+- Toda feature mantém os limites de identidade/RBAC, banco original, dados sintéticos, workspaces, testes locais, documentação e rollback definidos acima. Não introduza GitHub Actions.
+- Execute `.\start.cmd --check` e registre apenas evidências realmente obtidas em `docs/setup-one-command.md` e no PR de entrega.

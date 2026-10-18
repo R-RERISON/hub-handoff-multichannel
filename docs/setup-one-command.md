@@ -4,6 +4,32 @@
 no **mesmo terminal**, com logs `[API]` / `[WEB]`. `Ctrl+C` encerra ambos.
 Somente localhost (`127.0.0.1:8000` e `127.0.0.1:5173`).
 
+## Spec Kit para novas mudanças
+
+O repositório foi inicializado com [GitHub Spec Kit](https://github.com/github/spec-kit),
+skills de GitHub Copilot e scripts PowerShell. O CLI local verificado nesta rodada
+é `specify-cli 1.0.13`; em outra máquina, instale-o com `uv tool install specify-cli`.
+Não é necessário adicionar dependência ao runtime Python ou frontend.
+
+No chat do Copilot, use `/speckit-specify` para uma mudança delimitada e continue
+com `/speckit-clarify` se necessário, `/speckit-plan`, `/speckit-tasks`,
+`/speckit-analyze`, `/speckit-implement` e `/speckit-converge`. Os novos pacotes
+de especificação são criados em `specs/`; `docs/specs/` continua contendo as
+especificações históricas. Consulte a constituição em
+`.specify/memory/constitution.md` e as instruções de engenharia em `AGENTS.md`.
+O Spec Kit não altera o uso de `start.cmd`, não migra o SQLite original e não
+adiciona GitHub Actions.
+
+### Evidência local — 2026-10-18
+
+Na branch `feat/006b5b-security-decisions-journal`, `specify init` instalou
+as skills do Copilot e os templates/scripts PowerShell; `specify check`
+confirmou que a instalação está pronta para uso no VS Code. `.\start.cmd --check`
+aprovou **132 testes Python, 1 ignorado, Ruff, 16 testes de arquitetura
+frontend, TypeScript e build Vite**. `git diff --check` também passou. A adoção
+não altera o runtime nem o banco POC; a integração à `main` depende do fluxo
+normal de revisão/publicação da branch e do PR #28.
+
 ## Homologação segura — recomendado
 
 ```powershell

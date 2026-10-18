@@ -34,6 +34,12 @@ O `release_probe.py` usa exclusivamente SQLite e contas descartáveis em `$env:T
 
 Para iniciar a POC **existente** normalmente em localhost, `.\start.cmd` utiliza `data/handoff-poc.db` e credenciais individuais em `data/demo-credentials.txt`. Não compartilhar senhas, Bearer tokens ou dados reais. Para produção corporativa ainda faltam Entra ID/OIDC, SQL Server, integração Teams, retenção LGPD e garantias de imutabilidade da auditoria.
 
+## Desenvolvimento orientado a especificações (Spec Kit)
+
+O repositório inclui [GitHub Spec Kit](https://github.com/github/spec-kit) com skills para GitHub Copilot e scripts PowerShell. Para mudanças novas, inicie uma feature delimitada com `/speckit-specify`, refine ambiguidades com `/speckit-clarify` quando necessário e siga com `/speckit-plan`, `/speckit-tasks`, `/speckit-analyze`, `/speckit-implement` e `/speckit-converge`. Revise cada artefato antes de avançar e execute `.\start.cmd --check` para validar a implementação.
+
+As novas features Spec Kit ficam em `specs/`. As especificações históricas existentes em `docs/specs/` não são recriadas nem movidas. `CONSTITUTION.md` é a fonte normativa; `.specify/memory/constitution.md` aplica essas regras ao fluxo SDD. Veja [AGENTS.md](AGENTS.md) e [inicialização local](docs/setup-one-command.md).
+
 ## Histórico de implementação (seções abaixo)
 
 As seções POC-002/003/004/005 e 006B-1 abaixo documentam a evolução histórica e podem mencionar **fluxos ou comandos superados** (por exemplo, chave compartilhada, distribuição manual e antigas branches). **Não utilizá-las como guia operacional vigente**; consulte o procedimento atual acima.
