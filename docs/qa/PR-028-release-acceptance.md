@@ -2,7 +2,7 @@
 
 > **Atualização operacional de 17/10/2026:** o modo recomendado para todos os testes visuais é `start.cmd --lab` (um terminal para API e frontend). Os exemplos antigos com dois arquivos `run-backend.ps1`/`run-web.ps1` e o preparador PowerShell foram preservados como evidência histórica, **não são mais necessários**. `start.cmd` **sem** `--lab` continua abrindo a POC original.
 
-**Estado (18/10/2026):** gate automatizado `start.cmd --check` aprovado no commit `d591b2f` (**125 Pytest aprovados, 1 skipped, Ruff, 13 testes frontend, TypeScript e Vite**). SEC-01 API e AUD-01 journals aprovados no laboratório 006b4 (`audit_release_result=PASS`, 1 LIST, 1 DETAIL, 2 negativas 404), com backend atestado. SEC-02 backend/UX PASS; SEC-03 backend/STATUS PASS, **SEC-03 UI ainda pendente**. As alterações posteriores a `d591b2f` ainda precisam do gate Windows no SHA final.  
+**Estado (18/10/2026):** nova execução do gate `start.cmd --check`: **129 Pytest aprovados, 1 skipped, Ruff, 14 testes de arquitetura frontend, TypeScript e Vite PASS**. `release_probe.py` também retornou **PASS** no SQLite efêmero 006b4 (22 tabelas, 2 auditorias de leitura, 4 decisões de segurança, cross-queue DENIED, revogação ENFORCED, rollback auditável e negativa 404 preservada). SEC-01 API e AUD-01 journals aprovados no laboratório 006b4 (`audit_release_result=PASS`, 1 LIST, 1 DETAIL, 2 negativas 404), com backend atestado. SEC-02 backend/UX PASS; SEC-03 backend/STATUS PASS, **SEC-03 UI ainda pendente**. A fixture UX-06 publicada após esses testes exige novo gate Windows no HEAD.  
 **Ambiente:** Windows PowerShell 5.1+ / Python 3.12+ / Node/npm local. Sem GitHub Actions ou serviços externos.  
 **Candidato:** `feat/006b5b-security-decisions-journal`, revisão de banco **006b4** exclusiva do laboratório sintético.
 
@@ -269,3 +269,31 @@ loading antes de requisitar a página seguinte, a bloquear botões de
 paginação durante carregamento e a expor rótulos acessíveis. O teste
 de contrato frontend foi ampliado de 13 para 14 casos. **Esta revisão
 ainda depende de novo `start.cmd --check` e teste manual no navegador.**
+
+
+### 18/10/2026 — Gate completo Windows PASS + preparação de UX-06
+
+O usuário apresentou saída completa de `start.cmd --check`:
+**129 passed, 1 skipped em 120.25 s**, `ruff check src tests`
+aprovado, **14 testes de arquitetura frontend aprovados**, TypeScript
+e Vite build concluídos (1601 módulos). `release_probe.py` retornou
+`result=PASS`, `EPHEMERAL_SYNTHETIC_ONLY`, revisão
+`006b4_security_decisions`, 22 tabelas, 2 `successful_read_audits`,
+4 `security_decisions`, cross-queue `DENIED`, revogação `ENFORCED`,
+falha de auditoria do grant `ROLLED_BACK`, negativa `PRESERVED_404`,
+`sensitive_payload_in_journals=false`.
+
+**Incremento posterior:** `scripts/release_ui_pagination_fixture.py`
+prepara, exclusivamente com confirmação opt-in e atestação do backend do
+laboratório TEMP, 27 sessões N1, 27 mensagens e 27 eventos marcados
+`QA_PAGE_EVENT` para habilitar página 2 de cada paginador. O script
+verifica as respostas paginadas da aplicação e não imprime IDs/segredos.
+Os eventos são **marcadores sintéticos de UX, não transições reais**.
+Foram adicionados 3 testes de segurança/contrato para a fixture e
+documentação de navegador em `docs/qa/PR-028-ui-final-gates.md`.
+
+**Gates pendentes:** rerun do `start.cmd --check` no HEAD com a fixture,
+execução da fixture (se o usuário aceitar gravar dados no laboratório
+TEMP), e homologação efetiva SEC-03/UI, UX-05/06/07/08. A aprovação
+do probe é restrita ao banco efêmero; nenhuma conclusão de produção ou
+merge está autorizada.
