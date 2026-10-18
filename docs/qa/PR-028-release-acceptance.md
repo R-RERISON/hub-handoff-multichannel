@@ -200,3 +200,49 @@ $lab = Join-Path $env:TEMP 'handoff-qa-006b4-1ohg0707'
 ```
 
 Se retornar `HTTP 401` ou `403`, conferir o diretório exibido no terminal A, identificar o processo que escuta na porta 8000 e validar que nenhum outro servidor está ligado a um SQLite diferente. **Não executar revoke/restore enquanto STATUS não for PASS.** Apenas depois disso seguir SEC-02/SEC-03 com a UI do Auditor aberta.
+
+
+### 18/10/2026 — AUD-01 / SEC-01: executar cenário de auditoria somente em TEMP
+
+O gate Windows no commit `d591b2f` concluiu **125 Pytest aprovados, 1 ignorado,
+Ruff, 13 arquitetura frontend, TypeScript e build Vite aprovados**.
+`python -m scripts.release_audit_evidence --lab $lab` retornou
+`INCOMPLETE`, com **ciclo de grant PASS, escopo final PASS,
+LIST=0, DETAIL=0 e DENIED=0**. Esse status não representa regressão
+de segurança: faltam os cenários reais do Auditor neste SQLite.
+
+**Executor opcional e explicitamente mutável:**
+`scripts/release_audit_scenarios.py` é diferente do relatório read-only:
+exige `--confirm-synthetic`, verifica o banco 006b4 do diretório TEMP e
+utiliza credenciais sintéticas locais para emitir Bearer via TestClient
+ligado **explicitamente** a `$lab/synthetic.db`. Emite apenas
+`GET /v1/auth/me` para a API real na porta 8000 para comprovar que
+o backend em execução usa esse mesmo banco. Falha de atestação impede
+criar qualquer atendimento de prova. Ele então cria **uma conversa e
+uma mensagem exclusivamente sintéticas** no laboratório, executa LIST
+e DETAIL N1 autorizados (200), tenta LIST e DETAIL N2 (404), verifica
+que as respostas negadas não incluem conteúdo/ID da conversa sintética,
+e checa acréscimos aos diários via `release_audit_evidence.collect`.
+Não imprime tokens, senhas, IDs ou conteúdos. Não precisa alterar grants.
+
+```powershell
+# Primeiro, feche o launcher TEMP anterior (Ctrl+C), faça git fetch + ff-only,
+# rode start.cmd --check; mantenha start.cmd --lab --lab-dir no terminal A.
+$lab = Join-Path $env:TEMP "handoff-qa-006b4-1ohg0707"
+
+# Terminal B, com o backend do mesmo laboratório ativo:
+.\.venv\Scripts\python.exe -m scripts.release_audit_scenarios --lab $lab --confirm-synthetic
+if ($LASTEXITCODE -ne 0) { throw "Cenario sintetico AUD-01/SEC-01 reprovado" }
+
+# Reexecutar a auditoria estritamente read-only:
+.\.venv\Scripts\python.exe -m scripts.release_audit_evidence --lab $lab
+if ($LASTEXITCODE -ne 0) { throw "Auditoria sintetica nao concluida" }
+```
+
+Este executor gera **evidências de API**, não confirma a UI, teclado,
+responsividade ou a segregação visual N1→N2 do navegador. Esses gates
+continuam sujeitos à matriz `docs/qa/PR-028-ui-final-gates.md`.
+
+**Estado:** runner e testes adicionais publicados na branch candidata,
+mas **não foram executados ainda no Windows**. Manter PR Draft e `main`
+intocada até receber evidências.
