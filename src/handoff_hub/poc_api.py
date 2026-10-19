@@ -45,6 +45,7 @@ from handoff_hub.poc_db import (
     utc_now,
 )
 from handoff_hub.provenance_writer import ProvenanceRecorder
+from handoff_hub.queue_lifecycle import require_active
 from handoff_hub.queue_authorization import (
     change_grant,
     granted_queues,
@@ -225,7 +226,8 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
 
     app.include_router(register_identity_endpoints(factory))
     app.include_router(register_admin_overview(factory, authenticate,
-                                               security_audit_enabled=provenance.security_audit_enabled),
+                                               security_audit_enabled=provenance.security_audit_enabled,
+                                               lifecycle_enabled=provenance.queue_lifecycle_enabled),
                        prefix="/v1")
 
     def exclusive_tx(db):
@@ -528,6 +530,7 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
             if (not integration or not queue or integration.operation_id != body.operation_id
                     or queue.operation_id != body.operation_id):
                 raise HTTPException(422, "Operação, integração ou fila inválidas")
+            require_active(db, queue.id, enabled=provenance.queue_lifecycle_enabled)
             h = HandoffSession(**body.model_dump(), idempotency_key=idempotency_key, status="QUEUED")
             db.add(h)
             db.flush()
@@ -562,6 +565,7 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
             queue = db.get(Queue, body.queue_id)
             if not queue or queue.operation_id != body.operation_id:
                 raise HTTPException(404, "Fila não encontrada")
+            require_active(db, queue.id, enabled=provenance.queue_lifecycle_enabled)
             waiting = db.scalar(select(HandoffSession).where(
                 HandoffSession.queue_id == body.queue_id, HandoffSession.status == "QUEUED"
             ).order_by(HandoffSession.created_at, HandoffSession.id).limit(1))
