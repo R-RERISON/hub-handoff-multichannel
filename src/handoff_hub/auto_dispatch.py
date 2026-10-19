@@ -21,8 +21,8 @@ from handoff_hub.poc_db import (
     SessionEvent,
     utc_now,
 )
-from handoff_hub.queue_lifecycle import queue_active
 from handoff_hub.provenance_writer import ProvenanceRecorder
+from handoff_hub.queue_lifecycle import queue_active
 
 OFFER_SECONDS = 120
 DECLINE_COOLDOWN_SECONDS = 120
