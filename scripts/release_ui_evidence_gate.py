@@ -80,7 +80,10 @@ def initialize(lab_dir: str | Path) -> dict:
         target.mkdir(mode=0o700)
     shots = []
     for index, (gate, persona, area, queue, width, height) in enumerate(REQUIRED, 1):
-        name = f"{index:02d}_{gate.replace('-', '')}_{persona}_{area}_{queue or 'all'}_{width}x{height}.png"
+        name = (
+            f"{index:02d}_{gate.replace('-', '')}_{persona}_{area}_"
+            f"{queue or 'all'}_{width}x{height}.png"
+        )
         shots.append({
             "gate": gate, "persona": persona, "area": area, "queue": queue,
             "width": width, "height": height, "file": name,
