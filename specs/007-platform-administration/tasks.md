@@ -17,7 +17,9 @@
   - [ ] T005-A0-QA Executar testes de escopo/RBAC e `start.cmd --check` no SHA final Windows.
   - [x] T005-A1.1 Criar fila ADMIN-only vinculada à operação, com journal transacional e formulário desktop (código/testes versionados, não homologados).
   - [ ] T005-A1.1-QA Executar testes Windows e revisar segurança/UX no SHA da fatia.
-  - [ ] T005-A1.2 Ativar/pausar/arquivar fila com schema versionado aditivo, proteção de intake/dispatcher e rollback.
+  - [x] T005-A1.2 Código de estados, migration opt-in 007a2, guardas e UI desktop versionados.
+  - [ ] T005-A1.2-QA Rodar start.cmd --check em Windows, migration TEMP, RBAC/CAS/dispatcher/transfer, visual desktop.
+  - [ ] T005-A1.2-SEC Revisar SQLite concurrency, journal, rollback e autorização.
 - [ ] T006 B Pessoas, perfis, memberships e grants separados; usar dados sintéticos, verificar autorização e revisar testes.
 - [ ] T007 C Revisão de alterações, auditoria, UX, rollback e documentação; usar dados sintéticos, verificar autorização e revisar testes.
 
