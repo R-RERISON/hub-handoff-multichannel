@@ -24,6 +24,9 @@
   - [x] T006-B0 Código de revalidação de role/operation em transação para membership, capacidade e presença; testes negativos sintéticos escritos.
   - [x] T006-B0-QA Executar start.cmd --check, testes cross-operation/legítimos e revisão independente do diff no Windows (código 49a28ad; 170 passed, 1 skipped; 8 testes B0.1; sem findings no escopo revisado).
   - [ ] T006-B1 Inventário de pessoas/operadores e memberships por fila, API/UI administrativa separada dos grants.
+    - [x] T006-B1.0 GET administrativo de pessoas, contas, operadores e memberships somente leitura, com escopo da operação, testes negativos e componente desktop versionados.
+    - [ ] T006-B1.0-QA Executar gate Windows no SHA final, revisão independente e validação desktop 1366×768 / 1920×1080 / zoom 200%.
+    - [ ] T006-B1.1 Gestão auditada de memberships/capacidade/presença com concorrência, journal e UX confirmada.
   - [ ] T006-B2 Fluxo auditado de concessão/revogação de grants com controle de versão e revogação comprovada.
 - [ ] T007 C Revisão de alterações, auditoria, UX, rollback e documentação; usar dados sintéticos, verificar autorização e revisar testes.
 
