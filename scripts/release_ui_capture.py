@@ -140,7 +140,12 @@ def capture(raw: str | Path, channel: str) -> dict:
     ))
     collected = []
     with sync_playwright() as driver:
-        browser = driver.chromium.launch(channel=channel, headless=False)
+        try:
+            browser = driver.chromium.launch(channel=channel, headless=False)
+        except Exception:
+            raise LabSafetyError(
+                "Browser Edge/Chrome local indisponivel; instale-o ou use --browser"
+            ) from None
         context = None
         last_username = None
         try:
@@ -149,7 +154,8 @@ def capture(raw: str | Path, channel: str) -> dict:
                 file_name = slots[expected]
                 if (not isinstance(file_name, str)
                         or Path(file_name).name != file_name
-                        or not file_name.endswith(".png")):
+                        or not file_name.endswith(".png")
+                        or "/" in file_name or "\\" in file_name):
                     raise LabSafetyError("Nome de imagem invalido no manifesto")
                 output = evidence_dir / file_name
                 if output.is_symlink():
