@@ -20,7 +20,6 @@ from handoff_hub.poc_db import (
 from scripts import lab_environment
 from scripts.release_grant_toggle import bearer
 
-
 KEY = "spec007-b0-lab-only"
 
 
