@@ -249,3 +249,38 @@ test('admin people inventory stays read-only and separate from role grants', () 
   assert.match(people,/Contas de autenticação da operação/)
   assert.doesNotMatch(people,/api\([^)]*,\s*['"](POST|PATCH|DELETE)['"]/)
 })
+
+test('RC-001 G07 keeps notification action visible at 200% zoom', () => {
+  const css = read('src/styles.css')
+  const desk = read('src/OperatorDesk.tsx')
+  assert.match(desk, /className="outline small desk-notification-button"/)
+  assert.match(desk, /Ativar alertas/)
+  assert.doesNotMatch(css,
+    /\.desk-layout--compact \.desk-notification-button\s*\{\s*display:\s*none/)
+  assert.match(css,
+    /@media\(max-width:780px\)\{[\s\S]*?\.desk-layout--compact \.desk-notification-button\s*\{\s*display:inline-flex/)
+  assert.match(css,
+    /\.operator-portal__main \.desk-top\s*\{min-height:0;max-height:none\}/)
+})
+
+test('RC-001 G07 enables keyboard scrolling of all three admin tables', () => {
+  const css = read('src/styles.css')
+  const people = read('src/workspaces/AdminPeople.tsx')
+  const landing = read('src/workspaces/AdminLanding.tsx')
+  const regions = [
+    ['admin-operators-scroll-hint', 'Tabela de operadores e memberships', people],
+    ['admin-accounts-scroll-hint', 'Tabela de contas de autenticação', people],
+    ['admin-queues-scroll-hint', 'Tabela de filas da operação', landing],
+  ]
+  for (const [hintId, label, content] of regions) {
+    assert.ok(content.includes('id="' + hintId + '"'), 'missing hint: ' + hintId)
+    assert.ok(content.includes('aria-label="' + label + '"'), 'missing region: ' + label)
+    assert.ok(content.includes('aria-describedby="' + hintId + '" tabIndex={0}'),
+      'missing keyboard focus: ' + label)
+  }
+  assert.equal((people.match(/tabIndex=\{0\}/g) ?? []).length, 2)
+  assert.equal((landing.match(/tabIndex=\{0\}/g) ?? []).length, 1)
+  assert.match(css, /\.admin-inventory__table-scroll:focus-visible\s*\{/)
+  assert.match(css, /\.admin-inventory__table-scroll\s*\{\s*overflow-x:auto/)
+  assert.match(css, /\.admin-inventory__table table\s*\{min-width:1040px\}/)
+})

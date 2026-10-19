@@ -69,7 +69,12 @@ export default function AdminPeople({api}:{api:Api}){
             placeholder="Nome, identificador ou fila" onChange={e=>setFilter(e.target.value)}/>
         </label>
       </div>
-      <div className="admin-inventory__table-scroll">
+      <p id="admin-operators-scroll-hint" className="admin-inventory__scroll-hint">
+        Tabela com rolagem horizontal: pressione Tab para focar e use as setas para acessar todas as colunas.
+      </p>
+      <div className="admin-inventory__table-scroll" role="region"
+        aria-label="Tabela de operadores e memberships"
+        aria-describedby="admin-operators-scroll-hint" tabIndex={0}>
         <table>
           <caption>Operadores da operação {people.operation.name} ({operators.length} exibidos de {people.operators.length})</caption>
           <thead><tr>
@@ -89,7 +94,12 @@ export default function AdminPeople({api}:{api:Api}){
       </div>
       {operators.length===0&&<p className="admin-inventory__empty">
         Nenhum operador corresponde ao filtro.</p>}
-      <div className="admin-inventory__table-scroll">
+      <p id="admin-accounts-scroll-hint" className="admin-inventory__scroll-hint">
+        Tabela com rolagem horizontal: pressione Tab para focar e use as setas para acessar todas as colunas.
+      </p>
+      <div className="admin-inventory__table-scroll" role="region"
+        aria-label="Tabela de contas de autenticação"
+        aria-describedby="admin-accounts-scroll-hint" tabIndex={0}>
         <table>
           <caption>Contas de autenticação da operação ({people.accounts.length}) — não representam grants</caption>
           <thead><tr>

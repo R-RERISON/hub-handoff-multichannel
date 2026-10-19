@@ -148,7 +148,12 @@ export default function AdminLanding({api}:{api:Api}){
           <p>Estados administrados com versionamento, auditoria e proteção das sessões em andamento.</p></div>
           <span className="admin-inventory__tag"><Shield size={15}/> Dados sem conteúdo de conversas</span>
         </header>
-        <div className="admin-inventory__table-scroll">
+        <p id="admin-queues-scroll-hint" className="admin-inventory__scroll-hint">
+          Tabela com rolagem horizontal: pressione Tab para focar e use as setas para acessar todas as colunas.
+        </p>
+        <div className="admin-inventory__table-scroll" role="region"
+          aria-label="Tabela de filas da operação"
+          aria-describedby="admin-queues-scroll-hint" tabIndex={0}>
           <table>
             <thead><tr><th scope="col">Fila</th><th scope="col">Membros</th>
               <th scope="col">Grants</th><th scope="col">Aguardando</th>
