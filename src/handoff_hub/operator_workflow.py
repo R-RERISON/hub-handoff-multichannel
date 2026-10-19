@@ -26,6 +26,7 @@ from handoff_hub.poc_db import (
     utc_now,
 )
 from handoff_hub.provenance_writer import ProvenanceRecorder
+from handoff_hub.queue_lifecycle import queue_active, require_active
 
 OFFER_SECONDS = 120
 DECLINE_COOLDOWN_SECONDS = 120
@@ -132,6 +133,7 @@ def register_operator_workflow(
             queue = db.get(Queue, body.queue_id)
             if queue is None or queue.operation_id != body.operation_id:
                 raise HTTPException(404, "Fila não encontrada")
+            require_active(db, queue.id, enabled=provenance.queue_lifecycle_enabled)
             waiting = db.scalar(
                 select(HandoffSession)
                 .where(
@@ -303,7 +305,10 @@ def register_operator_workflow(
             return {
                 "session_id": handoff.id,
                 "source_queue_id": handoff.queue_id,
-                "destinations": [{"id": q.id, "name": q.name} for q in destinations],
+                "destinations": [
+                    {"id": q.id, "name": q.name} for q in destinations
+                    if queue_active(db, q.id, enabled=provenance.queue_lifecycle_enabled)
+                ],
             }
 
     @router.post("/handoffs/{handoff_id}/transfer")
@@ -321,6 +326,7 @@ def register_operator_workflow(
                 raise HTTPException(422, "Fila destino inexistente ou de outra operação")
             if queue.id == handoff.queue_id:
                 raise HTTPException(422, "Escolha uma fila de destino diferente da atual")
+            require_active(db, queue.id, enabled=provenance.queue_lifecycle_enabled)
             assert_transition(HandoffStatus.ACTIVE, HandoffStatus.TRANSFER_PENDING)
             assert_transition(HandoffStatus.TRANSFER_PENDING, HandoffStatus.QUEUED)
             transfer = SessionTransfer(

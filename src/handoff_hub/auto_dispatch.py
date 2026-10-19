@@ -22,6 +22,7 @@ from handoff_hub.poc_db import (
     utc_now,
 )
 from handoff_hub.provenance_writer import ProvenanceRecorder
+from handoff_hub.queue_lifecycle import queue_active
 
 OFFER_SECONDS = 120
 DECLINE_COOLDOWN_SECONDS = 120
@@ -73,6 +74,8 @@ def run_dispatch_cycle(factory, provenance: ProvenanceRecorder | None = None) ->
         db.flush()
 
         for queue in db.scalars(select(Queue).order_by(Queue.id)).all():
+            if not queue_active(db, queue.id, enabled=provenance.queue_lifecycle_enabled):
+                continue
             waiting = db.scalars(
                 select(HandoffSession)
                 .where(HandoffSession.queue_id == queue.id,
