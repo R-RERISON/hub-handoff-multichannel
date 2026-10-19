@@ -211,6 +211,7 @@ def capture(raw: str | Path, channel: str) -> dict:
         "present_captures": report["present_captures"],
         "missing_captures": report["missing_captures"],
         "manual_review": "NOT_RUN",
+        "runtime_commit_attested": False,
         "release_approved": False,
         "original_database_touched": False,
     }

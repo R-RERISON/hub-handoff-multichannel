@@ -52,3 +52,13 @@ no SHA final. Registrar resultados de QA, revisão de privacidade e aprovação
 independente. Captura de screenshot NÃO equivale a PASS do gate UX-08.
 
 Nenhum screenshot real foi gerado nesta entrega de código.
+
+## Limite de atestação do SHA
+
+O manifesto verifica o SHA do checkout local que executa o runner e a API
+localhost é atestada contra a identidade/banco TEMP; **não existe ainda
+endpoint confiável de fingerprint do código do processo Vite/FastAPI em execução**.
+O responsável por QA deve encerrar processos antigos, reiniciar o launcher na
+branch e SHA pretendidos e registrar o processo/build real antes de aceitar
+as evidências. O relatório marca runtime_commit_attested=false até prova
+independente. Este script não promove main nem concede PASS visual.
