@@ -224,5 +224,7 @@ preflight, grants parciais para operador multi-fila, capacidade insuficiente
 para ocupação e remoção de membership com atendimento ativo. Todos usaram
 SQLite TEMP; a POC original não foi usada.
 
-Auditoria das mutações de equipe e revisão independente de segurança continuam
-pendentes para B1/B2 e antes da integração. Não houve merge ou promoção à `main`.
+A revisão independente do diff B0.1 não identificou vulnerabilidades no escopo
+revisado. A auditoria transacional das mutações de equipe continua pendente para
+B1/B2; a decisão formal de integração também permanece pendente. Não houve merge
+ou promoção à `main`.

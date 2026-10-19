@@ -1,6 +1,6 @@
 # SPEC-007 / B0 — Boundary de operações, pessoas e membership
 
-**Status:** CODED / B0.1_WINDOWS_QA_PASS / SECURITY_REVIEW_REQUIRED / INTEGRATION_PENDING.
+**Status:** CODED / B0.1_WINDOWS_QA_PASS / B0.1_DIFF_SECURITY_REVIEW_NO_FINDINGS / INTEGRATION_PENDING.
 **Branch:** feat/007b0-people-boundary-hardening, empilhada no
 PR #48 (SPEC-007/A1.2), que teve PASS de código em 6503d30.
 **Modo:** SQLite POC, sem esquema novo, somente laboratório TEMP sintético.
@@ -85,9 +85,10 @@ abaixo da ocupação e remoção de membership com atendimento ativo.
 
 Execução em worktree descartável e fixtures SQLite TEMP; nenhum uso do banco
 original ou teste visual foi necessário para este incremento sem mudança de UI.
-Os eventos administrativos de capacity/presence/membership continuam pendentes
-para B1/B2. A revisão independente de segurança continua obrigatória antes do
-merge; não houve promoção à `main`.
+A revisão independente do diff B0.1 não identificou vulnerabilidades no escopo
+revisado. Os eventos administrativos de capacity/presence/membership continuam
+pendentes para B1/B2; aprovação formal de integração permanece pendente.
+Não houve merge nem promoção à `main`.
 
 ## Fora do escopo B0
 
