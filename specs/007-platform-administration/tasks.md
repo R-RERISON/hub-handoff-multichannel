@@ -21,6 +21,10 @@
   - [ ] T005-A1.2-QA Rodar start.cmd --check em Windows, migration TEMP, RBAC/CAS/dispatcher/transfer, visual desktop.
   - [ ] T005-A1.2-SEC Revisar SQLite concurrency, journal, rollback e autorização.
 - [ ] T006 B Pessoas, perfis, memberships e grants separados; usar dados sintéticos, verificar autorização e revisar testes.
+  - [x] T006-B0 Código de revalidação de role/operation em transação para membership, capacidade e presença; testes negativos sintéticos escritos.
+  - [ ] T006-B0-QA Executar start.cmd --check, testes cross-operation/legítimos e revisão segurança em Windows no SHA específico.
+  - [ ] T006-B1 Inventário de pessoas/operadores e memberships por fila, API/UI administrativa separada dos grants.
+  - [ ] T006-B2 Fluxo auditado de concessão/revogação de grants com controle de versão e revogação comprovada.
 - [ ] T007 C Revisão de alterações, auditoria, UX, rollback e documentação; usar dados sintéticos, verificar autorização e revisar testes.
 
 ## Phase 3 — Gates and closure

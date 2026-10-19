@@ -20,7 +20,7 @@
 ## Vertical slices
 
 1. **A Cadastro de operações/filas, estados e políticas mínimas** — A0 inventário read-only, A1.1 criação auditada via journal 006b4 sem migração, A1.2 lifecycle opt-in 007a2 com CAS, audit trail e proteção de intake/despacho/transferência (PRs pequenos e gates por SHA).
-2. **B Pessoas, perfis, memberships e grants separados** — entregar API/modelo + autorização + testes + UX/documentação pertinente; abrir PR pequeno.
+2. **B Pessoas, perfis, memberships e grants separados** — B0 reforça RBAC e tenancy de rotas de membership/capacidade/presença antes da UI, com testes negativos. B1 inventário e gestão de pessoas/membership; B2 grants/auditoria/revogação. Entregas em PRs pequenos.
 3. **C Revisão de alterações, auditoria, UX, rollback e documentação** — entregar API/modelo + autorização + testes + UX/documentação pertinente; abrir PR pequeno.
 
 ## Risks and decisions to validate
