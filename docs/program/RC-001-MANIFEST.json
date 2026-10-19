@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "RC-001",
+  "date": "2026-10-19",
+  "candidate_branch": "integration/rc-001-consolidated-poc-20261019",
+  "main_base_sha": "7de0e16976ee856280ebb82366380580ccb956a6",
+  "source_branch": "feat/007b1-people-inventory-desktop",
+  "source_sha": "ee0a834a283b4ce60e129185961ef4d1cf8072da",
+  "source_tree_sha": "a11fd096192f006788b3c67b70961f2159037d6c",
+  "method": "single snapshot commit with main parent; no merge to main",
+  "historical_branches_preserved": true,
+  "excluded_diverged_branches": [
+    "spec/006-enterprise-operating-model",
+    "feat/006-queue-scoped-auth-foundation",
+    "feat/006b-migrations-queue-segments"
+  ],
+  "overlay_paths": [
+    "README.md",
+    "docs/program/MASTER-TRACKER.md",
+    "docs/program/RELEASE-GATES.md",
+    "docs/program/RC-001-BASELINE.md",
+    "docs/program/RC-001-QA-MATRIX.md",
+    "docs/program/RC-001-MANIFEST.json"
+  ],
+  "automated_qa": "NOT_RUN",
+  "manual_qa": "NOT_RUN",
+  "review": "PENDING",
+  "user_acceptance": "NOT_RUN",
+  "main_merge": false,
+  "production_ready": false
+}

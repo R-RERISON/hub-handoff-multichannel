@@ -1,0 +1,132 @@
+openapi: 3.1.0
+info:
+  title: Handoff Hub Integration API (PROPOSTA NÃO IMPLEMENTADA)
+  version: 0.1.0-draft
+  description: >
+    Desenho de interface para integradores. Não corresponde à API FastAPI
+    operacional desta fase. Autenticação, autorização, persistência e outbox
+    são gates obrigatórios antes de implementar qualquer rota mutante.
+servers:
+  - url: https://handoff.example.invalid
+security:
+  - bearerAuth: []
+paths:
+  /v1/handoffs:
+    post:
+      operationId: requestHandoff
+      summary: Abrir solicitação de atendimento
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HandoffRequest'
+      responses:
+        '202':
+          description: Solicitação gravada de forma durável
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Handoff'
+        '401': { description: Não autenticado }
+        '403': { description: Operação não autorizada }
+        '409': { description: Solicitação conflitante }
+  /v1/handoffs/{handoff_id}:
+    get:
+      operationId: getHandoff
+      summary: Consultar sessão
+      parameters:
+        - $ref: '#/components/parameters/HandoffId'
+      responses:
+        '200':
+          description: Estado da sessão
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Handoff'
+        '404': { description: Não encontrada ou inacessível }
+  /v1/handoffs/{handoff_id}/messages:
+    post:
+      operationId: ingestMessage
+      summary: Registrar mensagem recebida do adapter
+      parameters:
+        - $ref: '#/components/parameters/HandoffId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InboundMessage'
+      responses:
+        '202': { description: Mensagem gravada na inbox }
+        '403': { description: Integração não autorizada }
+        '409': { description: Mensagem conflitante ou sessão encerrada }
+  /v1/handoffs/{handoff_id}/close:
+    post:
+      operationId: closeHandoff
+      summary: Solicitar encerramento
+      parameters:
+        - $ref: '#/components/parameters/HandoffId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202': { description: Encerramento registrado }
+        '403': { description: Ator não autorizado }
+        '409': { description: Estado incompatível }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    HandoffId:
+      name: handoff_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 128 }
+  schemas:
+    HandoffRequest:
+      type: object
+      additionalProperties: false
+      required: [operation_id, integration_id, external_conversation_id, requester, queue_id]
+      properties:
+        operation_id: { type: string }
+        integration_id: { type: string }
+        external_conversation_id: { type: string }
+        requester:
+          type: object
+          additionalProperties: false
+          required: [external_user_id]
+          properties:
+            external_user_id: { type: string }
+        queue_id: { type: string }
+        context:
+          type: object
+          additionalProperties: true
+    Handoff:
+      type: object
+      required: [id, status]
+      properties:
+        id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [REQUESTED, QUEUED, OFFERED, ACTIVE, TRANSFER_PENDING, WRAP_UP, CLOSED, CANCELLED, ABANDONED, EXPIRED]
+    InboundMessage:
+      type: object
+      additionalProperties: false
+      required: [external_message_id, direction, content]
+      properties:
+        external_message_id: { type: string }
+        direction: { type: string, enum: [USER_TO_OPERATOR, OPERATOR_TO_USER] }
+        content:
+          type: object
+          additionalProperties: true
+        occurred_at: { type: string, format: date-time }
