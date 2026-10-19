@@ -67,6 +67,7 @@ def test_admin_inventory_is_read_only_and_scoped_to_operation(tmp_path, monkeypa
         assert {q["id"] for q in payload["queues"]} == {"n1", "n2"}
         assert payload["capabilities"] == {
             "read_only": True,
+            "queue_create_available": True,
             "queue_lifecycle_available": False,
             "identity_provider": "LOCAL_POC",
         }
