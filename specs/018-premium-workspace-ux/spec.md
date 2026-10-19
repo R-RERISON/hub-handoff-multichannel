@@ -19,14 +19,14 @@
 
 ## User Scenarios & Testing
 
-### User Story 1 — Atender em qualquer viewport suportado (Priority: P1)
+### User Story 1 — Atender com acessibilidade nos viewports desktop suportados (Priority: P1)
 
 Como **operador**, quero responder e transferir sem controles cortados.
 
 **Independent Test**: executar a jornada isolada em ambiente autorizado com dados sintéticos.
 
 **Acceptance Scenarios**:
-1. Dado viewport 390×844, quando abrir a Mesa e uma conversa, então composer e ações essenciais permanecem operáveis sem overflow horizontal.
+1. Dado viewport desktop 1366×768, quando abrir a Mesa e uma conversa, então composer e ações essenciais permanecem operáveis sem overflow horizontal.
 2. Dado teclado sem mouse, quando navega ofertas/transferência, então foco e rótulos de ação são previsíveis.
 
 ### User Story 2 — Entender estados e segurança (Priority: P2)
@@ -51,7 +51,7 @@ Como **supervisor ou auditor**, quero reconhecer lista vazia, autorização revo
 
 - **FR-001**: Criar tokens e componentes compartilhados de tipografia, cores semânticas, espaçamentos, foco, tabelas, formulários, estado vazio/erro e feedback..
 - **FR-002**: Manter shells independentes para Operador, Supervisão, Administração, Auditoria, Monitoria e Laboratório; evitar dashboard genérico sobrecarregado..
-- **FR-003**: Garantir operabilidade por teclado e critérios WCAG 2.2 AA aplicáveis; suporte 390×844, 1366×768 e 1920×1080 com evidência visual..
+- **FR-003**: Garantir operabilidade por teclado e critérios WCAG 2.2 AA aplicáveis; suporte desktop 1366×768 e 1920×1080 com evidência visual..
 - **FR-004**: Limpar cache/estado protegido em logout, revogação e troca de escopo; mascarar dados e não confiar na UI como fronteira de segurança..
 - **FR-005**: Aplicar pesquisa qualitativa de tarefas críticas e regression screenshots sintéticas por portal, sem retroceder UX aprovada..
 
@@ -70,7 +70,7 @@ Como **supervisor ou auditor**, quero reconhecer lista vazia, autorização revo
 
 ### Measurable Outcomes
 
-- **SC-001**: 0 controles essenciais cortados nas três resoluções exigidas.
+- **SC-001**: 0 controles essenciais cortados nas duas resoluções desktop exigidas.
 - **SC-002**: 100% das tarefas críticas testadas por teclado sem bloqueio.
 - **SC-003**: 0 dados protegidos stale após revogação/troca de fila.
 - **SC-004**: 100% dos critérios de aceite com evidência objetiva e revisão de segurança antes de declarar a SPEC aceita.

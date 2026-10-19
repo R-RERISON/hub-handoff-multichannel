@@ -262,7 +262,7 @@ export default function App() {
         <button className="outline" onClick={()=>navigate('/inicio')}>
           <ArrowLeftRight size={15}/> Trocar espaço
         </button><button className="outline" onClick={()=>void logout()}>Sair</button></header>
-      <Routes><Route path="/administracao" element={<AdminLanding/>}/>
+      <Routes><Route path="/administracao" element={<AdminLanding api={api}/>}/>
         <Route path="*" element={<Navigate to="/administracao" replace/>}/></Routes>
     </main>
   </div>

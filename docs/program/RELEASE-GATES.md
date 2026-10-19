@@ -10,13 +10,13 @@
 | `release_probe.py`, AUD-01, SEC-01 | PASS relatado no lab sintético | Não equivale a validação externa | JSON sanitizado e banco/schema TEMP |
 | SEC-02 e SEC-03 UI | PASS relatado (revogação/restauração) | Proteger contra regressão | Evidência da rodada |
 | UX-06 paginação, UX-07 teclado no histórico | PASS relatado | Mantê-los no gate de regressão | Capturas e roteiro |
-| **UX-08**: 390×844, 1366×768, 1920×1080 Histórico + Operador | **BLOCKED** | **Bloqueia main** | Capturas em viewport estável, sem corte/overflow |
+| **UX-08**: 1366×768 e 1920×1080 Histórico + Operador (desktop-only) | **PENDING HUMAN REVIEW** | **Bloqueia main** | Capturas em viewport estável, sem corte/overflow |
 | **UX-02**: Supervisor N1/N2 | **NOT_RUN** | **Bloqueia main** | Evidência isolamentos e papéis |
 | **UX-05**: N1→N2 | **NOT_RUN** na rodada final | **Bloqueia main** | Mensagens e notas internas segregadas |
 | Diff/segredos/concorrência, PRs paralelos | PENDING | **Bloqueia main** | Review de diff integral e pareceres |
 | Decisão formal de promoção | PENDING | **Bloqueia main** | Aprovação/justificativa/rollback e SHA |
 
-**Nota sobre evidência:** valores acima vêm de documentação do próprio PR e não foram executados nesta revisão de portfólio. Não reinterpretar `BLOCKED` como `PASS` por medidas geométricas preliminares.
+**Nota sobre evidência:** valores acima vêm de documentação do próprio PR e não foram executados nesta revisão de portfólio. Não reinterpretar `BLOCKED` como `PASS` por medidas geométricas preliminares. A decisão do Product Owner de 19/10/2026 retirou o suporte mobile do escopo obrigatório; imagens mobile anteriores permanecem inválidas, não aprovadas. O desktop permanece sujeito a revisão de conteúdo e interatividade.
 
 ## 2. Procedimento obrigatório de QA
 
