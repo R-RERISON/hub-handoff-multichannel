@@ -1,6 +1,6 @@
 # Tasks — SPEC-007: Administração de operações, filas, pessoas e permissões
 
-**State**: IN_PROGRESS / A0 CODED — gates locais e aceite ainda pendentes. IDs T001–T010 e subfatia A0.
+**State**: IN_PROGRESS / B0.1 Windows QA PASS; B0.1 diff review sem findings; B1 e integração pendentes. IDs T001–T010.
 **Dependencies**: 006C para desenvolvimento integrado; SPEC-006A/006B para grants e esquema; SPEC-018 para UX
 
 ## Phase 1 — Design and verification
@@ -14,13 +14,17 @@
 
 - [ ] T005 A Cadastro de operações/filas, estados e políticas mínimas; usar dados sintéticos, verificar autorização e revisar testes.
   - [x] T005-A0 API GET administrativa somente leitura e painel de inventário (código versionado; sem claim de teste executado).
-  - [ ] T005-A0-QA Executar testes de escopo/RBAC e `start.cmd --check` no SHA final Windows.
+  - [x] T005-A0-QA Executar testes de escopo/RBAC e `start.cmd --check` no SHA A0 (evidência da rodada registrada).
   - [x] T005-A1.1 Criar fila ADMIN-only vinculada à operação, com journal transacional e formulário desktop (código/testes versionados, não homologados).
-  - [ ] T005-A1.1-QA Executar testes Windows e revisar segurança/UX no SHA da fatia.
+  - [x] T005-A1.1-QA Executar testes Windows e revisar segurança/UX no SHA 8fd9294.
   - [x] T005-A1.2 Código de estados, migration opt-in 007a2, guardas e UI desktop versionados.
-  - [ ] T005-A1.2-QA Rodar start.cmd --check em Windows, migration TEMP, RBAC/CAS/dispatcher/transfer, visual desktop.
+  - [x] T005-A1.2-QA Rodar start.cmd --check em Windows, migration TEMP, RBAC/CAS/dispatcher/transfer, visual desktop (código 6503d30; evidência em setup-one-command.md).
   - [ ] T005-A1.2-SEC Revisar SQLite concurrency, journal, rollback e autorização.
 - [ ] T006 B Pessoas, perfis, memberships e grants separados; usar dados sintéticos, verificar autorização e revisar testes.
+  - [x] T006-B0 Código de revalidação de role/operation em transação para membership, capacidade e presença; testes negativos sintéticos escritos.
+  - [x] T006-B0-QA Executar start.cmd --check, testes cross-operation/legítimos e revisão independente do diff no Windows (código 49a28ad; 170 passed, 1 skipped; 8 testes B0.1; sem findings no escopo revisado).
+  - [ ] T006-B1 Inventário de pessoas/operadores e memberships por fila, API/UI administrativa separada dos grants.
+  - [ ] T006-B2 Fluxo auditado de concessão/revogação de grants com controle de versão e revogação comprovada.
 - [ ] T007 C Revisão de alterações, auditoria, UX, rollback e documentação; usar dados sintéticos, verificar autorização e revisar testes.
 
 ## Phase 3 — Gates and closure

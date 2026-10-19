@@ -208,3 +208,23 @@ PNG verificadas foram preservadas em
 `$env:TEMP\handoff-qa-006b4-air5z1nu\qa-evidence-a1.2`.
 Revisão de segurança e integração continuam pendentes; não houve merge nem
 promoção à `main`.
+
+## Evidência local — SPEC-007/B0.1 — 2026-10-19
+
+Na branch `feat/007b0-people-boundary-hardening`, commit `49a28ad`,
+`.\start.cmd --check` terminou com exit code 0: **170 testes Python aprovados,
+1 ignorado, Ruff, 16 testes de arquitetura frontend, TypeScript e Vite
+(1.601 módulos)**. Os oito testes específicos em
+`tests/test_spec007_people_boundaries.py` passaram.
+
+O ADMIN sintético recebeu HTTP 404 em tentativas cross-operation para
+capacidade, presença e membership, sem alteração ou enumeração dos dados.
+Também passaram os cenários de revogação de sessão e mudança de papel após
+preflight, grants parciais para operador multi-fila, capacidade insuficiente
+para ocupação e remoção de membership com atendimento ativo. Todos usaram
+SQLite TEMP; a POC original não foi usada.
+
+A revisão independente do diff B0.1 não identificou vulnerabilidades no escopo
+revisado. A auditoria transacional das mutações de equipe continua pendente para
+B1/B2; a decisão formal de integração também permanece pendente. Não houve merge
+ou promoção à `main`.

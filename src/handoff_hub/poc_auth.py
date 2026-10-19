@@ -11,6 +11,7 @@ from datetime import UTC, datetime, timedelta
 from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from handoff_hub.poc_db import AuthSession, AuthUser, HandoffSession, LoginThrottle, utc_now
 
@@ -83,6 +84,37 @@ def get_principal(factory, authorization: str | None) -> Principal:
             raise HTTPException(403, "Usuário desativado ou perfil desconhecido")
         return Principal(user.username, user.role, user.operation_id,
                          user.operator_id, user.id, session.id)
+
+
+def revalidate_principal(
+    db: Session, principal: Principal, *, allow_legacy_test: bool = False,
+) -> Principal:
+    if principal.session_id is None:
+        if (
+            allow_legacy_test
+            and principal.username == "legacy-tests"
+            and principal.role == "ADMIN"
+            and principal.operation_id == "demo"
+            and principal.operator_id is None
+            and principal.user_id == "legacy"
+        ):
+            return principal
+        raise HTTPException(401, "Autenticação individual obrigatória")
+    auth_session = db.get(AuthSession, principal.session_id)
+    if (
+        auth_session is None
+        or auth_session.user_id != principal.user_id
+        or auth_session.revoked
+        or auth_session.expires_at <= naive_utc()
+    ):
+        raise HTTPException(401, "Sessão expirada ou revogada")
+    user = db.get(AuthUser, auth_session.user_id)
+    if user is None or not user.is_active or user.role not in ROLES:
+        raise HTTPException(403, "Usuário desativado ou perfil desconhecido")
+    return Principal(
+        user.username, user.role, user.operation_id, user.operator_id,
+        user.id, auth_session.id,
+    )
 
 
 def require_owner(factory, handoff_id: str, operator_id: str) -> None:
