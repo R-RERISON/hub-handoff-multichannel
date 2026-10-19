@@ -12,6 +12,7 @@ import json
 import re
 import struct
 import subprocess
+import zlib
 from pathlib import Path
 
 from scripts.lab_environment import LabSafetyError, validate_lab
@@ -100,21 +101,45 @@ def initialize(lab_dir: str | Path) -> dict:
 
 
 def _file_digest(path: Path, expected: tuple[int, int]) -> str:
+    """Check PNG chunk structure, CRC and viewport dimensions, then hash bytes.
+
+    This validates file integrity, NOT that the browser, identity, login or
+    displayed content is correct. Those remain manual review requirements.
+    """
     if path.is_symlink() or not path.is_file() or path.stat().st_size > 15_000_000:
         raise LabSafetyError("Arquivo de captura invalido, grande ou com symlink")
-    with path.open("rb") as fp:
-        header = fp.read(24)
-    if (len(header) != 24 or header[:8] != PNG_SIGNATURE
-            or header[12:16] != b"IHDR"):
-        raise LabSafetyError("Captura deve ser PNG valido com header IHDR")
-    actual = struct.unpack(">II", header[16:24])
-    if actual != expected:
-        raise LabSafetyError("Dimensao PNG nao corresponde ao viewport declarado")
-    digest = hashlib.sha256()
-    with path.open("rb") as fp:
-        for part in iter(lambda: fp.read(131072), b""):
-            digest.update(part)
-    return digest.hexdigest()
+    data = path.read_bytes()
+    if len(data) < 57 or data[:8] != PNG_SIGNATURE:
+        raise LabSafetyError("Assinatura PNG invalida")
+    index = 8
+    first = True
+    saw_idat = False
+    saw_iend = False
+    while index + 12 <= len(data):
+        length = struct.unpack_from(">I", data, index)[0]
+        if length > 15_000_000 or index + 12 + length > len(data):
+            raise LabSafetyError("Tamanho de chunk PNG invalido")
+        kind = data[index + 4:index + 8]
+        payload = data[index + 8:index + 8 + length]
+        expected_crc = struct.unpack_from(">I", data, index + 8 + length)[0]
+        if zlib.crc32(kind + payload) & 0xffffffff != expected_crc:
+            raise LabSafetyError("Checksum CRC PNG invalido")
+        if first:
+            if kind != b"IHDR" or length != 13:
+                raise LabSafetyError("PNG deve iniciar com IHDR")
+            if struct.unpack(">II", payload[:8]) != expected:
+                raise LabSafetyError("Dimensao PNG nao corresponde ao viewport declarado")
+            first = False
+        if kind == b"IDAT":
+            saw_idat = True
+        if kind == b"IEND":
+            saw_iend = True
+            index += 12 + length
+            break
+        index += 12 + length
+    if not saw_idat or not saw_iend or index != len(data):
+        raise LabSafetyError("PNG sem IDAT/IEND ou com dados extras")
+    return hashlib.sha256(data).hexdigest()
 
 
 def inspect(lab_dir: str | Path) -> dict:

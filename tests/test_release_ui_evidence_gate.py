@@ -1,6 +1,7 @@
 """SPEC-006C screenshot evidence validation: never approves UX automatically."""
 import json
 import struct
+import zlib
 from pathlib import Path
 
 import pytest
@@ -18,10 +19,17 @@ def setup(tmp_path, monkeypatch):
 
 
 def fake_png(path: Path, width: int, height: int, salt: int):
+    """Create a structurally valid synthetic image; it proves NO visual behavior."""
+    def chunk(name, payload):
+        value = zlib.crc32(name + payload) & 0xffffffff
+        return struct.pack(">I", len(payload)) + name + payload + struct.pack(">I", value)
+
+    scanline = b"\x00" + bytes((salt, 0, 0)) * width
     path.write_bytes(
-        gate.PNG_SIGNATURE + struct.pack(">I", 13) + b"IHDR"
-        + struct.pack(">II", width, height) + bytes((8, 2, 0, 0, 0))
-        + b"\x00\x00\x00\x00" + bytes((salt,))
+        gate.PNG_SIGNATURE
+        + chunk(b"IHDR", struct.pack(">II", width, height) + bytes((8, 2, 0, 0, 0)))
+        + chunk(b"IDAT", zlib.compress(scanline * height, level=6))
+        + chunk(b"IEND", b"")
     )
 
 
