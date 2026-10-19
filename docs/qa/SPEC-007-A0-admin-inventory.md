@@ -55,3 +55,11 @@ mutáveis e isolamento da operação. **Não execute testes sobre
 - CRUD de memberships/grants com audit trail transacional, optimistic
   concurrency e UX com confirmação.
 - Testes negativos, revisão segurança/UX, aceite humano.
+
+## Continuidade da SPEC-007
+
+A fatia A0 foi reportada **PASS** em Windows no SHA `86a1438`:
+146 passed, 1 skipped, Ruff, 15 frontend, TypeScript e Vite.
+Sua primeira mutação administrativa foi isolada no PR posterior
+A1.1 `feat/007a1-queue-create-audited`. A0 permanece com o seu SHA
+inalterado, e seu gate PASS não valida automaticamente A1.1.
