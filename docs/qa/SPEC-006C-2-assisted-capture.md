@@ -62,3 +62,38 @@ O responsável por QA deve encerrar processos antigos, reiniciar o launcher na
 branch e SHA pretendidos e registrar o processo/build real antes de aceitar
 as evidências. O relatório marca runtime_commit_attested=false até prova
 independente. Este script não promove main nem concede PASS visual.
+
+## Sequência correta dos gates (lições da rodada 19/10)
+
+A rodada em `37f48af` atestou backend N1/N2 em TEMP, mas não executou
+a etapa de captura; portanto, o `--check` posterior encontrou o pacote
+ausente. **Esse resultado é NOT_RUN visual, não FAIL de layout.**
+
+Ordem para o novo SHA (sempre em worktree/lab descartável):
+
+1. Rodar `start.cmd --check` integral, registrar SHA final.
+2. Iniciar `start.cmd --lab` num TEMP novo e manter API/Vite ativos.
+   Se 8000/5173 estiverem ocupadas, **não encerrar serviços automaticamente**:
+   identificar a origem dos processos, seus responsáveis e obter autorização
+   explícita. Processos podem reiniciar sob gerenciador/supervisão externa.
+3. Executar `release_ui_scope_fixture --lab <TEMP> --confirm-synthetic`
+   **uma vez**, certificando `ux05_n2_operator_ready=PASS`.
+4. Rodar `release_ui_capture --lab <TEMP> --browser msedge`, navegar
+   manualmente aos perfis/filas indicados, fazer login no próprio browser
+   com credenciais descartáveis e completar 11 capturas PNG.
+5. Somente então rodar `release_ui_evidence_gate --lab <TEMP> --check`;
+   o resultado válido é `EVIDENCE_READY_FOR_MANUAL_REVIEW`, não PASS UX.
+6. Revisar as evidências antes de removê-las: perfis efetivos,
+   conteúdo e notas restritas, responsividade e interações por teclado.
+   Registrar SHA, browser, dados sintéticos e decisão de cada gate.
+
+Para UX-05 a Mesa N2 deve ser acessada como `bruno.demo`; após o fixture,
+a sessão estará `ACTIVE` por aceite real na fila N2. A atribuição de
+Ana em N1 continua sendo uma **precondição sintética**, não uma prova de
+aceite N1. Não reutilizar o mesmo banco TEMP para rodar o fixture uma
+segunda vez, pois a capacidade do operador N2 já estará ocupada.
+
+Os screenshots são apenas **arquivos locais no TEMP**: o runner não os
+publica nem faz sanitização automática. A revisão humana continua
+obrigatória, e a existência de PNG não comprova o SHA do processo web
+em execução; conferir que o launcher foi reiniciado do checkout correto.
