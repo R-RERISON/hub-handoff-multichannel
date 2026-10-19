@@ -866,3 +866,39 @@ body{background:var(--hub-bg)}
   .verified-history-layout .history-sidebar{min-height:220px;max-height:320px}
   .verified-history-layout .history-details{min-height:350px;max-height:none}
 }
+
+
+/* SPEC-007/A0 — Desktop-first, authorized administration inventory. */
+.admin-inventory__status{display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:12px}
+.admin-inventory__status>span,.admin-inventory__tag{display:inline-flex;align-items:center;gap:7px;
+  color:#345c79;font-size:12px;font-weight:700}
+.admin-inventory__feedback{padding:20px;color:#355673}
+.admin-inventory__operation{display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:14px;padding:24px}
+.admin-inventory__operation h3{margin:8px 0;color:#193b56;font-size:19px}
+.admin-inventory__operation small{color:#617c95}
+.admin-inventory__metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.admin-inventory__metric{padding:18px;min-width:0;display:flex;flex-direction:column;gap:8px}
+.admin-inventory__metric span{font-size:11px;color:#637f96;font-weight:700}
+.admin-inventory__metric strong{font-size:24px;color:#183a58;font-variant-numeric:tabular-nums}
+.admin-inventory__table{overflow:hidden}
+.admin-inventory__table>header{display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:12px;padding:18px 20px;border-bottom:1px solid #e3ebf2}
+.admin-inventory__table h3{margin:5px 0;font-size:17px;color:#1e415e}
+.admin-inventory__table p{margin:0;font-size:12px;color:#657f96}
+.admin-inventory__table-scroll{overflow-x:auto;max-width:100%}
+.admin-inventory__table table{border-collapse:collapse;width:100%;min-width:760px}
+.admin-inventory__table th,.admin-inventory__table td{padding:14px 17px;text-align:left;
+  border-bottom:1px solid #e5edf4;font-size:12px;color:#365c7b}
+.admin-inventory__table thead th{background:#f5f9fc;white-space:nowrap;font-size:11px}
+.admin-inventory__table tbody th strong{display:block;color:#153e5f}
+.admin-inventory__table tbody th small{display:block;margin-top:4px;color:#748ca0}
+.admin-inventory__table tbody tr:last-child>*{border-bottom:0}
+.admin-inventory__empty{padding:18px}
+.admin-inventory__next{display:flex;align-items:flex-start;gap:12px;padding:17px 20px;
+  color:#446783;font-size:12px}
+.admin-inventory__next strong{display:block;color:#254c6d}
+.admin-inventory__next p{margin:4px 0 0;line-height:1.5}
+@media(max-width:1200px){.admin-inventory__metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:850px){.admin-inventory__metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}

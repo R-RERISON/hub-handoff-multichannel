@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
+from handoff_hub.admin_overview import register_admin_overview
 from handoff_hub.auto_dispatch import run_dispatch_cycle
 from handoff_hub.demo_routing import DEFAULT_INTAKE_QUEUE_ID, configure_demo_routing
 from handoff_hub.operator_workflow import register_operator_workflow
@@ -223,6 +224,7 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
         return principal
 
     app.include_router(register_identity_endpoints(factory))
+    app.include_router(register_admin_overview(factory, authenticate), prefix="/v1")
 
     def exclusive_tx(db):
         """SQLite writer lock. Do not reuse this locking syntax in SQL Server."""
