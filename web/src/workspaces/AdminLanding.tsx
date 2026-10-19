@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { ArrowUpRight, CheckCircle2, LockKeyhole, Plus, RefreshCw, ServerCog, Shield } from 'lucide-react'
 import type { Api } from './types'
+import AdminPeople from './AdminPeople'
 
 type QueueRow = {
   id:string
@@ -194,8 +195,9 @@ export default function AdminLanding({api}:{api:Api}){
       {transitionError&&<p role="alert" className="admin-inventory__error">{transitionError}</p>}
       {transitionNotice&&<p role="status" className="admin-inventory__success">{transitionNotice}</p>}
     </>}
+    <AdminPeople api={api}/>
     <section className="panel admin-inventory__next">
-      <ArrowUpRight size={18}/><div><strong>Próximo incremento: políticas e governança de filas</strong>
+      <ArrowUpRight size={18}/><div><strong>Próximo incremento: gestão auditada de memberships e grants</strong>
         <p>Ciclo de vida protegido quando o schema 007a2 está habilitado.
           Próximas etapas: memberships, grants e políticas de roteamento.</p></div>
     </section>

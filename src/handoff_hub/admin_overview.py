@@ -125,6 +125,83 @@ def register_admin_overview(
                 },
             }
 
+
+    @router.get("/admin/people", dependencies=[Depends(authenticate)])
+    def people(request: Request):
+        """B1.0: read-only identity/operator/membership projection for one operation."""
+        principal = request.state.principal
+        if principal.role != "ADMIN":
+            raise HTTPException(403, "Inventario de pessoas exige ADMIN")
+        with factory() as db:
+            operation = db.get(Operation, principal.operation_id)
+            if operation is None:
+                raise HTTPException(404, "Operacao indisponivel")
+            operators = db.scalars(
+                select(Operator)
+                .where(Operator.operation_id == principal.operation_id)
+                .order_by(Operator.name, Operator.id)
+            ).all()
+            operator_ids = {operator.id for operator in operators}
+            memberships = defaultdict(list)
+            for operator_id, queue_id, queue_name in db.execute(
+                select(QueueMembership.operator_id, Queue.id, Queue.name)
+                .join(Queue, Queue.id == QueueMembership.queue_id)
+                .join(Operator, Operator.id == QueueMembership.operator_id)
+                .where(
+                    Queue.operation_id == principal.operation_id,
+                    Operator.operation_id == principal.operation_id,
+                )
+                .order_by(Operator.id, Queue.name, Queue.id)
+            ):
+                memberships[operator_id].append({
+                    "queue_id": queue_id,
+                    "queue_name": queue_name,
+                })
+            occupancy = defaultdict(dict)
+            for operator_id, status, count in db.execute(
+                select(HandoffSession.operator_id, HandoffSession.status, func.count())
+                .where(
+                    HandoffSession.operation_id == principal.operation_id,
+                    HandoffSession.operator_id.in_(operator_ids),
+                    HandoffSession.status.in_(("ACTIVE", "OFFERED")),
+                )
+                .group_by(HandoffSession.operator_id, HandoffSession.status)
+            ):
+                occupancy[operator_id][status] = count
+            accounts = db.scalars(
+                select(AuthUser)
+                .where(AuthUser.operation_id == principal.operation_id)
+                .order_by(AuthUser.username, AuthUser.id)
+            ).all()
+            return {
+                "operation": {"id": operation.id, "name": operation.name},
+                "operators": [{
+                    "id": operator.id,
+                    "name": operator.name,
+                    "presence": operator.presence,
+                    "capacity": operator.capacity,
+                    "active": occupancy[operator.id].get("ACTIVE", 0),
+                    "offered": occupancy[operator.id].get("OFFERED", 0),
+                    "memberships": memberships[operator.id],
+                } for operator in operators],
+                "accounts": [{
+                    "id": account.id,
+                    "username": account.username,
+                    "role": account.role,
+                    "is_active": account.is_active,
+                    "operator_id": (
+                        account.operator_id if account.operator_id in operator_ids
+                        else None
+                    ),
+                } for account in accounts],
+                "capabilities": {
+                    "read_only": True,
+                    "membership_write_available": False,
+                    "grant_write_available": False,
+                    "identity_provider": "LOCAL_POC",
+                },
+            }
+
     @router.post("/admin/queues", status_code=201, dependencies=[Depends(authenticate)])
     def create_queue(request: Request, body: NewQueue):
         principal = request.state.principal
