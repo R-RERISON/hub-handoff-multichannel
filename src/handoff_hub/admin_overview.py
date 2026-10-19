@@ -8,7 +8,9 @@ from __future__ import annotations
 from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 
 from handoff_hub.poc_db import (
     AuthUser,
@@ -19,9 +21,22 @@ from handoff_hub.poc_db import (
     QueueMembership,
     QueueRoleGrant,
 )
+from handoff_hub.security_writer import record_security_decision
 
 
-def register_admin_overview(factory, authenticate) -> APIRouter:
+class NewQueue(BaseModel):
+    id: str = Field(pattern=r"^[a-z][a-z0-9-]{1,39}$", max_length=40)
+    name: str = Field(min_length=3, max_length=120)
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, name: str) -> str:
+        if name != name.strip() or any(ord(c) < 32 for c in name):
+            raise ValueError("Nome deve ser legivel e sem espacos nas extremidades")
+        return name
+
+
+def register_admin_overview(factory, authenticate, *, security_audit_enabled: bool) -> APIRouter:
     router = APIRouter()
 
     @router.get("/admin/overview", dependencies=[Depends(authenticate)])
@@ -92,9 +107,41 @@ def register_admin_overview(factory, authenticate) -> APIRouter:
                 "queues": rows,
                 "capabilities": {
                     "read_only": True,
+                    "queue_create_available": security_audit_enabled,
                     "queue_lifecycle_available": False,
                     "identity_provider": "LOCAL_POC",
                 },
             }
+
+    @router.post("/admin/queues", status_code=201, dependencies=[Depends(authenticate)])
+    def create_queue(request: Request, body: NewQueue):
+        principal = request.state.principal
+        if principal.role != "ADMIN":
+            raise HTTPException(403, "Cadastro de filas exige ADMIN")
+        if not security_audit_enabled:
+            raise HTTPException(503, "Cadastro indisponivel sem auditoria 006b4")
+        try:
+            with factory() as db:
+                # SQLite POC: one writer owns ID check, insert and journal.
+                db.connection().exec_driver_sql("BEGIN IMMEDIATE")
+                if db.get(Operation, principal.operation_id) is None:
+                    raise HTTPException(404, "Operacao indisponivel")
+                if db.get(Queue, body.id) is not None:
+                    raise HTTPException(409, "Identificador de fila indisponivel")
+                queue = Queue(
+                    id=body.id, operation_id=principal.operation_id, name=body.name,
+                )
+                db.add(queue)
+                db.flush()
+                record_security_decision(
+                    db, principal, action="QUEUE_CREATED",
+                    outcome="APPLIED", queue_id=queue.id,
+                )
+                db.commit()
+                return {"id": queue.id, "name": queue.name,
+                        "operation_id": principal.operation_id,
+                        "audit": "APPLIED"}
+        except IntegrityError as exc:
+            raise HTTPException(409, "Cadastro de fila em conflito") from exc
 
     return router

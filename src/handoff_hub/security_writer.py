@@ -19,7 +19,7 @@ from handoff_hub.security_schema import SECURITY_DECISIONS
 LOGGER = logging.getLogger("handoff.security")
 ACTIONS = frozenset({
     "HISTORY_LIST_DENIED", "HISTORY_DETAIL_DENIED",
-    "GRANT_ENABLED", "GRANT_REVOKED",
+    "GRANT_ENABLED", "GRANT_REVOKED", "QUEUE_CREATED",
 })
 
 
