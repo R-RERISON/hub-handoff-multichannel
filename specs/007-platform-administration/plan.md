@@ -19,7 +19,7 @@
 
 ## Vertical slices
 
-1. **A Cadastro de operações/filas, estados e políticas mínimas** — A0 inventário read-only, A1.1 criação auditada via journal 006b4 sem migração, A1.2 lifecycle versionado e proteção de intake/despacho (PRs pequenos e gates por SHA).
+1. **A Cadastro de operações/filas, estados e políticas mínimas** — A0 inventário read-only, A1.1 criação auditada via journal 006b4 sem migração, A1.2 lifecycle opt-in 007a2 com CAS, audit trail e proteção de intake/despacho/transferência (PRs pequenos e gates por SHA).
 2. **B Pessoas, perfis, memberships e grants separados** — entregar API/modelo + autorização + testes + UX/documentação pertinente; abrir PR pequeno.
 3. **C Revisão de alterações, auditoria, UX, rollback e documentação** — entregar API/modelo + autorização + testes + UX/documentação pertinente; abrir PR pequeno.
 

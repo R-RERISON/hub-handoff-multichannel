@@ -23,6 +23,7 @@ from sqlalchemy.engine import URL
 from handoff_hub.audit_schema import HISTORY_ACCESS_AUDIT
 from handoff_hub.poc_db import Base
 from handoff_hub.provenance_schema import PROVENANCE_TABLES
+from handoff_hub.queue_lifecycle_schema import LIFECYCLE_REVISION, LIFECYCLE_TABLES
 from handoff_hub.security_schema import SECURITY_DECISIONS
 
 BASELINE_REVISION = "006b1_poc_baseline"
@@ -73,16 +74,20 @@ def verify_database(path: Path) -> dict:
             rows = db.execute("SELECT version_num FROM alembic_version").fetchall()
             if len(rows) != 1 or rows[0][0] not in (
                 BASELINE_REVISION, PROVENANCE_REVISION, AUDIT_REVISION, SECURITY_REVISION,
+                LIFECYCLE_REVISION,
             ):
                 raise SchemaSafetyError("Unexpected Alembic revision: manual review required")
             version = rows[0][0]
         signature_tables = list(Base.metadata.sorted_tables)
-        if version in (PROVENANCE_REVISION, AUDIT_REVISION, SECURITY_REVISION):
+        if version in (PROVENANCE_REVISION, AUDIT_REVISION, SECURITY_REVISION,
+                       LIFECYCLE_REVISION):
             signature_tables.extend(PROVENANCE_TABLES)
-        if version in (AUDIT_REVISION, SECURITY_REVISION):
+        if version in (AUDIT_REVISION, SECURITY_REVISION, LIFECYCLE_REVISION):
             signature_tables.append(HISTORY_ACCESS_AUDIT)
-        if version == SECURITY_REVISION:
+        if version in (SECURITY_REVISION, LIFECYCLE_REVISION):
             signature_tables.append(SECURITY_DECISIONS)
+        if version == LIFECYCLE_REVISION:
+            signature_tables.extend(LIFECYCLE_TABLES)
         expected_tables = {table.name for table in signature_tables}
         if actual_tables != expected_tables:
             missing = sorted(expected_tables - actual_tables)
@@ -319,13 +324,50 @@ def upgrade_security_existing(database: Path, backup_dir: Path, *, confirmed: bo
     }
 
 
+def upgrade_lifecycle_existing(database: Path, backup_dir: Path,
+                               *, confirmed: bool) -> dict:
+    """Explicit offline 006b4 -> 007a2 after backup and strict schema checks."""
+    if not confirmed:
+        raise SchemaSafetyError("Explicit --confirm-offline is required")
+    if database.resolve() == DEFAULT_DB.resolve():
+        raise SchemaSafetyError("Lifecycle upgrade refuses the original POC database")
+    before = verify_database(database)
+    if before["revision"] != SECURITY_REVISION:
+        raise SchemaSafetyError("Lifecycle upgrade requires verified 006b4 revision")
+    backup_path, digest = verified_backup(database, backup_dir)
+    try:
+        command.upgrade(_config(database), LIFECYCLE_REVISION)
+        after = verify_database(database)
+        if after["revision"] != LIFECYCLE_REVISION:
+            raise SchemaSafetyError("Lifecycle upgrade revision mismatch")
+        if any(after["row_counts"].get(name) != count
+               for name, count in before["row_counts"].items()):
+            raise SchemaSafetyError("Lifecycle upgrade changed preexisting rows")
+        if any(after["row_counts"][table.name] != 0 for table in LIFECYCLE_TABLES):
+            raise SchemaSafetyError("Lifecycle tables must start empty")
+    except Exception as exc:
+        raise SchemaSafetyError(
+            f"Lifecycle upgrade failed: preserve backup {backup_path}; "
+            f"original error: {exc}"
+        ) from exc
+    return {
+        "action": "lifecycle_upgraded",
+        "revision": LIFECYCLE_REVISION,
+        "backup": str(backup_path),
+        "backup_sha256": digest,
+        "preserved_rows": before["row_counts"],
+        "lifecycle_tables_empty": True,
+    }
+
+
 def create_new(database: Path, *, confirmed: bool) -> dict:
     if not confirmed:
         raise SchemaSafetyError("Explicit --confirm-offline is required")
     if database.exists():
         raise SchemaSafetyError("Refusing to overwrite an existing database")
     database.parent.mkdir(parents=True, exist_ok=True)
-    command.upgrade(_config(database), "head")
+    # Preserve fresh-lab 006b4 semantics; opt-in 007a2 is separate.
+    command.upgrade(_config(database), SECURITY_REVISION)
     outcome = verify_database(database)
     if outcome["revision"] != LATEST_REVISION:
         raise SchemaSafetyError("New database failed schema verification")
@@ -341,7 +383,8 @@ def main(argv: list[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="action", required=True)
     subparsers.add_parser("inspect", help="Read-only strict schema verification")
     subparsers.add_parser("backup", help="Consistent verified SQLite backup")
-    for action in ("adopt", "create", "upgrade", "upgrade-audit", "upgrade-security"):
+    for action in ("adopt", "create", "upgrade", "upgrade-audit", "upgrade-security",
+                   "upgrade-lifecycle"):
         subparsers.add_parser(action).add_argument(
             "--confirm-offline", action="store_true",
             help="I confirm API, Vite and dispatcher are stopped",
@@ -365,6 +408,10 @@ def main(argv: list[str] | None = None) -> int:
         elif args.action == "upgrade-security":
             result = upgrade_security_existing(args.database, args.backup_dir,
                                                confirmed=args.confirm_offline)
+        elif args.action == "upgrade-lifecycle":
+            result = upgrade_lifecycle_existing(
+                args.database, args.backup_dir, confirmed=args.confirm_offline,
+            )
         else:
             result = create_new(args.database, confirmed=args.confirm_offline)
         print(json.dumps(result, indent=2, ensure_ascii=False))

@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from handoff_hub.poc_db import make_session_factory
+from handoff_hub.queue_lifecycle_schema import LIFECYCLE_REVISION, LIFECYCLE_TABLES
 from handoff_hub.schema_admin import SECURITY_REVISION, create_new, verify_database
 from handoff_hub.seed_demo_auth import provision
 
@@ -20,6 +21,10 @@ LAB_PREFIX = "handoff-qa-006b4-"
 EXPECTED_TABLES = 22
 EXPECTED_ACCOUNTS = 5
 EXPECTED_QUEUES = 2
+SUPPORTED_LAB_TABLE_COUNTS = {
+    SECURITY_REVISION: EXPECTED_TABLES,
+    LIFECYCLE_REVISION: EXPECTED_TABLES + len(LIFECYCLE_TABLES),
+}
 
 
 class LabSafetyError(RuntimeError):
@@ -53,7 +58,7 @@ def validate_lab_dir(raw: str | Path) -> Path:
 
 
 def validate_lab(raw: str | Path) -> LabEnvironment:
-    """Inspect an existing 006b4 lab without seed, migration or file mutation."""
+    """Inspect an existing 006b4 or explicitly upgraded 007a2 lab read-only."""
     directory = validate_lab_dir(raw)
     database = directory / "synthetic.db"
     credentials = directory / "synthetic-credentials.txt"
@@ -63,14 +68,17 @@ def validate_lab(raw: str | Path) -> LabEnvironment:
     ):
         raise LabSafetyError("Synthetic SQLite/credentials missing or linked outside TEMP")
     state = verify_database(database)
+    expected_tables = SUPPORTED_LAB_TABLE_COUNTS.get(state["revision"])
     if (
         state["integrity"] != "ok"
-        or state["revision"] != SECURITY_REVISION
-        or state["table_count"] != EXPECTED_TABLES
+        or expected_tables is None
+        or state["table_count"] != expected_tables
         or state["row_counts"]["auth_users"] != EXPECTED_ACCOUNTS
-        or state["row_counts"]["queues"] != EXPECTED_QUEUES
+        or state["row_counts"]["queues"] < EXPECTED_QUEUES
     ):
-        raise LabSafetyError("Existing laboratory is not the expected seeded 006b4 DB")
+        raise LabSafetyError(
+            "Existing laboratory must be seeded 006b4 or explicitly migrated 007a2"
+        )
     return LabEnvironment(directory, database, credentials, created=False)
 
 

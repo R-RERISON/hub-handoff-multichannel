@@ -6,6 +6,7 @@ No conversation content, bearer credentials or audit payloads are returned.
 from __future__ import annotations
 
 from collections import defaultdict
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
@@ -21,6 +22,7 @@ from handoff_hub.poc_db import (
     QueueMembership,
     QueueRoleGrant,
 )
+from handoff_hub.queue_lifecycle import change_state, create_draft, queue_state
 from handoff_hub.security_writer import record_security_decision
 
 
@@ -36,7 +38,15 @@ class NewQueue(BaseModel):
         return name
 
 
-def register_admin_overview(factory, authenticate, *, security_audit_enabled: bool) -> APIRouter:
+class StateChange(BaseModel):
+    state: Literal["ACTIVE", "PAUSED", "ARCHIVED"]
+    expected_version: int = Field(ge=0)
+
+
+def register_admin_overview(
+    factory, authenticate, *, security_audit_enabled: bool,
+    lifecycle_enabled: bool = False,
+) -> APIRouter:
     router = APIRouter()
 
     @router.get("/admin/overview", dependencies=[Depends(authenticate)])
@@ -83,6 +93,8 @@ def register_admin_overview(factory, authenticate, *, security_audit_enabled: bo
                     "offered": statuses.get("OFFERED", 0),
                     "active": statuses.get("ACTIVE", 0),
                     "total_sessions": sum(statuses.values()),
+                    "lifecycle_state": queue_state(db, queue.id, enabled=lifecycle_enabled)[0],
+                    "lifecycle_version": queue_state(db, queue.id, enabled=lifecycle_enabled)[1],
                 })
             operators = db.scalar(
                 select(func.count()).select_from(Operator)
@@ -108,7 +120,7 @@ def register_admin_overview(factory, authenticate, *, security_audit_enabled: bo
                 "capabilities": {
                     "read_only": True,
                     "queue_create_available": security_audit_enabled,
-                    "queue_lifecycle_available": False,
+                    "queue_lifecycle_available": lifecycle_enabled,
                     "identity_provider": "LOCAL_POC",
                 },
             }
@@ -138,6 +150,10 @@ def register_admin_overview(factory, authenticate, *, security_audit_enabled: bo
                         db, principal, action="QUEUE_CREATED",
                         outcome="APPLIED", queue_id=queue.id,
                     )
+                    create_draft(
+                        db, queue.id, principal.operation_id, principal.user_id,
+                        enabled=lifecycle_enabled,
+                    )
                 except SQLAlchemyError as exc:
                     # The queue INSERT must roll back with the failed journal.
                     raise HTTPException(
@@ -149,5 +165,31 @@ def register_admin_overview(factory, authenticate, *, security_audit_enabled: bo
                         "audit": "APPLIED"}
         except IntegrityError as exc:
             raise HTTPException(409, "Cadastro de fila em conflito") from exc
+
+    @router.patch("/admin/queues/{queue_id}/state",
+                  dependencies=[Depends(authenticate)])
+    def update_queue_state(request: Request, queue_id: str, body: StateChange):
+        principal = request.state.principal
+        if principal.role != "ADMIN":
+            raise HTTPException(403, "Alteracao de fila exige ADMIN")
+        if not lifecycle_enabled or not security_audit_enabled:
+            raise HTTPException(503, "Ciclo de vida exige schema 007a2")
+        try:
+            with factory() as db:
+                db.connection().exec_driver_sql("BEGIN IMMEDIATE")
+                queue = db.get(Queue, queue_id)
+                if queue is None or queue.operation_id != principal.operation_id:
+                    raise HTTPException(404, "Fila nao encontrada")
+                try:
+                    response = change_state(
+                        db, queue.id, principal.operation_id, principal.user_id,
+                        body.state, body.expected_version,
+                    )
+                except SQLAlchemyError as exc:
+                    raise HTTPException(503, "Auditoria do estado indisponivel") from exc
+                db.commit()
+                return response
+        except IntegrityError as exc:
+            raise HTTPException(503, "Transicao nao persistida") from exc
 
     return router

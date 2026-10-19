@@ -920,3 +920,24 @@ body{background:var(--hub-bg)}
 .admin-inventory__success{color:#20694d!important}
 @media(max-width:1000px){.admin-inventory__create-fields{grid-template-columns:1fr 1fr}
 .admin-inventory__create-fields button{grid-column:1/-1;justify-content:center}}
+
+/* SPEC-007/A1.2 — Desktop state machine controls */
+.admin-inventory__table table{min-width:1040px}
+.admin-inventory__state{display:inline-block;border-radius:6px;padding:5px 8px;
+ font-size:10px;font-weight:800;letter-spacing:.04em;background:#eaf3ff;color:#245d8b}
+.admin-inventory__state--active{background:#e5f7ee;color:#1c6a4a}
+.admin-inventory__state--paused{background:#fff0da;color:#91571b}
+.admin-inventory__state--archived{background:#e7ecf0;color:#657482}
+.admin-inventory__state-actions{display:flex;gap:7px;flex-wrap:wrap}
+.admin-inventory__state-actions button{border:1px solid #bdd4e6;border-radius:6px;
+ background:#f7fbff;color:#235f89;padding:6px 9px;font-size:11px;cursor:pointer}
+.admin-inventory__state-actions button:focus-visible,
+.admin-inventory__confirm button:focus-visible{outline:3px solid #80b8ed;outline-offset:2px}
+.admin-inventory__state-actions button:disabled{opacity:.5;cursor:not-allowed}
+.admin-inventory__confirm{padding:20px;display:flex;align-items:center;
+ justify-content:space-between;gap:20px;flex-wrap:wrap}
+.admin-inventory__confirm strong{color:#143d5f;font-size:14px}
+.admin-inventory__confirm p{font-size:12px;color:#6a8195;max-width:660px;margin:6px 0 0}
+.admin-inventory__confirm-buttons{display:flex;gap:10px;align-items:center}
+.admin-inventory__confirm-buttons button{min-height:36px;padding:7px 12px;
+ border-radius:7px;border:1px solid #b9d0e3;cursor:pointer}

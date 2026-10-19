@@ -8,6 +8,12 @@ from types import SimpleNamespace
 
 import pytest
 
+from handoff_hub.queue_lifecycle_schema import LIFECYCLE_REVISION
+from handoff_hub.schema_admin import (
+    SECURITY_REVISION,
+    upgrade_lifecycle_existing,
+    verify_database,
+)
 from scripts import dev
 from scripts import lab_environment as lab
 
@@ -20,7 +26,6 @@ def test_disposable_lab_is_created_and_reused_without_reset(tmp_path, monkeypatc
     assert created.credentials.is_file()
     original_credentials = created.credentials.read_bytes()
     original_bytes = created.database.stat().st_size
-    from handoff_hub.schema_admin import SECURITY_REVISION, verify_database
 
     state = verify_database(created.database)
     assert state["revision"] == SECURITY_REVISION
@@ -32,6 +37,30 @@ def test_disposable_lab_is_created_and_reused_without_reset(tmp_path, monkeypatc
     assert resumed.database_url == created.database_url
     assert resumed.credentials.read_bytes() == original_credentials
     assert resumed.database.stat().st_size == original_bytes
+
+
+def test_lifecycle_lab_resumes_after_explicit_upgrade_without_mutation(
+    tmp_path, monkeypatch,
+):
+    monkeypatch.setattr(lab.tempfile, "gettempdir", lambda: str(tmp_path))
+    created = lab.prepare_lab()
+    original_credentials = created.credentials.read_bytes()
+    upgrade = upgrade_lifecycle_existing(
+        created.database, tmp_path / "schema-backups", confirmed=True,
+    )
+    assert upgrade["revision"] == LIFECYCLE_REVISION
+    assert upgrade["lifecycle_tables_empty"] is True
+    before_resume = verify_database(created.database)
+    original_database = created.database.read_bytes()
+
+    resumed = lab.validate_lab(created.directory)
+
+    assert resumed.created is False
+    assert resumed.database_url == created.database_url
+    assert resumed.credentials.read_bytes() == original_credentials
+    assert created.database.read_bytes() == original_database
+    assert verify_database(created.database) == before_resume
+    assert before_resume["revision"] == LIFECYCLE_REVISION
 
 
 def test_lab_refuses_non_temp_directories_and_dangling_files(tmp_path, monkeypatch):

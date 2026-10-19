@@ -53,8 +53,11 @@ e grants, copie o diretório mostrado ao inicializar:
 O nome entre `<id>` é um exemplo; substitua pelo diretório real.
 `--lab-dir` **não** cria, reseta ou migra banco algum. O utilitário recusa
 qualquer caminho que não seja diretório `handoff-qa-006b4-*` filho direto de
-`$env:TEMP`, qualquer SQLite sem revisão 006b4/22 tabelas/5 identidades/2 filas
-e symlinks para arquivos externos.
+`$env:TEMP`, symlinks para arquivos externos, e esquemas que não sejam um
+laboratório semeado 006b4 (22 tabelas) ou um laboratório migrado explicitamente
+para 007a2 (24 tabelas), ambos com cinco identidades e pelo menos duas filas.
+Laboratórios novos continuam fixados em 006b4; só o comando offline
+`upgrade-lifecycle --confirm-offline` os promove para 007a2.
 
 Abra `synthetic-credentials.txt` localmente em um editor, sem publicá-lo.
 O launcher não aceita chave de API compartilhada no runtime do laboratório.
@@ -183,3 +186,25 @@ são criadas somente na primeira inicialização de cada diretório TEMP.
   o diretório de testes manualmente ao concluir a homologação e encerrar processos.
 - `docs/qa/PR-028-release-acceptance.md` contém os gates UX, RBAC e auditoria para
   consolidação na `main`. PR #28 permanece Draft até homologação.
+
+## Evidência local — SPEC-007/A1.2 — 2026-10-19
+
+Na branch `feat/007a2-queue-lifecycle`, commit `6503d30`, `.\start.cmd --check`
+terminou com exit code 0: **162 testes Python aprovados, 1 ignorado, Ruff,
+16 testes de arquitetura frontend, TypeScript e Vite (1.601 módulos)**.
+Os oito testes específicos do ciclo de vida passaram; o teste novo de retomada
+confirma que `--lab-dir` reabre um 007a2 validado sem alterar o SQLite.
+
+A migração offline do laboratório TEMP preservou todas as contagens 006b4,
+criou as tabelas de ciclo de vida vazias e validou o backup antes do upgrade.
+Depois, a Mesa Administrativa criou uma fila sintética e percorreu
+DRAFT → ACTIVE → PAUSED → ARCHIVED, com quatro eventos auditados, sem
+memberships/grants automáticos. O mesmo laboratório foi encerrado e retomado
+com o histórico persistido.
+
+O navegador integrado foi verificado em 1366×768 e 1920×1080, sem overflow
+horizontal; o foco por Tab alcançou a confirmação da transição. As capturas
+PNG verificadas foram preservadas em
+`$env:TEMP\handoff-qa-006b4-air5z1nu\qa-evidence-a1.2`.
+Revisão de segurança e integração continuam pendentes; não houve merge nem
+promoção à `main`.
