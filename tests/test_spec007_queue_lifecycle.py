@@ -8,8 +8,11 @@ from alembic import command
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from handoff_hub.auto_dispatch import run_dispatch_cycle
 from handoff_hub.poc_api import create_app
-from handoff_hub.poc_db import AuthUser, make_session_factory
+from handoff_hub.poc_db import (
+    AuthUser, HandoffSession, QueueMembership, make_session_factory,
+)
 from handoff_hub.provenance_writer import ProvenanceRecorder
 from handoff_hub.queue_lifecycle_schema import LIFECYCLE_REVISION
 from handoff_hub.schema_admin import (
@@ -265,3 +268,47 @@ def test_transfer_rejects_draft_queue_and_does_not_expose_target(
         assert blocked.status_code == 409
         assert rows(lab, "n7")[0] == ("DRAFT", 1)
         assert c.get("/v1/handoffs", headers={"X-POC-Key": KEY}).status_code == 200
+
+
+def test_auto_dispatch_skips_draft_even_with_synthetic_queued_case(
+    tmp_path, monkeypatch,
+):
+    lab = lab_ready(tmp_path, monkeypatch)
+    upgraded(lab, tmp_path)
+    app = create_app(database_url=lab.database_url, api_key=KEY)
+    factory, engine = make_session_factory(lab.database_url)
+    try:
+        with TestClient(app, raise_server_exceptions=False) as c:
+            admin = login(c, lab, "admin.demo")
+            login(c, lab, "ana.demo")  # Live operator auth lease.
+            assert create(c, admin, "n8").status_code == 201
+            blocked_manual = c.post(
+                "/v1/dispatch/next",
+                headers={"X-POC-Key": KEY},
+                json={"queue_id": "n8", "operation_id": "demo"},
+            )
+            assert blocked_manual.status_code == 409
+            with factory.begin() as db:
+                # Deliberate synthetic bypass of intake for dispatch regression.
+                db.add(QueueMembership(queue_id="n8", operator_id="op-ana"))
+                db.add(HandoffSession(
+                    operation_id="demo", integration_id="demo-bot",
+                    queue_id="n8", external_conversation_id="qa-auto-draft",
+                    requester_label="Pessoa sintética", subject="Fila DRAFT",
+                    idempotency_key="spec007-auto-draft",
+                ))
+            assert run_dispatch_cycle(factory)["offered"] == 0
+            with factory() as db:
+                session = db.scalar(select(HandoffSession).where(
+                    HandoffSession.queue_id == "n8",
+                ))
+                assert session is not None and session.status == "QUEUED"
+            assert transition(c, admin, "n8", "ACTIVE", 1).status_code == 200
+            assert run_dispatch_cycle(factory)["offered"] == 1
+            with factory() as db:
+                session = db.scalar(select(HandoffSession).where(
+                    HandoffSession.queue_id == "n8",
+                ))
+                assert session is not None and session.status == "OFFERED"
+    finally:
+        engine.dispose()
