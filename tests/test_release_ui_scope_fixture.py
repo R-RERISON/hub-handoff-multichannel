@@ -76,3 +76,15 @@ def test_n1_n2_verified_transfer_and_negative_permissions(tmp_path, monkeypatch)
     assert totals(lab) == (1, 2)
     for secret in (fixture.N1_TEXT, fixture.N2_TEXT, fixture.PRIVATE_NOTE):
         assert secret not in str(result)
+
+
+def test_busy_n2_preflight_fails_before_any_session_is_written(
+    tmp_path, monkeypatch,
+):
+    lab = lab_for(tmp_path, monkeypatch)
+    with sqlite3.connect(lab.database) as db:
+        db.execute("UPDATE operators SET presence='OFFLINE' WHERE id='op-bruno'")
+    monkeypatch.setattr(fixture, "attest_running_backend", lambda *_: None)
+    with pytest.raises(lab_environment.LabSafetyError, match="N2"):
+        fixture.run(lab.directory, confirmed=True)
+    assert totals(lab) == (0, 0)

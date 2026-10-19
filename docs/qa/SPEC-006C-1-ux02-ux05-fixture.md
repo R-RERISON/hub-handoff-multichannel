@@ -45,12 +45,14 @@ operacional. Em Auditor conferir apenas N1. Repetir UX-08 no browser de
 viewport estável em 390×844, 1366×768 e 1920×1080, incluindo Mesa de Operador.
 Anexar evidência sanitizada ao PR #28 e issue #29, SHA e ambiente.
 
-Cada execução acrescenta uma sessão e duas mensagens no SQLite TEMP.
+Uma execução aprovada acrescenta uma sessão e duas mensagens no SQLite TEMP.
 Nenhuma operação do script modifica data/handoff-poc.db, grants ou main.
 
 ### Atenção à massa de dados
 
-Executar preferencialmente em laboratório TEMP novo, sem atendimentos N2
-preexistentes em espera. Se o despacho oferecer outra sessão, o fixture
-interrompe com falha explícita, sem tentar alterar sessões de terceiros.
+Executar em laboratório TEMP novo, com Bruno AVAILABLE e capacidade livre.
+O pré-check verifica, somente leitura, se Bruno tem membership em N2,
+se há atendimentos ativos/ofertados a ele e se N2 possui fila pendente.
+Se estiver ocupado, recusa **antes** de criar a sessão. Não repetir no
+mesmo TEMP sem encerramento ou descarte controlado do cenário anterior.
 Use Bruno em /operador para capturar a conversa N2 e sua nota interna.

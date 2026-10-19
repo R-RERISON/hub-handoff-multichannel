@@ -50,6 +50,26 @@ def accounts_and_grants(database: Path) -> tuple[str, str]:
         ).fetchall())
         if set(users) != {"auditor.demo", "supervisor.demo"}:
             raise LabSafetyError("Contas sinteticas de QA ausentes")
+        # The operator-facing UX-05 scenario requires a clean N2 queue and
+        # an available seat. Refuse before any synthetic session is created,
+        # rather than consuming another case's offer or partially seeding QA.
+        operator = db.execute(
+            "SELECT presence, capacity FROM operators WHERE id='op-bruno'"
+        ).fetchone()
+        membership = db.execute(
+            "SELECT count(*) FROM queue_memberships "
+            "WHERE queue_id='n2' AND operator_id='op-bruno'"
+        ).fetchone()[0]
+        existing = db.execute(
+            "SELECT count(*) FROM handoff_sessions "
+            "WHERE (queue_id='n2' AND status='QUEUED') "
+            "OR (operator_id='op-bruno' AND status IN ('ACTIVE','OFFERED'))"
+        ).fetchone()[0]
+        if (
+            operator is None or operator[0] != "AVAILABLE"
+            or operator[1] < 1 or membership != 1 or existing
+        ):
+            raise LabSafetyError("Fila/operador N2 nao estao livres no TEMP")
         for username, role, expected in (
             ("auditor.demo", "AUDITOR", {"n1"}),
             ("supervisor.demo", "SUPERVISOR", {"n1", "n2"}),
