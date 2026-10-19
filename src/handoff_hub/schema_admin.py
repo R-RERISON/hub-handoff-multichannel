@@ -329,6 +329,8 @@ def upgrade_lifecycle_existing(database: Path, backup_dir: Path,
     """Explicit offline 006b4 -> 007a2 after backup and strict schema checks."""
     if not confirmed:
         raise SchemaSafetyError("Explicit --confirm-offline is required")
+    if database.resolve() == DEFAULT_DB.resolve():
+        raise SchemaSafetyError("Lifecycle upgrade refuses the original POC database")
     before = verify_database(database)
     if before["revision"] != SECURITY_REVISION:
         raise SchemaSafetyError("Lifecycle upgrade requires verified 006b4 revision")

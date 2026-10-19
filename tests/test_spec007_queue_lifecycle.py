@@ -228,3 +228,40 @@ def test_unmigrated_lab_has_no_transition_endpoint_effect(tmp_path, monkeypatch)
         assert create(c, admin, "n3").status_code == 201
         assert ticket(c, "n3", "legacy").status_code == 201
     assert verify_database(lab.database)["revision"] == SECURITY_REVISION
+
+
+def test_transfer_rejects_draft_queue_and_does_not_expose_target(
+    tmp_path, monkeypatch,
+):
+    lab = lab_ready(tmp_path, monkeypatch)
+    upgraded(lab, tmp_path)
+    app = create_app(database_url=lab.database_url, api_key=KEY)
+    with TestClient(app, raise_server_exceptions=False) as c:
+        admin = login(c, lab, "admin.demo")
+        assert create(c, admin, "n7").status_code == 201
+        original = ticket(c, "n1", "source")
+        assert original.status_code == 201, original.text
+        sid = original.json()["id"]
+        offered = c.post("/v1/dispatch/offer", headers={"X-POC-Key": KEY},
+                         json={"queue_id": "n1", "operation_id": "demo"})
+        assert offered.status_code == 200
+        assert offered.json()["result"] == "offered"
+        accepted = c.post(
+            f"/v1/handoffs/{sid}/accept", headers={"X-POC-Key": KEY},
+            json={"operator_id": "op-ana"},
+        )
+        assert accepted.status_code == 200
+        choices = c.get(
+            f"/v1/handoffs/{sid}/transfer-targets",
+            headers={"X-POC-Key": KEY},
+        )
+        assert choices.status_code == 200
+        assert "n7" not in {q["id"] for q in choices.json()["destinations"]}
+        blocked = c.post(
+            f"/v1/handoffs/{sid}/transfer", headers={"X-POC-Key": KEY},
+            json={"operator_id": "op-ana", "queue_id": "n7",
+                  "reason": "QA teste de fila em rascunho"},
+        )
+        assert blocked.status_code == 409
+        assert rows(lab, "n7")[0] == ("DRAFT", 1)
+        assert c.get("/v1/handoffs", headers={"X-POC-Key": KEY}).status_code == 200
