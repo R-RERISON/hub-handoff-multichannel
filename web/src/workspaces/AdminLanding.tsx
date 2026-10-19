@@ -18,7 +18,7 @@ type Inventory = {
   operation:{id:string;name:string}
   summary:{queues:number;operators:number;accounts:number;role_grants:number;sessions_in_progress:number}
   queues:QueueRow[]
-  capabilities:{read_only:true;queue_create_available:boolean;queue_lifecycle_available:false;identity_provider:'LOCAL_POC'}
+  capabilities:{read_only:true;queue_create_available:boolean;queue_lifecycle_available:boolean;identity_provider:'LOCAL_POC'}
 }
 
 export default function AdminLanding({api}:{api:Api}){
@@ -84,7 +84,7 @@ export default function AdminLanding({api}:{api:Api}){
         <span className="eyebrow">SPEC-007 / ADMINISTRAÇÃO · POC LOCAL</span>
         <h2>Operações e filas</h2>
         <p>Inventário confirmado pelo backend para a operação autenticada. Alterações de cadastro,
-          pausa, arquivamento e permissões serão liberadas em incrementos posteriores.</p>
+          permissões avançadas e regras de roteamento serão liberadas em incrementos posteriores.</p>
       </div>
       <div className="banner-icon"><ServerCog size={28}/></div>
     </section>
@@ -144,7 +144,7 @@ export default function AdminLanding({api}:{api:Api}){
       <section className="panel admin-inventory__table">
         <header><div><span className="eyebrow">CADASTRO DE FILAS</span>
           <h3>Filas da operação</h3>
-          <p>Capacidade e políticas de ciclo de vida ainda não são editáveis nesta fatia.</p></div>
+          <p>Estados administrados com versionamento, auditoria e proteção das sessões em andamento.</p></div>
           <span className="admin-inventory__tag"><Shield size={15}/> Dados sem conteúdo de conversas</span>
         </header>
         <div className="admin-inventory__table-scroll">
@@ -195,9 +195,9 @@ export default function AdminLanding({api}:{api:Api}){
       {transitionNotice&&<p role="status" className="admin-inventory__success">{transitionNotice}</p>}
     </>}
     <section className="panel admin-inventory__next">
-      <ArrowUpRight size={18}/><div><strong>Próximo incremento: estados do ciclo de vida</strong>
-        <p>Ativação, pausa e arquivamento com auditoria transacional e proteção
-          contra sessões em andamento. Esta tela não executa mudanças.</p></div>
+      <ArrowUpRight size={18}/><div><strong>Próximo incremento: políticas e governança de filas</strong>
+        <p>Ciclo de vida protegido quando o schema 007a2 está habilitado.
+          Próximas etapas: memberships, grants e políticas de roteamento.</p></div>
     </section>
   </div>
 }
