@@ -100,7 +100,7 @@ export default function AdminLanding({api}:{api:Api}){
           <div className="admin-inventory__create-fields">
             <label htmlFor="new-queue-id">Identificador
               <input id="new-queue-id" required minLength={2} maxLength={40}
-                pattern="[a-z][a-z0-9-]{1,39}" autoComplete="off"
+                pattern="[a-z](?:[a-z0-9]|-){1,39}" autoComplete="off"
                 placeholder="suporte-n3" value={newId} disabled={saving}
                 onChange={event=>setNewId(event.target.value)}/>
             </label>

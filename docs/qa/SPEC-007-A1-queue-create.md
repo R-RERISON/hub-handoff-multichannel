@@ -84,3 +84,49 @@ Sem Teams real, Entra, SQL Server, multi-host, dados reais, POC original
 ou migração automática. PR Draft empilhado em A0. Validar gates por
 SHA e revisar diff/ameaças. Merge exige autorização humana, não
 ocorre durante esta entrega.
+
+## QA reportado e correção do contrato HTML (19/10/2026)
+
+**SHA efetivamente testado:** `39748192dc7d40dc731953b9e389149c37088b95`.
+Relatório do executor Windows: `start.cmd --check` exit 0,
+**153 passed, 1 skipped (153,64 s)**; Ruff PASS, arquitetura frontend
+**15/15 PASS**, TypeScript e Vite PASS (1.601 módulos).
+`tests/test_spec007_queue_create.py`: **7 passed, 12,09 s**.
+
+Em laboratório TEMP 006b4, foi observado `POST /v1/admin/queues`
+HTTP 201 para `qa-a1-3974819`, fila única, journal único, zero
+memberships e zero grants. Reenvio duplicado HTTP 409, ID inválido
+`bad/queue` HTTP 422, sem mutação. A UI em 1366×768 e 1920×1080
+mostrou os campos/indicadores e navegação Tab, sem overflow horizontal
+de documento. Dois PNGs ficaram no diretório TEMP local do executor,
+**não foram enviados ao repositório**. Branch original/POC preservados.
+
+**Achado HTML-QA-001:** o `pattern="[a-z][a-z0-9-]{1,39}"`
+de `AdminLanding.tsx` é sintaticamente inválido para a flag Unicode
+`v` usada na validação de formulário de Chromium moderno.
+O JavaScript de formulário anteriormente chegava ao backend mesmo
+com `bad/queue`, que respondeu 422; isso confirma a proteção do
+backend, **não a validação HTML nativa**.
+
+**Correção nesta branch, posterior ao SHA testado:**
+`pattern="[a-z](?:[a-z0-9]|-){1,39}"`. O hífen está fora da
+classe de caracteres; o contrato permanece 2–40 caracteres,
+minúsculo ASCII, primeiro caractere letra. Um teste de arquitetura
+compila o padrão real extraído do TSX com `RegExp(..., 'v')`
+e confirma IDs válidos/inválidos, incluindo `bad/queue`.
+O teste adicional exige Node com suporte à flag `v` (Chromium alvo);
+se o Node da estação não suportá-la, registrar bloqueio ambiental,
+não remover a validação.
+
+**Novo SHA da correção: RETEST_REQUIRED.** Reexecutar
+`start.cmd --check` inteiro e conferir em navegador desktop real
+`input.validity.patternMismatch===true` para `bad/queue`,
+`form.checkValidity()===false`, ausência de POST (bloqueio nativo),
+e `checkValidity()===true` para `suporte-n3`.
+O backend deve continuar retornando 422 a POST inválido direto,
+sem fila/journal novos. O reteste anterior não aprova automaticamente
+o novo commit.
+
+As capturas por `iframe` no navegador integrado devem ser identificadas
+como método assistido, sem equiparar sua geometria a Edge/Chrome externo.
+Credenciais sintéticas locais nunca devem ser expostas/publicadas.
