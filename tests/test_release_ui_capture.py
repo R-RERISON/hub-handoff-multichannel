@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from scripts.lab_environment import LabSafetyError
 from scripts import release_ui_capture as cap
+from scripts.lab_environment import LabSafetyError
 
 
 class Locator:
