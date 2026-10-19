@@ -49,7 +49,7 @@ Como **analista de QA**, preciso reproduzir cada cenário sem dados reais.
 
 ### Functional Requirements
 
-- **FR-001**: Bloquear qualquer promoção à main enquanto UX-08 (390×844, 1366×768, 1920×1080, histórico e Mesa do Operador), UX-02, UX-05 ou revisão integral do diff estiver sem evidência aprovada.
+- **FR-001**: Bloquear qualquer promoção à main enquanto UX-08 (1366×768 e 1920×1080, histórico e Mesa do Operador, viewport desktop nativo), UX-02, UX-05 ou revisão integral do diff estiver sem evidência aprovada.
 - **FR-002**: Exigir matriz única de critérios QA, segurança, migração, RBAC, concorrência, privacidade, rollback e revisão por SHA com estados NOT_RUN, PASS, FAIL, BLOCKED, WAIVED (justificativa e aprovação).
 - **FR-003**: Permitir somente dados sintéticos e scripts no diretório TEMP 006b4 para testes mutantes; proteger o SQLite original data/handoff-poc.db contra escrita, adoção ou migração.
 - **FR-004**: Não promover PR #28 nem autorizar produção automaticamente; a decisão humana deve ser registrada com evidência e riscos residuais.

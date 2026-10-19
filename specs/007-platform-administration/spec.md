@@ -2,7 +2,7 @@
 
 **Feature Branch**: `spec/007-platform-administration` (proposta de execução futura; não criada)
 **Created**: 2026-10-18
-**Status**: Draft — especificação proposta; não implementada nesta entrega
+**Status**: IN_PROGRESS — incremento A0 read-only versionado em branch separada, sem aceite da feature
 **Priority / Wave**: P0 / W1
 **Input**: solicitação de consolidação do Handoff Hub via Spec Kit e reconciliação da arquitetura existente.
 **Dependencies**: 006C para desenvolvimento integrado; SPEC-006A/006B para grants e esquema; SPEC-018 para UX

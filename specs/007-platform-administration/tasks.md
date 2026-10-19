@@ -1,6 +1,6 @@
 # Tasks — SPEC-007: Administração de operações, filas, pessoas e permissões
 
-**State**: PLANNED; nenhuma tarefa abaixo foi executada nesta entrega. IDs locais T001–T010.
+**State**: IN_PROGRESS / A0 CODED — gates locais e aceite ainda pendentes. IDs T001–T010 e subfatia A0.
 **Dependencies**: 006C para desenvolvimento integrado; SPEC-006A/006B para grants e esquema; SPEC-018 para UX
 
 ## Phase 1 — Design and verification
@@ -13,6 +13,9 @@
 ## Phase 2 — Incremental delivery
 
 - [ ] T005 A Cadastro de operações/filas, estados e políticas mínimas; usar dados sintéticos, verificar autorização e revisar testes.
+  - [x] T005-A0 API GET administrativa somente leitura e painel de inventário (código versionado; sem claim de teste executado).
+  - [ ] T005-A0-QA Executar testes de escopo/RBAC e `start.cmd --check` no SHA final Windows.
+  - [ ] T005-A1 Criar/ativar/pausar/arquivar fila com esquema aditivo, audit trail, concorrência e rollback.
 - [ ] T006 B Pessoas, perfis, memberships e grants separados; usar dados sintéticos, verificar autorização e revisar testes.
 - [ ] T007 C Revisão de alterações, auditoria, UX, rollback e documentação; usar dados sintéticos, verificar autorização e revisar testes.
 

@@ -1,6 +1,6 @@
 # Implementation Plan — SPEC-007: Administração de operações, filas, pessoas e permissões
 
-**Status**: PROPOSED / NOT IMPLEMENTED — detalhar e executar `/speckit-plan` na abertura do incremento.
+**Status**: IN_PROGRESS / SPEC-007-A0 iniciado — inventário read-only antes das mutações do ciclo de vida; testes locais ainda pendentes.
 **Constitution gate**: `CONSTITUTION.md` e `.specify/memory/constitution.md` mandatório.
 **Prerequisites**: 006C para desenvolvimento integrado; SPEC-006A/006B para grants e esquema; SPEC-018 para UX.
 **Delivery wave**: W1; prioridade P0.
@@ -37,7 +37,7 @@
 - [ ] `/speckit-tasks` refinado, rastreabilidade FR → cenários → testes, análise de consistência.
 - [ ] Gates `start.cmd --check` aprovados no SHA da feature em Windows e saída sanitizada anexada ao PR.
 - [ ] Testes negativos cross-operation/cross-queue, concorrência quando houver, regressão transfer N1→N2.
-- [ ] QA de UX em 390×844, 1366×768 e 1920×1080 quando houver interface.
+- [ ] QA de UX em desktop 1366×768 e 1920×1080, mais navegação por teclado e zoom 200% quando houver interface.
 - [ ] Migração/reversão demonstrada em cópia/lab sintético; banco original intocado.
 - [ ] Convergência `/speckit-converge`, review técnico e aprovação explícita; sem deploy/merge automático.
 
