@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import { ArrowUpRight, CheckCircle2, LockKeyhole, RefreshCw, ServerCog, Shield } from 'lucide-react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { ArrowUpRight, CheckCircle2, LockKeyhole, Plus, RefreshCw, ServerCog, Shield } from 'lucide-react'
 import type { Api } from './types'
 
 type QueueRow = {
@@ -16,13 +16,18 @@ type Inventory = {
   operation:{id:string;name:string}
   summary:{queues:number;operators:number;accounts:number;role_grants:number;sessions_in_progress:number}
   queues:QueueRow[]
-  capabilities:{read_only:true;queue_lifecycle_available:false;identity_provider:'LOCAL_POC'}
+  capabilities:{read_only:true;queue_create_available:boolean;queue_lifecycle_available:false;identity_provider:'LOCAL_POC'}
 }
 
 export default function AdminLanding({api}:{api:Api}){
   const [inventory,setInventory]=useState<Inventory|null>(null)
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
+  const [newId,setNewId]=useState('')
+  const [newName,setNewName]=useState('')
+  const [saving,setSaving]=useState(false)
+  const [createError,setCreateError]=useState('')
+  const [createNotice,setCreateNotice]=useState('')
   const refresh=useCallback(async ()=>{
     setLoading(true);setError('');setInventory(null)
     try{
@@ -34,6 +39,20 @@ export default function AdminLanding({api}:{api:Api}){
     }finally{setLoading(false)}
   },[api])
   useEffect(()=>{void refresh()},[refresh])
+  async function createQueue(event:FormEvent<HTMLFormElement>){
+    event.preventDefault()
+    if(saving||!inventory?.capabilities.queue_create_available)return
+    setSaving(true);setCreateError('');setCreateNotice('')
+    try{
+      const response=await api('/v1/admin/queues','POST',{id:newId,name:newName})
+      if(response.audit!=='APPLIED')throw new Error('Persistência não confirmada')
+      setNewId('');setNewName('')
+      await refresh()
+      setCreateNotice('Fila cadastrada e auditada na operação autenticada.')
+    }catch{
+      setCreateError('Cadastro não confirmado. Verifique identificador, permissão e disponibilidade.')
+    }finally{setSaving(false)}
+  }
 
   return <div className="section-stack admin-inventory">
     <section className="intro-banner">
@@ -46,7 +65,7 @@ export default function AdminLanding({api}:{api:Api}){
       <div className="banner-icon"><ServerCog size={28}/></div>
     </section>
     <div className="admin-inventory__status">
-      <span><LockKeyhole size={16}/> Somente leitura · Administração</span>
+      <span><LockKeyhole size={16}/> Inventário somente leitura · Cadastro auditado</span>
       <button className="outline" type="button" onClick={()=>void refresh()} disabled={loading}>
         <RefreshCw size={16}/> Atualizar inventário
       </button>
@@ -70,6 +89,34 @@ export default function AdminLanding({api}:{api:Api}){
           <span>{label}</span><strong>{inventory.summary[key]}</strong>
         </div>)}
       </section>
+      {inventory.capabilities.queue_create_available&&
+        <form className="panel admin-inventory__create" onSubmit={event=>void createQueue(event)}>
+          <div>
+            <span className="eyebrow">SPEC-007 / A1.1 · CADASTRO AUDITÁVEL</span>
+            <h3>Cadastrar fila</h3>
+            <p>Identificador estável; operação vinculada ao login.
+              Não concede acesso, membership nem habilita integração.</p>
+          </div>
+          <div className="admin-inventory__create-fields">
+            <label htmlFor="new-queue-id">Identificador
+              <input id="new-queue-id" required minLength={2} maxLength={40}
+                pattern="[a-z](?:[a-z0-9]|-){1,39}" autoComplete="off"
+                placeholder="suporte-n3" value={newId} disabled={saving}
+                onChange={event=>setNewId(event.target.value)}/>
+            </label>
+            <label htmlFor="new-queue-name">Nome exibido
+              <input id="new-queue-name" required minLength={3} maxLength={120}
+                autoComplete="off" placeholder="Suporte N3"
+                value={newName} disabled={saving}
+                onChange={event=>setNewName(event.target.value)}/>
+            </label>
+            <button className="primary" type="submit" disabled={saving||loading}>
+              <Plus size={15}/> {saving?'Gravando…':'Cadastrar fila'}
+            </button>
+          </div>
+          {createError&&<p role="alert" className="admin-inventory__error">{createError}</p>}
+          {createNotice&&<p role="status" className="admin-inventory__success">{createNotice}</p>}
+        </form>}
       <section className="panel admin-inventory__table">
         <header><div><span className="eyebrow">CADASTRO DE FILAS</span>
           <h3>Filas da operação</h3>
@@ -94,8 +141,8 @@ export default function AdminLanding({api}:{api:Api}){
       </section>
     </>}
     <section className="panel admin-inventory__next">
-      <ArrowUpRight size={18}/><div><strong>Próximo incremento: ciclo de vida</strong>
-        <p>Cadastro, ativação, pausa e arquivamento com auditoria transacional e proteção
+      <ArrowUpRight size={18}/><div><strong>Próximo incremento: estados do ciclo de vida</strong>
+        <p>Ativação, pausa e arquivamento com auditoria transacional e proteção
           contra sessões em andamento. Esta tela não executa mudanças.</p></div>
     </section>
   </div>

@@ -15,7 +15,9 @@
 - [ ] T005 A Cadastro de operações/filas, estados e políticas mínimas; usar dados sintéticos, verificar autorização e revisar testes.
   - [x] T005-A0 API GET administrativa somente leitura e painel de inventário (código versionado; sem claim de teste executado).
   - [ ] T005-A0-QA Executar testes de escopo/RBAC e `start.cmd --check` no SHA final Windows.
-  - [ ] T005-A1 Criar/ativar/pausar/arquivar fila com esquema aditivo, audit trail, concorrência e rollback.
+  - [x] T005-A1.1 Criar fila ADMIN-only vinculada à operação, com journal transacional e formulário desktop (código/testes versionados, não homologados).
+  - [ ] T005-A1.1-QA Executar testes Windows e revisar segurança/UX no SHA da fatia.
+  - [ ] T005-A1.2 Ativar/pausar/arquivar fila com schema versionado aditivo, proteção de intake/dispatcher e rollback.
 - [ ] T006 B Pessoas, perfis, memberships e grants separados; usar dados sintéticos, verificar autorização e revisar testes.
 - [ ] T007 C Revisão de alterações, auditoria, UX, rollback e documentação; usar dados sintéticos, verificar autorização e revisar testes.
 

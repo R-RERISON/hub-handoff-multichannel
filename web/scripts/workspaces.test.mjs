@@ -217,3 +217,21 @@ test('verified paging clears stale content before fetching and labels controls',
   assert.match(view, /setDetail\(null\);setDetailLoading\(true\);setEventPage\(v=>v[+-]1\)/)
   assert.match(view, /if\(!selectedId\|\|!queueId\)\{\s*setDetail\(null\)\s*setDetailLoading\(false\)/)
 })
+
+
+test('admin queue ID follows HTML Unicode v constraint and server-side format', () => {
+  const page = read('src/workspaces/AdminLanding.tsx')
+  const input = page.match(/<input\s+id="new-queue-id"([\s\S]*?)\/>/)
+  assert.ok(input, 'queue ID input is required')
+  const pattern = input[1].match(/\bpattern="([^"]+)"/)?.[1]
+  assert.ok(pattern, 'HTML constraint validation pattern is required')
+  assert.equal(pattern, '[a-z](?:[a-z0-9]|-){1,39}')
+  const compiled = new RegExp('^(?:' + pattern + ')$', 'v')
+  for (const valid of ['n3', 'suporte-n3', 'a-', 'a--', 'a'.repeat(40)]) {
+    assert.equal(compiled.test(valid), true, 'expected valid ID: ' + valid)
+  }
+  for (const invalid of ['', 'a', 'A3', 'bad/queue', 'a_b', 'á3',
+    ' a', 'a ', 'a\n3', 'a'.repeat(41)]) {
+    assert.equal(compiled.test(invalid), false, 'expected invalid ID: ' + invalid)
+  }
+})

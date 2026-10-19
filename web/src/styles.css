@@ -902,3 +902,21 @@ body{background:var(--hub-bg)}
 .admin-inventory__next p{margin:4px 0 0;line-height:1.5}
 @media(max-width:1200px){.admin-inventory__metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:850px){.admin-inventory__metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* SPEC-007/A1.1 — Controlled desktop queue creation; no implied access grant. */
+.admin-inventory__create{padding:20px;display:flex;flex-direction:column;gap:16px}
+.admin-inventory__create h3{margin:6px 0;font-size:17px;color:#183b59}
+.admin-inventory__create p{margin:5px 0 0;font-size:12px;color:#607d95}
+.admin-inventory__create-fields{display:grid;grid-template-columns:minmax(180px,1fr)
+  minmax(230px,1.5fr) auto;gap:12px;align-items:end}
+.admin-inventory__create-fields label{display:flex;flex-direction:column;gap:6px;
+  color:#365b78;font-size:12px;font-weight:700}
+.admin-inventory__create-fields input{min-height:39px;padding:9px 11px;
+  border:1px solid #cbdae8;border-radius:7px;background:#fff;
+  font:inherit;font-size:13px;color:#153e5f;min-width:0}
+.admin-inventory__create-fields input:focus-visible{outline:3px solid #80b8ed;outline-offset:1px}
+.admin-inventory__create-fields button{min-height:39px;white-space:nowrap}
+.admin-inventory__error{color:#9c2939!important}
+.admin-inventory__success{color:#20694d!important}
+@media(max-width:1000px){.admin-inventory__create-fields{grid-template-columns:1fr 1fr}
+.admin-inventory__create-fields button{grid-column:1/-1;justify-content:center}}

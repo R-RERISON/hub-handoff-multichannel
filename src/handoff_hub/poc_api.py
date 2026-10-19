@@ -224,7 +224,9 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
         return principal
 
     app.include_router(register_identity_endpoints(factory))
-    app.include_router(register_admin_overview(factory, authenticate), prefix="/v1")
+    app.include_router(register_admin_overview(factory, authenticate,
+                                               security_audit_enabled=provenance.security_audit_enabled),
+                       prefix="/v1")
 
     def exclusive_tx(db):
         """SQLite writer lock. Do not reuse this locking syntax in SQL Server."""
