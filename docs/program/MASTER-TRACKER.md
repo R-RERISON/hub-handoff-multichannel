@@ -67,3 +67,10 @@
 ## 7. Risco de deriva documental
 
 `docs/roadmap.md` histórico contém numeração POC-005/006 diferente de SPEC-005/006 e conteúdo anterior ao release 006B. Para decisões atuais **este MASTER-TRACKER prevalece apenas após aceite do PR de planejamento**; até lá, é proposta. Ver [crosswalk](./SPEC-CROSSWALK.md) e [riscos](./DECISIONS-RISKS.md).
+
+## Incremento em andamento: SPEC-006C-1 (19/10/2026)
+
+- Branch: feat/006c1-ux02-ux05-synthetic-evidence, baseada na branch de planejamento. Contém fixture de transferência N1→N2 no laboratório TEMP e checker de evidências PNG por SHA.
+- Implementação de ferramentas QA apenas: nenhum endpoint de produção, migração, código React ou SQLite original alterado.
+- Gate local start.cmd --check e QA real de UX-02/05/08: PENDENTES. Resultados reportados por scripts e testes que não foram executados não podem ser marcados PASS.
+- PR #28 segue Draft; PR de implementação da 006C-1 separado da reorganização (#43). Não interpretar esta fatia como pronta para promoção à main.

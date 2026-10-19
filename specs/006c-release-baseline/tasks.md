@@ -25,3 +25,13 @@
 ## Progress convention
 
 Marcar caixa **somente após evidência objetiva** (link do commit, teste, captura sintética, PR). Manter `NOT_STARTED → IN_PROGRESS → BLOCKED / IN_REVIEW → ACCEPTED` no registro de programa. `ACCEPTED` não significa `PRODUCTION_READY`.
+
+## Fatia implementada 006C-1 (código criado; gates ainda pendentes)
+
+- [x] T005a Criar fixture TEMP 006b4 para evidência sintética UX-02/UX-05, sem tocar no banco original (código versionado nesta branch).
+- [x] T005b Criar gerador/verificador de manifesto com SHA e PNGs nas três resoluções, sem autoaprovar UX (código versionado nesta branch).
+- [ ] T005c Executar testes completos no Windows, inclusive novos Pytest, Ruff, TypeScript/Vite e release_probe.py no SHA final.
+- [ ] T006 Homologar de verdade UX-02/05/08 no navegador e anexar capturas sanitizadas.
+- [ ] T007 Reavaliar diff amplo PR #28 e registrar decisão humana; NENHUM merge realizado.
+
+Prova documental: scripts/release_ui_scope_fixture.py, scripts/release_ui_evidence_gate.py, tests/test_release_ui_scope_fixture.py, tests/test_release_ui_evidence_gate.py e docs/qa/SPEC-006C-*. Não marcar T008–T010 como PASS sem execução local.
