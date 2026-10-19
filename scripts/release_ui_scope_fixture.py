@@ -20,7 +20,11 @@ from handoff_hub.poc_api import create_app
 from handoff_hub.poc_db import HandoffSession, make_session_factory
 from handoff_hub.schema_admin import SchemaSafetyError
 from scripts.lab_environment import LabSafetyError, validate_lab
-from scripts.release_grant_toggle import attest_running_backend, bearer
+from scripts.release_grant_toggle import (
+    LabSafetyError as AttestationSafetyError,
+    attest_running_backend,
+    bearer,
+)
 
 QA_KEY = "spec006c-testclient-only"
 N1_TEXT = "QA 006C mensagem sintetica da fila N1"
@@ -209,7 +213,7 @@ def main() -> None:
     args = parser.parse_args()
     try:
         outcome = run(args.lab, args.confirm_synthetic)
-    except LabSafetyError as exc:
+    except (LabSafetyError, AttestationSafetyError) as exc:
         raise SystemExit("REPROVADO: " + str(exc)) from None
     except (SchemaSafetyError, OSError, sqlite3.Error, ValueError, KeyError, TypeError):
         raise SystemExit("REPROVADO: laboratorio ou contrato QA indisponivel") from None
