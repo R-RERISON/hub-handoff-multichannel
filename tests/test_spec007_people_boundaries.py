@@ -5,16 +5,20 @@ No original POC database, secrets, or external services.
 """
 from __future__ import annotations
 
+from fastapi import Request
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from handoff_hub.poc_api import create_app
 from handoff_hub.poc_db import (
+    AuthSession,
     AuthUser,
+    HandoffSession,
     Operation,
     Operator,
     Queue,
     QueueMembership,
+    QueueRoleGrant,
     make_session_factory,
 )
 from scripts import lab_environment
@@ -71,6 +75,52 @@ def operator_state(lab, operator_id):
         engine.dispose()
 
 
+def install_post_preflight_mutation(app, lab, mutate):
+    route = next(
+        route for route in app.routes
+        if getattr(route, "path", None) == "/v1/operators/{operator_id}/capacity"
+    )
+    authenticate = next(
+        dependency.call for dependency in route.dependant.dependencies
+        if getattr(dependency.call, "__name__", "") == "authenticate"
+    )
+    factory, engine = make_session_factory(lab.database_url)
+
+    async def mutate_after_authentication(request: Request):
+        principal = await authenticate(
+            request,
+            request.headers.get("authorization"),
+            request.headers.get("x-poc-key"),
+        )
+        with factory.begin() as db:
+            mutate(db, principal)
+        return principal
+
+    app.dependency_overrides[authenticate] = mutate_after_authentication
+    return engine
+
+
+def make_active_handoff(client, factory, admin, suffix, operator_id="op-ana"):
+    response = client.post(
+        "/v1/handoffs",
+        headers={**admin, "Idempotency-Key": f"spec007-b0-active-{suffix}"},
+        json={
+            "queue_id": "n1",
+            "external_conversation_id": f"b0-active-{suffix}",
+            "requester_label": "Synthetic QA",
+            "subject": "B0 capacity and membership conflict",
+        },
+    )
+    assert response.status_code == 201, response.text
+    handoff_id = response.json()["id"]
+    with factory.begin() as db:
+        handoff = db.get(HandoffSession, handoff_id)
+        assert handoff is not None
+        handoff.status = "ACTIVE"
+        handoff.operator_id = operator_id
+    return handoff_id
+
+
 def test_admin_cannot_write_other_operation_operator_or_membership(
     tmp_path, monkeypatch,
 ):
@@ -93,7 +143,9 @@ def test_admin_cannot_write_other_operation_operator_or_membership(
             "/v1/queues/n1/members/foreign-operator", headers=admin,
             json={"enabled": True},
         )
-        assert mixed.status_code == 422
+        assert mixed.status_code == 404
+        assert "OPERATOR_HIDDEN" not in mixed.text
+        assert "QUEUE_HIDDEN" not in mixed.text
     assert operator_state(lab, "foreign-operator") == (3, "AVAILABLE")
     factory, engine = make_session_factory(lab.database_url)
     try:
@@ -102,6 +154,165 @@ def test_admin_cannot_write_other_operation_operator_or_membership(
                 QueueMembership, ("foreign-queue", "foreign-operator"),
             ) is not None
             assert db.get(QueueMembership, ("n1", "foreign-operator")) is None
+    finally:
+        engine.dispose()
+
+
+def test_revoked_session_after_auth_preflight_cannot_write(
+    tmp_path, monkeypatch,
+):
+    lab = setup_lab(tmp_path, monkeypatch)
+    app = create_app(database_url=lab.database_url, api_key=KEY)
+
+    def revoke_session(db, principal):
+        auth_session = db.get(AuthSession, principal.session_id)
+        assert auth_session is not None
+        auth_session.revoked = True
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        admin = auth(client, lab, "admin.demo")
+        before = operator_state(lab, "op-ana")
+        engine = install_post_preflight_mutation(app, lab, revoke_session)
+        try:
+            response = client.patch(
+                "/v1/operators/op-ana/capacity",
+                headers=admin,
+                json={"capacity": 2},
+            )
+        finally:
+            engine.dispose()
+    assert response.status_code == 401
+    assert operator_state(lab, "op-ana") == before
+
+
+def test_role_change_after_auth_preflight_is_rechecked_before_write(
+    tmp_path, monkeypatch,
+):
+    lab = setup_lab(tmp_path, monkeypatch)
+    app = create_app(database_url=lab.database_url, api_key=KEY)
+
+    def downgrade_role(db, principal):
+        user = db.get(AuthUser, principal.user_id)
+        assert user is not None
+        user.role = "AUDITOR"
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        admin = auth(client, lab, "admin.demo")
+        before = operator_state(lab, "op-ana")
+        engine = install_post_preflight_mutation(app, lab, downgrade_role)
+        try:
+            response = client.patch(
+                "/v1/operators/op-ana/capacity",
+                headers=admin,
+                json={"capacity": 2},
+            )
+        finally:
+            engine.dispose()
+    assert response.status_code == 403
+    assert operator_state(lab, "op-ana") == before
+
+
+def test_supervisor_cannot_change_multi_queue_operator_with_partial_grants(
+    tmp_path, monkeypatch,
+):
+    lab = setup_lab(tmp_path, monkeypatch)
+    app = create_app(database_url=lab.database_url, api_key=KEY)
+    factory, engine = make_session_factory(lab.database_url)
+    try:
+        with factory.begin() as db:
+            supervisor_user = db.scalar(select(AuthUser).where(
+                AuthUser.username == "supervisor.demo"
+            ))
+            admin_user = db.scalar(select(AuthUser).where(
+                AuthUser.username == "admin.demo"
+            ))
+            assert supervisor_user is not None and admin_user is not None
+            assert db.get(QueueMembership, ("n2", "op-ana")) is None
+            db.add(QueueMembership(queue_id="n2", operator_id="op-ana"))
+            n1_grant = db.get(
+                QueueRoleGrant, (supervisor_user.id, "n1", "SUPERVISOR")
+            )
+            if n1_grant is None:
+                db.add(QueueRoleGrant(
+                    user_id=supervisor_user.id,
+                    queue_id="n1",
+                    role="SUPERVISOR",
+                    granted_by=admin_user.id,
+                ))
+            n2_grant = db.get(
+                QueueRoleGrant, (supervisor_user.id, "n2", "SUPERVISOR")
+            )
+            if n2_grant is not None:
+                db.delete(n2_grant)
+    finally:
+        engine.dispose()
+
+    before = operator_state(lab, "op-ana")
+    with TestClient(app, raise_server_exceptions=False) as client:
+        supervisor = auth(client, lab, "supervisor.demo")
+        capacity = client.patch(
+            "/v1/operators/op-ana/capacity",
+            headers=supervisor,
+            json={"capacity": 2},
+        )
+        presence = client.patch(
+            "/v1/operators/op-ana/presence",
+            headers=supervisor,
+            json={"presence": "AWAY"},
+        )
+    assert capacity.status_code == 403
+    assert presence.status_code == 403
+    assert operator_state(lab, "op-ana") == before
+
+
+def test_capacity_cannot_drop_below_active_occupancy(
+    tmp_path, monkeypatch,
+):
+    lab = setup_lab(tmp_path, monkeypatch)
+    app = create_app(database_url=lab.database_url, api_key=KEY)
+    factory, engine = make_session_factory(lab.database_url)
+    try:
+        with TestClient(app, raise_server_exceptions=False) as client:
+            admin = auth(client, lab, "admin.demo")
+            expanded = client.patch(
+                "/v1/operators/op-ana/capacity",
+                headers=admin,
+                json={"capacity": 3},
+            )
+            assert expanded.status_code == 200
+            make_active_handoff(client, factory, admin, "capacity-a")
+            make_active_handoff(client, factory, admin, "capacity-b")
+            response = client.patch(
+                "/v1/operators/op-ana/capacity",
+                headers=admin,
+                json={"capacity": 1},
+            )
+        assert response.status_code == 409
+        assert operator_state(lab, "op-ana") == (3, "AVAILABLE")
+    finally:
+        engine.dispose()
+
+
+def test_membership_removal_is_blocked_while_operator_has_active_handoff(
+    tmp_path, monkeypatch,
+):
+    lab = setup_lab(tmp_path, monkeypatch)
+    app = create_app(database_url=lab.database_url, api_key=KEY)
+    factory, engine = make_session_factory(lab.database_url)
+    try:
+        with TestClient(app, raise_server_exceptions=False) as client:
+            admin = auth(client, lab, "admin.demo")
+            handoff_id = make_active_handoff(client, factory, admin, "membership")
+            response = client.patch(
+                "/v1/queues/n1/members/op-ana",
+                headers=admin,
+                json={"enabled": False},
+            )
+        assert response.status_code == 409
+        with factory() as db:
+            assert db.get(QueueMembership, ("n1", "op-ana")) is not None
+            handoff = db.get(HandoffSession, handoff_id)
+            assert handoff is not None and handoff.status == "ACTIVE"
     finally:
         engine.dispose()
 

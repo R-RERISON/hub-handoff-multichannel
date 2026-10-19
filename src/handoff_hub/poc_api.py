@@ -25,6 +25,7 @@ from handoff_hub.poc_auth import (
     get_principal,
     naive_utc,
     register_identity_endpoints,
+    revalidate_principal,
 )
 from handoff_hub.poc_db import (
     AuthSession,
@@ -446,7 +447,10 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
                             body: QueueMemberUpdate):
         with factory() as db:
             exclusive_tx(db)
-            principal = request.state.principal
+            principal = revalidate_principal(
+                db, request.state.principal, allow_legacy_test=legacy_test_mode,
+            )
+            request.state.principal = principal
             if principal.role not in ("ADMIN", "SUPERVISOR"):
                 raise HTTPException(403, "Perfil não autorizado para membership")
             q = db.get(Queue, queue_id)
@@ -457,7 +461,7 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
                 require_queue(db, principal, queue_id, manage=True)
             op = db.get(Operator, operator_id)
             if op is None or op.operation_id != principal.operation_id:
-                raise HTTPException(422, "Fila ou operador incompatível")
+                raise HTTPException(404, "Operador não encontrado")
             member = db.get(QueueMembership, (queue_id, operator_id))
             if body.enabled and member is None:
                 db.add(QueueMembership(queue_id=queue_id, operator_id=operator_id))
@@ -479,7 +483,10 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
     def update_capacity(request: Request, operator_id: str, body: CapacityUpdate):
         with factory() as db:
             exclusive_tx(db)
-            principal = request.state.principal
+            principal = revalidate_principal(
+                db, request.state.principal, allow_legacy_test=legacy_test_mode,
+            )
+            request.state.principal = principal
             if principal.role not in ("ADMIN", "SUPERVISOR"):
                 raise HTTPException(403, "Capacidade exige gestão autorizada")
             op = db.get(Operator, operator_id)
@@ -527,7 +534,10 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
     def update_presence(request: Request, operator_id: str, body: PresenceUpdate):
         with factory() as db:
             exclusive_tx(db)
-            principal = request.state.principal
+            principal = revalidate_principal(
+                db, request.state.principal, allow_legacy_test=legacy_test_mode,
+            )
+            request.state.principal = principal
             op = db.get(Operator, operator_id)
             if op is None or op.operation_id != principal.operation_id:
                 raise HTTPException(404, "Operador não encontrado")
