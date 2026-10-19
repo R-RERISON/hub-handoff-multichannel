@@ -47,6 +47,9 @@ python -m handoff_hub.schema_admin --database <TEMP>/synthetic.db inspect
 O comando de criação de banco permanece fixado na revisão 006b4.
 O upgrade 007a2 não é invocado automaticamente pelo launcher.
 O caminho original data/handoff-poc.db é expressamente recusado.
+Após o upgrade e a inspeção, o mesmo laboratório pode ser iniciado para
+homologação visual com `.\start.cmd --lab --lab-dir "<TEMP>"`. O launcher
+valida e retoma tanto 006b4 quanto 007a2 sem criar, resetar ou migrar o banco.
 Rollback: interromper todos os serviços e restaurar o backup verificado
 sob aprovação humana; downgrade destrutivo é recusado quando existem
 estados ou eventos. Não copiar senhas, tokens ou o SQLite para GitHub.

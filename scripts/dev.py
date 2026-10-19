@@ -1,8 +1,7 @@
-"""Single-command Handoff launcher for both regular POC and isolated QA lab.
+"""Single-command Handoff launcher for the POC and isolated QA laboratories.
 
-start.cmd --lab creates or resumes a disposable versioned SQLite 006b4 lab,
-then launches FastAPI and Vite in one terminal. Plain start.cmd preserves the
-original POC startup and never performs Alembic migrations.
+start.cmd --lab creates a fresh 006b4 lab; --lab-dir resumes a validated
+006b4 or explicitly migrated 007a2 lab. The launcher never runs migrations.
 """
 
 from __future__ import annotations
@@ -219,8 +218,8 @@ def prepare_lab_from_venv(python: str, lab_dir: str | None) -> dict:
     except (FileNotFoundError, subprocess.CalledProcessError, ValueError) as exc:
         # Hide raw stderr: it can contain paths, SQL, or incidental data.
         raise LauncherError(
-            "Laboratorio 006b4 recusado ou nao inicializado; "
-            "confira caminho TEMP e versao do schema."
+            "Laboratorio sintetico recusado ou nao inicializado; "
+            "confira o caminho TEMP e a revisao do schema."
         ) from exc
 
 
@@ -233,10 +232,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-browser", action="store_true", help="Nao abre navegador automaticamente")
     parser.add_argument(
         "--lab", action="store_true",
-        help="Cria banco/contas sinteticas 006b4 e inicia API+Web no mesmo terminal",
+        help="Cria laboratorio sintetico novo 006b4 ou retoma com --lab-dir",
     )
     parser.add_argument(
-        "--lab-dir", help="Retoma um laboratorio TEMP 006b4 existente (requer --lab)",
+        "--lab-dir",
+        help="Retoma laboratorio TEMP validado 006b4/007a2 (requer --lab)",
     )
     args = parser.parse_args(argv)
     if args.lab_dir and not args.lab:

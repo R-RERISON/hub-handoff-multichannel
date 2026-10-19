@@ -11,7 +11,10 @@ from sqlalchemy import select
 from handoff_hub.auto_dispatch import run_dispatch_cycle
 from handoff_hub.poc_api import create_app
 from handoff_hub.poc_db import (
-    AuthUser, HandoffSession, QueueMembership, make_session_factory,
+    AuthUser,
+    HandoffSession,
+    QueueMembership,
+    make_session_factory,
 )
 from handoff_hub.provenance_writer import ProvenanceRecorder
 from handoff_hub.queue_lifecycle_schema import LIFECYCLE_REVISION
@@ -24,7 +27,6 @@ from handoff_hub.schema_admin import (
 )
 from scripts import lab_environment
 from scripts.release_grant_toggle import bearer
-
 
 KEY = "qa-lifecycle-only"
 
@@ -113,7 +115,7 @@ def test_migration_is_explicit_offline_verified_and_never_backfills(
                for name, count in before["row_counts"].items())
     assert after["row_counts"]["queue_lifecycle"] == 0
     assert after["row_counts"]["queue_lifecycle_events"] == 0
-    factory, engine = make_session_factory(lab.database_url)
+    _factory, engine = make_session_factory(lab.database_url)
     try:
         assert ProvenanceRecorder(engine).queue_lifecycle_enabled is True
     finally:

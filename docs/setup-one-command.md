@@ -53,8 +53,11 @@ e grants, copie o diretório mostrado ao inicializar:
 O nome entre `<id>` é um exemplo; substitua pelo diretório real.
 `--lab-dir` **não** cria, reseta ou migra banco algum. O utilitário recusa
 qualquer caminho que não seja diretório `handoff-qa-006b4-*` filho direto de
-`$env:TEMP`, qualquer SQLite sem revisão 006b4/22 tabelas/5 identidades/2 filas
-e symlinks para arquivos externos.
+`$env:TEMP`, symlinks para arquivos externos, e esquemas que não sejam um
+laboratório semeado 006b4 (22 tabelas) ou um laboratório migrado explicitamente
+para 007a2 (24 tabelas), ambos com cinco identidades e pelo menos duas filas.
+Laboratórios novos continuam fixados em 006b4; só o comando offline
+`upgrade-lifecycle --confirm-offline` os promove para 007a2.
 
 Abra `synthetic-credentials.txt` localmente em um editor, sem publicá-lo.
 O launcher não aceita chave de API compartilhada no runtime do laboratório.

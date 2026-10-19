@@ -1,7 +1,14 @@
 """SPEC-007 lifecycle tables owned exclusively by 007a2 migration."""
 from sqlalchemy import (
-    CheckConstraint, Column, DateTime, ForeignKey, Index,
-    Integer, MetaData, String, Table,
+    CheckConstraint,
+    Column,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    MetaData,
+    String,
+    Table,
 )
 
 LIFECYCLE_REVISION = "007a2_queue_lifecycle"
