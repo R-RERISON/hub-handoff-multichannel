@@ -4,8 +4,12 @@
 
 O utilitário scripts/release_ui_scope_fixture.py cria no laboratório TEMP 006b4
 uma sessão sintética N1, mensagem N1, transferência real via API para N2
-e mensagem N2. A atribuição ACTIVE a Ana é apenas uma precondição de QA;
-este script não atesta a jornada de oferta/aceite.
+e mensagem N2. A atribuição ACTIVE a Ana é apenas uma precondição de QA,
+não um teste da oferta/aceite N1. Após verificar os controles de acesso, o
+fixture executa o despacho e o aceite **reais pela API** na fila N2 e
+confirma que a Mesa de Bruno possui a sessão ACTIVE. Também verifica que
+a nota interna pode aparecer na trilha privada do operador, mas nunca nas
+mensagens do cliente. Isso prepara a captura UX-05 sem aprovar a UX.
 
 ## Execução na máquina Windows
 
@@ -28,6 +32,7 @@ a outro banco ANTES de qualquer escrita.
 - A nota de transferência nunca aparece no histórico verificado.
 - Auditor N1 solicitando N2 recebe 404 sem conteúdo protegido.
 - Supervisor não publica como operador: 403.
+- N2 recebe oferta e aceita a sessão por API, disponível na Mesa do Bruno.
 - Resumo JSON não inclui IDs, senhas, tokens, mensagens ou notas.
 - manual_ux02=NOT_RUN, manual_ux05=NOT_RUN, manual_ux08=BLOCKED.
 
@@ -40,5 +45,14 @@ operacional. Em Auditor conferir apenas N1. Repetir UX-08 no browser de
 viewport estável em 390×844, 1366×768 e 1920×1080, incluindo Mesa de Operador.
 Anexar evidência sanitizada ao PR #28 e issue #29, SHA e ambiente.
 
-Cada execução acrescenta uma sessão e duas mensagens no SQLite TEMP.
+Uma execução aprovada acrescenta uma sessão e duas mensagens no SQLite TEMP.
 Nenhuma operação do script modifica data/handoff-poc.db, grants ou main.
+
+### Atenção à massa de dados
+
+Executar em laboratório TEMP novo, com Bruno AVAILABLE e capacidade livre.
+O pré-check verifica, somente leitura, se Bruno tem membership em N2,
+se há atendimentos ativos/ofertados a ele e se N2 possui fila pendente.
+Se estiver ocupado, recusa **antes** de criar a sessão. Não repetir no
+mesmo TEMP sem encerramento ou descarte controlado do cenário anterior.
+Use Bruno em /operador para capturar a conversa N2 e sua nota interna.
