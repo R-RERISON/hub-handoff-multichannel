@@ -11,6 +11,8 @@ type QueueRow = {
   offered:number
   active:number
   total_sessions:number
+  lifecycle_state:'DRAFT'|'ACTIVE'|'PAUSED'|'ARCHIVED'
+  lifecycle_version:number
 }
 type Inventory = {
   operation:{id:string;name:string}
@@ -28,6 +30,10 @@ export default function AdminLanding({api}:{api:Api}){
   const [saving,setSaving]=useState(false)
   const [createError,setCreateError]=useState('')
   const [createNotice,setCreateNotice]=useState('')
+  const [selectedTransition,setSelectedTransition]=useState<{id:string;name:string;state:'ACTIVE'|'PAUSED'|'ARCHIVED';version:number}|null>(null)
+  const [transitionBusy,setTransitionBusy]=useState(false)
+  const [transitionError,setTransitionError]=useState('')
+  const [transitionNotice,setTransitionNotice]=useState('')
   const refresh=useCallback(async ()=>{
     setLoading(true);setError('');setInventory(null)
     try{
@@ -39,6 +45,24 @@ export default function AdminLanding({api}:{api:Api}){
     }finally{setLoading(false)}
   },[api])
   useEffect(()=>{void refresh()},[refresh])
+  async function commitTransition(){
+    if(!selectedTransition||transitionBusy)return
+    const change=selectedTransition
+    setTransitionBusy(true);setTransitionError('');setTransitionNotice('')
+    try{
+      const response=await api('/v1/admin/queues/'+encodeURIComponent(change.id)+'/state',
+        'PATCH',{state:change.state,expected_version:change.version})
+      if(response.audit!=='APPLIED'||response.state!==change.state)
+        throw new Error('Estado não confirmado')
+      setSelectedTransition(null)
+      await refresh()
+      setTransitionNotice('Alteração de estado confirmada no diário administrativo.')
+    }catch{
+      setSelectedTransition(null)
+      setTransitionError('Alteração não aplicada. Atualize a lista e confira pendências/versão.')
+      await refresh()
+    }finally{setTransitionBusy(false)}
+  }
   async function createQueue(event:FormEvent<HTMLFormElement>){
     event.preventDefault()
     if(saving||!inventory?.capabilities.queue_create_available)return
@@ -128,17 +152,47 @@ export default function AdminLanding({api}:{api:Api}){
             <thead><tr><th scope="col">Fila</th><th scope="col">Membros</th>
               <th scope="col">Grants</th><th scope="col">Aguardando</th>
               <th scope="col">Ofertados</th><th scope="col">Ativos</th>
-              <th scope="col">Total histórico</th></tr></thead>
+              <th scope="col">Total histórico</th><th scope="col">Estado</th>
+              <th scope="col">Ações</th></tr></thead>
             <tbody>{inventory.queues.map(q=><tr key={q.id}>
               <th scope="row"><strong>{q.name}</strong><small>{q.id}</small></th>
               <td>{q.members}</td><td>{q.grants}</td><td>{q.waiting}</td>
               <td>{q.offered}</td><td>{q.active}</td><td>{q.total_sessions}</td>
+              <td><span className={'admin-inventory__state admin-inventory__state--'+q.lifecycle_state.toLowerCase()}>
+                {q.lifecycle_state}</span></td>
+              <td>{inventory.capabilities.queue_lifecycle_available
+                ? <div className="admin-inventory__state-actions">
+                    {(q.lifecycle_state==='DRAFT'||q.lifecycle_state==='PAUSED')&&
+                      <button type="button" disabled={transitionBusy}
+                        onClick={()=>setSelectedTransition({id:q.id,name:q.name,state:'ACTIVE',version:q.lifecycle_version})}>Ativar</button>}
+                    {q.lifecycle_state==='ACTIVE'&&
+                      <button type="button" disabled={transitionBusy}
+                        onClick={()=>setSelectedTransition({id:q.id,name:q.name,state:'PAUSED',version:q.lifecycle_version})}>Pausar</button>}
+                    {(q.lifecycle_state==='DRAFT'||q.lifecycle_state==='PAUSED')&&
+                      <button type="button" disabled={transitionBusy}
+                        onClick={()=>setSelectedTransition({id:q.id,name:q.name,state:'ARCHIVED',version:q.lifecycle_version})}>Arquivar</button>}
+                  </div>
+                : <span aria-label="Ciclo de vida indisponível">—</span>}</td>
             </tr>)}</tbody>
           </table>
         </div>
         {inventory.queues.length===0&&<p className="admin-inventory__empty">
           Nenhuma fila registrada nesta operação.</p>}
       </section>
+      {selectedTransition&&<section className="panel admin-inventory__confirm" role="group"
+        aria-label="Confirmar mudança de estado">
+        <div><strong>Confirmar {selectedTransition.state} — {selectedTransition.name}?</strong>
+          <p>Uma pausa/arquivamento será recusada se existirem atendimentos pendentes,
+             ofertados ou ativos. Arquivamento é irreversível nesta fase.</p></div>
+        <div className="admin-inventory__confirm-buttons">
+          <button type="button" disabled={transitionBusy}
+            onClick={()=>setSelectedTransition(null)}>Cancelar</button>
+          <button className="primary" type="button" disabled={transitionBusy}
+            onClick={()=>void commitTransition()}>{transitionBusy?'Salvando…':'Confirmar mudança'}</button>
+        </div>
+      </section>}
+      {transitionError&&<p role="alert" className="admin-inventory__error">{transitionError}</p>}
+      {transitionNotice&&<p role="status" className="admin-inventory__success">{transitionNotice}</p>}
     </>}
     <section className="panel admin-inventory__next">
       <ArrowUpRight size={18}/><div><strong>Próximo incremento: estados do ciclo de vida</strong>
