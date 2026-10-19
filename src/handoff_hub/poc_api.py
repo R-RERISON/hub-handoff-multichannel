@@ -44,8 +44,8 @@ from handoff_hub.poc_db import (
     make_session_factory,
     utc_now,
 )
-from handoff_hub.provenance_writer import ProvenanceRecorder
 from handoff_hub.queue_lifecycle import require_active
+from handoff_hub.provenance_writer import ProvenanceRecorder
 from handoff_hub.queue_authorization import (
     change_grant,
     granted_queues,

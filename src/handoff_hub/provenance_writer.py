@@ -12,12 +12,12 @@ from sqlalchemy import Engine, func, insert, select, text, update
 from sqlalchemy.orm import Session
 
 from handoff_hub.poc_db import HandoffSession, Message, SessionEvent, SessionTransfer, utc_now
-from handoff_hub.queue_lifecycle_schema import LIFECYCLE_REVISION
 from handoff_hub.provenance_schema import (
     MESSAGE_QUEUE_PROVENANCE,
     SESSION_EVENT_QUEUE_PROVENANCE,
     SESSION_QUEUE_SEGMENTS,
 )
+from handoff_hub.queue_lifecycle_schema import LIFECYCLE_REVISION
 
 REQUIRED_REVISION = "006b2_queue_provenance"
 AUDIT_REVISION = "006b3_history_access_audit"

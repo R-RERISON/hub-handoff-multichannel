@@ -6,10 +6,10 @@ No conversation content, bearer credentials or audit payloads are returned.
 from __future__ import annotations
 
 from collections import defaultdict
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
-from typing import Literal
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
@@ -22,8 +22,8 @@ from handoff_hub.poc_db import (
     QueueMembership,
     QueueRoleGrant,
 )
-from handoff_hub.security_writer import record_security_decision
 from handoff_hub.queue_lifecycle import change_state, create_draft, queue_state
+from handoff_hub.security_writer import record_security_decision
 
 
 class NewQueue(BaseModel):

@@ -23,8 +23,8 @@ from sqlalchemy.engine import URL
 from handoff_hub.audit_schema import HISTORY_ACCESS_AUDIT
 from handoff_hub.poc_db import Base
 from handoff_hub.provenance_schema import PROVENANCE_TABLES
-from handoff_hub.security_schema import SECURITY_DECISIONS
 from handoff_hub.queue_lifecycle_schema import LIFECYCLE_REVISION, LIFECYCLE_TABLES
+from handoff_hub.security_schema import SECURITY_DECISIONS
 
 BASELINE_REVISION = "006b1_poc_baseline"
 PROVENANCE_REVISION = "006b2_queue_provenance"
