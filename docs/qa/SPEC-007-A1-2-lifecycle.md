@@ -1,7 +1,8 @@
 # SPEC-007/A1.2 — Estados das filas e bloqueio operacional
 
-Estado: CODED / WINDOWS_QA_REQUIRED / SECURITY_REVIEW_REQUIRED.
+Estado: CODED / WINDOWS_QA_PASS / SECURITY_REVIEW_REQUIRED / INTEGRATION_PENDING.
 Branch: feat/007a2-queue-lifecycle. Base: A1.1 8fd9294, validada.
+Reteste Windows: commit 6503d30.
 A migração é EXCLUSIVAMENTE opt-in no SQLite TEMP sintético.
 
 ## Esquema separado e seguro
@@ -64,3 +65,24 @@ Inspecionar UI em Edge/Chrome desktop 1366x768 e 1920x1080,
 foco Tab, confirmação de alteração e mensagens de erro.
 Documentar a semântica de filas antigas ACTIVE/0 e revisar segurança
 do fluxo no diff antes de integrar. Não realizar merge automático.
+
+## Evidência Windows — 2026-10-19
+
+No commit `6503d30`, `.\start.cmd --check` terminou com exit code 0:
+162 testes Python aprovados, 1 ignorado, Ruff aprovado, 16 testes de
+arquitetura frontend, TypeScript e Vite (1.601 módulos).
+
+No laboratório TEMP, o backup foi validado antes do upgrade offline 006b4 →
+007a2. As contagens de todas as tabelas existentes foram preservadas; as
+tabelas de ciclo de vida iniciaram vazias. O launcher retomou o mesmo banco
+migrado antes e depois de registrar as transições, sem migrar ou semear dados.
+
+No navegador integrado do VS Code, a fila sintética `qa-lifecycle` percorreu
+DRAFT/v1 → ACTIVE/v2 → PAUSED/v3 → ARCHIVED/v4; cada transição retornou
+HTTP 200 e auditoria APPLIED. A fila terminou com zero memberships e grants.
+Foco por Tab alcançou “Confirmar mudança”; não houve overflow horizontal em
+1366×768 ou 1920×1080. Capturas PNG verificadas estão no diretório
+TEMP `handoff-qa-006b4-air5z1nu\qa-evidence-a1.2`.
+
+Segurança e integração continuam pendentes. Não houve merge nem promoção à
+`main`.
