@@ -65,6 +65,7 @@ def test_n1_n2_verified_transfer_and_negative_permissions(tmp_path, monkeypatch)
     assert result["result"] == "PASS"
     assert result["ux02_backend_scope"] == "PASS"
     assert result["ux05_backend_verified_isolation"] == "PASS"
+    assert result["ux05_n2_operator_ready"] == "PASS"
     assert result["auditor_n2_http"] == 404
     assert result["supervisor_operator_write_http"] == 403
     assert result["private_note_exposed"] is False

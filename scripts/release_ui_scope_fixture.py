@@ -187,11 +187,53 @@ def run(lab_dir: str | Path, confirmed: bool) -> dict:
             if session_id not in {t["session_id"] for t in listing.json()["tickets"]}:
                 raise LabSafetyError("Sessao QA nao aparece na fila concedida")
 
+        # Complete the N2 operator screen scenario using real dispatch/accept
+        # endpoints. A queue in use by another QA scenario is not silently
+        # altered: fail if this fixture did not receive its own session.
+        offer = client.post(
+            "/v1/dispatch/offer", headers=local, json={"queue_id": "n2"},
+        )
+        require(offer, 200, "offer_n2")
+        offering = offer.json()
+        if (
+            offering.get("result") != "offered"
+            or offering.get("offer", {}).get("session_id") != session_id
+            or offering["offer"].get("operator_id") != "op-bruno"
+        ):
+            raise LabSafetyError("Oferta N2 nao corresponde ao atendimento sintetico")
+        accepted = client.post(
+            f"/v1/handoffs/{session_id}/accept",
+            headers=local, json={"operator_id": "op-bruno"},
+        )
+        require(accepted, 200, "accept_n2")
+        if accepted.json().get("status") != "ACTIVE":
+            raise LabSafetyError("Sessao N2 nao ficou ativa para Bruno")
+        work = client.get("/v1/operators/op-bruno/work", headers=local)
+        require(work, 200, "operator_n2_work")
+        if session_id not in {item["id"] for item in work.json()["active"]}:
+            raise LabSafetyError("Mesa N2 nao apresenta atendimento ativo QA")
+        timeline = client.get(
+            f"/v1/handoffs/{session_id}/timeline", headers=local,
+        )
+        require(timeline, 200, "operator_private_timeline")
+        if not any(
+            entry.get("reason") == PRIVATE_NOTE
+            for entry in timeline.json().get("transfers", [])
+        ):
+            raise LabSafetyError("Nota privada ausente na trilha do operador")
+        transcript = client.get(
+            f"/v1/handoffs/{session_id}/messages", headers=local,
+        )
+        require(transcript, 200, "customer_transcript")
+        if PRIVATE_NOTE in transcript.text:
+            raise LabSafetyError("Nota privada vazou para mensagens ao cliente")
+
     return {
         "result": "PASS",
         "scope": "TEMP_SYNTHETIC_006B4_ONLY",
         "ux02_backend_scope": "PASS",
         "ux05_backend_verified_isolation": "PASS",
+        "ux05_n2_operator_ready": "PASS",
         "supervisor_queue_count": 2,
         "auditor_n2_http": 404,
         "supervisor_operator_write_http": 403,

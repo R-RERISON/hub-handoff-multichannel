@@ -4,8 +4,12 @@
 
 O utilitário scripts/release_ui_scope_fixture.py cria no laboratório TEMP 006b4
 uma sessão sintética N1, mensagem N1, transferência real via API para N2
-e mensagem N2. A atribuição ACTIVE a Ana é apenas uma precondição de QA;
-este script não atesta a jornada de oferta/aceite.
+e mensagem N2. A atribuição ACTIVE a Ana é apenas uma precondição de QA,
+não um teste da oferta/aceite N1. Após verificar os controles de acesso, o
+fixture executa o despacho e o aceite **reais pela API** na fila N2 e
+confirma que a Mesa de Bruno possui a sessão ACTIVE. Também verifica que
+a nota interna pode aparecer na trilha privada do operador, mas nunca nas
+mensagens do cliente. Isso prepara a captura UX-05 sem aprovar a UX.
 
 ## Execução na máquina Windows
 
@@ -28,6 +32,7 @@ a outro banco ANTES de qualquer escrita.
 - A nota de transferência nunca aparece no histórico verificado.
 - Auditor N1 solicitando N2 recebe 404 sem conteúdo protegido.
 - Supervisor não publica como operador: 403.
+- N2 recebe oferta e aceita a sessão por API, disponível na Mesa do Bruno.
 - Resumo JSON não inclui IDs, senhas, tokens, mensagens ou notas.
 - manual_ux02=NOT_RUN, manual_ux05=NOT_RUN, manual_ux08=BLOCKED.
 
@@ -42,3 +47,10 @@ Anexar evidência sanitizada ao PR #28 e issue #29, SHA e ambiente.
 
 Cada execução acrescenta uma sessão e duas mensagens no SQLite TEMP.
 Nenhuma operação do script modifica data/handoff-poc.db, grants ou main.
+
+### Atenção à massa de dados
+
+Executar preferencialmente em laboratório TEMP novo, sem atendimentos N2
+preexistentes em espera. Se o despacho oferecer outra sessão, o fixture
+interrompe com falha explícita, sem tentar alterar sessões de terceiros.
+Use Bruno em /operador para capturar a conversa N2 e sua nota interna.
