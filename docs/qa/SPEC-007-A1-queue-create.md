@@ -15,7 +15,7 @@ com letra. Nome de 3–120 caracteres, sem controles ou espaços extremos.
 
 - 201: `id`, `name`, `operation_id` efetiva, `audit:"APPLIED"`.
 - 401: sem token; 403: não ADMIN; 409: ID existente, mesmo de outra operação.
-- 422: validação; 503: banco sem journal de segurança 006b4.
+- 422: validação; 503: banco sem journal 006b4 **ou falha ao persistir evento** (rollback da fila).
 - Atomicidade: `BEGIN IMMEDIATE` no SQLite, fila+evento
   `security_decisions(action=QUEUE_CREATED, outcome=APPLIED)` na
   **mesma transação**. Uma falha do journal não pode confirmar criação.

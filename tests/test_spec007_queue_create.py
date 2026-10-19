@@ -163,7 +163,7 @@ def test_journal_failure_rolls_back_new_queue(tmp_path, monkeypatch):
         admin = login(c, lab, "admin.demo")
         failed = c.post("/v1/admin/queues", headers=admin,
                         json={"id": "n3", "name": "Suporte N3"})
-        assert failed.status_code != 201
+        assert failed.status_code == 503
         assert counts(lab, "n3") == (0, 0, 0)
         assert journal_count(lab.database, "n3") == 0
 

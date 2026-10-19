@@ -10,7 +10,7 @@ from collections import defaultdict
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from handoff_hub.poc_db import (
     AuthUser,
@@ -133,10 +133,16 @@ def register_admin_overview(factory, authenticate, *, security_audit_enabled: bo
                 )
                 db.add(queue)
                 db.flush()
-                record_security_decision(
-                    db, principal, action="QUEUE_CREATED",
-                    outcome="APPLIED", queue_id=queue.id,
-                )
+                try:
+                    record_security_decision(
+                        db, principal, action="QUEUE_CREATED",
+                        outcome="APPLIED", queue_id=queue.id,
+                    )
+                except SQLAlchemyError as exc:
+                    # The queue INSERT must roll back with the failed journal.
+                    raise HTTPException(
+                        503, "Auditoria indisponivel: cadastro nao aplicado",
+                    ) from exc
                 db.commit()
                 return {"id": queue.id, "name": queue.name,
                         "operation_id": principal.operation_id,
