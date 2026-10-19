@@ -209,16 +209,20 @@ PNG verificadas foram preservadas em
 Revisão de segurança e integração continuam pendentes; não houve merge nem
 promoção à `main`.
 
-## Evidência local — SPEC-007/B0 — 2026-10-19
+## Evidência local — SPEC-007/B0.1 — 2026-10-19
 
-Na branch `feat/007b0-people-boundary-hardening`, commit `e6b9d44`,
-`.\start.cmd --check` terminou com exit code 0: **165 testes Python aprovados,
+Na branch `feat/007b0-people-boundary-hardening`, commit `49a28ad`,
+`.\start.cmd --check` terminou com exit code 0: **170 testes Python aprovados,
 1 ignorado, Ruff, 16 testes de arquitetura frontend, TypeScript e Vite
-(1.601 módulos)**. Os três testes específicos de boundary passaram.
+(1.601 módulos)**. Os oito testes específicos em
+`tests/test_spec007_people_boundaries.py` passaram.
 
-O ADMIN sintético da operação demo não conseguiu alterar capacidade, presença
-ou membership de outra operação: os três requests receberam HTTP 404 e os dados
-do destino permaneceram inalterados. As negações de SUPERVISOR/AUDITOR e as
-escritas autorizadas no próprio escopo também foram verificadas. Todos os testes
-usaram SQLite TEMP; a POC original não foi usada. Revisão de segurança e
-integração seguem pendentes, sem merge ou promoção à `main`.
+O ADMIN sintético recebeu HTTP 404 em tentativas cross-operation para
+capacidade, presença e membership, sem alteração ou enumeração dos dados.
+Também passaram os cenários de revogação de sessão e mudança de papel após
+preflight, grants parciais para operador multi-fila, capacidade insuficiente
+para ocupação e remoção de membership com atendimento ativo. Todos usaram
+SQLite TEMP; a POC original não foi usada.
+
+Auditoria das mutações de equipe e revisão independente de segurança continuam
+pendentes para B1/B2 e antes da integração. Não houve merge ou promoção à `main`.
