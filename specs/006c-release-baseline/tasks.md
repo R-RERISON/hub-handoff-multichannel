@@ -1,0 +1,37 @@
+# Tasks — SPEC-006C: Baseline verificável e promoção controlada da POC
+
+**State**: PLANNED; nenhuma tarefa abaixo foi executada nesta entrega. IDs locais T001–T010.
+**Dependencies**: PR #28 Draft, banco TEMP 006b4, Constituição v1.1
+
+## Phase 1 — Design and verification
+
+- [ ] T001 Confirmar baseline do PR #28, Constituição e dependências anteriores; registrar SHA.
+- [ ] T002 Executar `/speckit-clarify` quando houver ambiguidade material e validar FR/SC com o stakeholder.
+- [ ] T003 Revisar contrato de dados, endpoints, riscos e ameaças; adicionar ADR, se necessário.
+- [ ] T004 Executar `/speckit-analyze` para cobertura FR/SC, autorização, concorrência, rollback.
+
+## Phase 2 — Incremental delivery
+
+- [ ] T005 C.1 Inventariar commits, diffs, dependências, PRs paralelos e atualizar a matriz de evidências; usar dados sintéticos, verificar autorização e revisar testes.
+- [ ] T006 C.2 Homologar UX-02, UX-05 e UX-08 com navegador de viewport comprovado; usar dados sintéticos, verificar autorização e revisar testes.
+- [ ] T007 C.3 Revalidar gates no SHA final, conferir concorrência e segurança, obter decisão formal de promoção; usar dados sintéticos, verificar autorização e revisar testes.
+
+## Phase 3 — Gates and closure
+
+- [ ] T008 Executar testes negativos e de concorrência (se aplicável) e provar invariantes do banco original.
+- [ ] T009 Executar `start.cmd --check` no Windows, documentar QA visual aplicável, artefatos, problemas e SHA.
+- [ ] T010 Executar `/speckit-converge`, revisar rollback e colher decisão formal no PR pequeno antes de integrar.
+
+## Progress convention
+
+Marcar caixa **somente após evidência objetiva** (link do commit, teste, captura sintética, PR). Manter `NOT_STARTED → IN_PROGRESS → BLOCKED / IN_REVIEW → ACCEPTED` no registro de programa. `ACCEPTED` não significa `PRODUCTION_READY`.
+
+## Fatia implementada 006C-1 (código criado; gates ainda pendentes)
+
+- [x] T005a Criar fixture TEMP 006b4 para evidência sintética UX-02/UX-05, sem tocar no banco original (código versionado nesta branch).
+- [x] T005b Criar gerador/verificador de manifesto com SHA e PNGs nas três resoluções, sem autoaprovar UX (código versionado nesta branch).
+- [ ] T005c Executar testes completos no Windows, inclusive novos Pytest, Ruff, TypeScript/Vite e release_probe.py no SHA final.
+- [ ] T006 Homologar de verdade UX-02/05/08 no navegador e anexar capturas sanitizadas.
+- [ ] T007 Reavaliar diff amplo PR #28 e registrar decisão humana; NENHUM merge realizado.
+
+Prova documental: scripts/release_ui_scope_fixture.py, scripts/release_ui_evidence_gate.py, tests/test_release_ui_scope_fixture.py, tests/test_release_ui_evidence_gate.py e docs/qa/SPEC-006C-*. Não marcar T008–T010 como PASS sem execução local.
