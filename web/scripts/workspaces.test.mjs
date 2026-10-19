@@ -235,3 +235,17 @@ test('admin queue ID follows HTML Unicode v constraint and server-side format', 
     assert.equal(compiled.test(invalid), false, 'expected invalid ID: ' + invalid)
   }
 })
+
+test('admin people inventory stays read-only and separate from role grants', () => {
+  const landing=read('src/workspaces/AdminLanding.tsx')
+  const people=read('src/workspaces/AdminPeople.tsx')
+  assert.match(landing,/import AdminPeople from '\.\/AdminPeople'/)
+  assert.match(landing,/<AdminPeople api=\{api\}\/>/)
+  assert.match(people,/\/v1\/admin\/people/)
+  assert.match(people,/membership_write_available/)
+  assert.match(people,/grant_write_available/)
+  assert.match(people,/role="alert"/)
+  assert.match(people,/Operadores da operação/)
+  assert.match(people,/Contas de autenticação da operação/)
+  assert.doesNotMatch(people,/api\([^)]*,\s*['"](POST|PATCH|DELETE)['"]/)
+})

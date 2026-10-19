@@ -69,6 +69,11 @@ def test_people_directory_scopes_accounts_operators_and_memberships(
             db.add(QueueMembership(
                 operator_id="external-operator", queue_id="external-queue",
             ))
+            db.add(AuthUser(
+                id="external-account", username="FOREIGN_ACCOUNT_PRIVATE",
+                password_hash="not-a-real-hash", role="AUDITOR",
+                operation_id="external-op", is_active=True,
+            ))
             # Within-operation operator without membership must remain visible.
             db.add(Operator(
                 id="unassigned-op", operation_id="demo", name="Unassigned Demo",
@@ -107,7 +112,8 @@ def test_people_directory_scopes_accounts_operators_and_memberships(
         } for account in data["accounts"])
         for forbidden in (
             "FOREIGN_OPERATION_PRIVATE", "FOREIGN_OPERATOR_PRIVATE",
-            "FOREIGN_QUEUE_PRIVATE", "external-operator", "external-queue",
+            "FOREIGN_QUEUE_PRIVATE", "FOREIGN_ACCOUNT_PRIVATE",
+            "external-operator", "external-queue", "external-account",
             "password", "token_hash", "access_token",
             "requester_label", "external_conversation_id", "subject",
         ):
