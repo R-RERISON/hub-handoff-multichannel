@@ -442,12 +442,21 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
 
     @app.patch("/v1/queues/{queue_id}/members/{operator_id}",
                dependencies=[Depends(authenticate)])
-    def update_queue_member(queue_id: str, operator_id: str, body: QueueMemberUpdate):
+    def update_queue_member(request: Request, queue_id: str, operator_id: str,
+                            body: QueueMemberUpdate):
         with factory() as db:
             exclusive_tx(db)
+            principal = request.state.principal
+            if principal.role not in ("ADMIN", "SUPERVISOR"):
+                raise HTTPException(403, "Perfil não autorizado para membership")
             q = db.get(Queue, queue_id)
+            if q is None or q.operation_id != principal.operation_id:
+                raise HTTPException(404, "Fila não encontrada")
+            if principal.role == "SUPERVISOR":
+                # Re-check within the write transaction, not only in auth preflight.
+                require_queue(db, principal, queue_id, manage=True)
             op = db.get(Operator, operator_id)
-            if not q or not op or q.operation_id != op.operation_id:
+            if op is None or op.operation_id != principal.operation_id:
                 raise HTTPException(422, "Fila ou operador incompatível")
             member = db.get(QueueMembership, (queue_id, operator_id))
             if body.enabled and member is None:
@@ -467,12 +476,25 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
 
     @app.patch("/v1/operators/{operator_id}/capacity",
                dependencies=[Depends(authenticate)])
-    def update_capacity(operator_id: str, body: CapacityUpdate):
+    def update_capacity(request: Request, operator_id: str, body: CapacityUpdate):
         with factory() as db:
             exclusive_tx(db)
+            principal = request.state.principal
+            if principal.role not in ("ADMIN", "SUPERVISOR"):
+                raise HTTPException(403, "Capacidade exige gestão autorizada")
             op = db.get(Operator, operator_id)
-            if not op:
-                raise HTTPException(404, "Operador inexistente")
+            if op is None or op.operation_id != principal.operation_id:
+                raise HTTPException(404, "Operador não encontrado")
+            if principal.role == "SUPERVISOR":
+                memberships = set(db.scalars(
+                    select(QueueMembership.queue_id).where(
+                        QueueMembership.operator_id == op.id,
+                    )
+                ).all())
+                if not memberships or not memberships.issubset(
+                    granted_queues(db, principal)
+                ):
+                    raise HTTPException(403, "Capacidade fora do escopo concedido")
             occupied = db.scalar(select(func.count()).select_from(HandoffSession).where(
                 HandoffSession.operator_id == operator_id,
                 HandoffSession.status.in_(("OFFERED", "ACTIVE")),
@@ -502,12 +524,30 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
                          HandoffSession.queue_id.in_(allowed))) or 0} for o in ops]
 
     @app.patch("/v1/operators/{operator_id}/presence", dependencies=[Depends(authenticate)])
-    def update_presence(operator_id: str, body: PresenceUpdate):
-        with factory.begin() as db:
+    def update_presence(request: Request, operator_id: str, body: PresenceUpdate):
+        with factory() as db:
+            exclusive_tx(db)
+            principal = request.state.principal
             op = db.get(Operator, operator_id)
-            if op is None:
-                raise HTTPException(404, "Operador inexistente")
+            if op is None or op.operation_id != principal.operation_id:
+                raise HTTPException(404, "Operador não encontrado")
+            if principal.role == "OPERATOR":
+                if principal.operator_id != operator_id:
+                    raise HTTPException(403, "Presença exige identidade do operador")
+            elif principal.role == "SUPERVISOR":
+                memberships = set(db.scalars(
+                    select(QueueMembership.queue_id).where(
+                        QueueMembership.operator_id == operator_id,
+                    )
+                ).all())
+                if not memberships or not memberships.issubset(
+                    granted_queues(db, principal)
+                ):
+                    raise HTTPException(403, "Presença fora do escopo concedido")
+            elif principal.role != "ADMIN":
+                raise HTTPException(403, "Perfil não autorizado para presença")
             op.presence = body.presence
+            db.commit()
         return {"operator_id": operator_id, "presence": body.presence}
 
     @app.post("/v1/handoffs", status_code=201, dependencies=[Depends(authenticate)])
