@@ -1,5 +1,7 @@
 """SPEC-006B-1: safe Alembic adoption of existing SQLite POC databases."""
+import hashlib
 import sqlite3
+from pathlib import Path
 
 import pytest
 from alembic import command
@@ -162,7 +164,9 @@ def test_backup_is_consistent_without_changing_original(tmp_path):
     backup_path, digest = verified_backup(path, tmp_path / "backups")
     assert len(digest) == 64
     assert backup_path != path
+    assert '-preunversioned-' in backup_path.name
     assert verify_database(backup_path) == initial
+    assert hashlib.sha256(backup_path.read_bytes()).hexdigest() == digest
     assert verify_database(path) == initial
 
 
@@ -177,6 +181,8 @@ def test_upgrade_006b1_to_006b2_keeps_legacy_records(tmp_path):
     upgraded = upgrade_existing(db_path, backups, confirmed=True)
     after = verify_database(db_path)
     assert upgraded["revision"] == PROVENANCE_REVISION
+    assert "-pre006b1-" in Path(upgraded["backup"]).name
+    assert verify_database(Path(upgraded["backup"]))["revision"] == BASELINE_REVISION
     assert after["revision"] == PROVENANCE_REVISION
     assert after["table_count"] == prior["table_count"] + 3
     assert after["row_counts"]["handoff_sessions"] == 1
@@ -230,6 +236,7 @@ def test_versioned_006b2_backup_is_independently_inspectable(tmp_path):
     backup_path, checksum = verified_backup(path, tmp_path / "backups")
     assert len(checksum) == 64
     assert verify_database(backup_path)["revision"] == SECURITY_REVISION
+    assert "-pre006b4-" in backup_path.name
     assert verify_database(path) == verify_database(backup_path)
 
 
@@ -277,6 +284,7 @@ def test_audit_revision_requires_explicit_offline_upgrade_and_preserves_rows(tmp
     result = upgrade_audit_existing(db_path, backups, confirmed=True)
     after = verify_database(db_path)
     assert result["revision"] == AUDIT_REVISION
+    assert "-pre006b2-" in Path(result["backup"]).name
     assert result["audit_table_empty"] is True
     assert len(result["backup_sha256"]) == 64
     assert after["revision"] == AUDIT_REVISION
@@ -314,6 +322,7 @@ def test_security_upgrade_requires_versioned_audit_database_and_verified_backup(
     upgraded = upgrade_security_existing(path, backup_dir, confirmed=True)
     after = verify_database(path)
     assert upgraded["revision"] == SECURITY_REVISION
+    assert "-pre006b3-" in Path(upgraded["backup"]).name
     assert upgraded["security_table_empty"] is True
     assert after["table_count"] == before["table_count"] + 1
     assert after["row_counts"]["security_decisions"] == 0

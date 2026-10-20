@@ -1,7 +1,9 @@
 """SPEC-007/A1.2 migration and lifecycle acceptance, synthetic SQLite only."""
 from __future__ import annotations
 
+import hashlib
 import sqlite3
+from pathlib import Path
 
 import pytest
 from alembic import command
@@ -110,6 +112,10 @@ def test_migration_is_explicit_offline_verified_and_never_backfills(
     result = upgraded(lab, tmp_path)
     after = verify_database(lab.database)
     assert result["lifecycle_tables_empty"] is True
+    assert "-pre006b4-" in Path(result["backup"]).name
+    preupgrade = Path(result["backup"])
+    assert verify_database(preupgrade) == before
+    assert hashlib.sha256(preupgrade.read_bytes()).hexdigest() == result["backup_sha256"]
     assert after["revision"] == LIFECYCLE_REVISION
     assert all(after["row_counts"][name] == count
                for name, count in before["row_counts"].items())
@@ -314,3 +320,18 @@ def test_auto_dispatch_skips_draft_even_with_synthetic_queued_case(
                 assert session is not None and session.status == "OFFERED"
     finally:
         engine.dispose()
+
+def test_lifecycle_backup_after_upgrade_uses_007a2_source_label(
+    tmp_path, monkeypatch,
+):
+    from handoff_hub.schema_admin import verified_backup
+
+    lab = lab_ready(tmp_path, monkeypatch)
+    upgraded(lab, tmp_path)
+    current = verify_database(lab.database)
+    assert current["revision"] == LIFECYCLE_REVISION
+    saved, checksum = verified_backup(lab.database, tmp_path / "snapshot-after")
+    assert "-pre007a2-" in saved.name
+    assert verify_database(saved) == current
+    assert hashlib.sha256(saved.read_bytes()).hexdigest() == checksum
+    assert verify_database(lab.database) == current
