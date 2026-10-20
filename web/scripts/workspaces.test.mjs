@@ -249,3 +249,105 @@ test('admin people inventory stays read-only and separate from role grants', () 
   assert.match(people,/Contas de autenticação da operação/)
   assert.doesNotMatch(people,/api\([^)]*,\s*['"](POST|PATCH|DELETE)['"]/)
 })
+
+test('RC-001 G07 keeps notification action visible at 200% zoom', () => {
+  const css = read('src/styles.css')
+  const desk = read('src/OperatorDesk.tsx')
+  assert.match(desk, /className="outline small desk-notification-button"/)
+  assert.match(desk, /Ativar alertas/)
+  assert.doesNotMatch(css,
+    /\.desk-layout--compact \.desk-notification-button\s*\{\s*display:\s*none/)
+  assert.match(css,
+    /@media\(max-width:780px\)\{[\s\S]*?\.desk-layout--compact \.desk-notification-button\s*\{\s*display:inline-flex/)
+  assert.match(css,
+    /\.operator-portal__main \.desk-top\s*\{min-height:0;max-height:none\}/)
+})
+
+test('RC-001 G07 enables keyboard scrolling of all three admin tables', () => {
+  const css = read('src/styles.css')
+  const people = read('src/workspaces/AdminPeople.tsx')
+  const landing = read('src/workspaces/AdminLanding.tsx')
+  const regions = [
+    ['admin-operators-scroll-hint', 'Tabela de operadores e memberships', people],
+    ['admin-accounts-scroll-hint', 'Tabela de contas de autenticação', people],
+    ['admin-queues-scroll-hint', 'Tabela de filas da operação', landing],
+  ]
+  for (const [hintId, label, content] of regions) {
+    assert.ok(content.includes('id="' + hintId + '"'), 'missing hint: ' + hintId)
+    assert.ok(content.includes('aria-label="' + label + '"'), 'missing region: ' + label)
+    assert.ok(content.includes('aria-describedby="' + hintId + '" tabIndex={0}'),
+      'missing keyboard focus: ' + label)
+  }
+  assert.equal((people.match(/tabIndex=\{0\}/g) ?? []).length, 2)
+  assert.equal((landing.match(/tabIndex=\{0\}/g) ?? []).length, 1)
+  assert.match(css, /\.admin-inventory__table-scroll:focus-visible\s*\{/)
+  assert.match(css, /\.admin-inventory__table-scroll\s*\{\s*overflow-x:auto/)
+  assert.match(css, /\.admin-inventory__table table\s*\{min-width:1040px\}/)
+})
+
+test('RC-001 G07 #53 prevents feedback from intercepting operational controls', () => {
+  const css = read('src/styles.css')
+  const desk = read('src/OperatorDesk.tsx')
+  const rule = css.match(/\.desk-layout--compact \.desk-feedback\s*\{([^}]*)\}/)?.[1]
+  assert.ok(rule, 'compact desk feedback rule missing')
+  assert.match(rule, /position:static/)
+  assert.match(rule, /display:flex;flex:0 0 auto;flex-direction:column/)
+  assert.match(rule, /max-height:min\(160px,28dvh\)/)
+  assert.match(rule, /overflow-y:auto/)
+  assert.doesNotMatch(rule, /position:\s*(absolute|fixed|sticky)/)
+  assert.doesNotMatch(rule, /(?:^|;)\s*(top|right|bottom|left)\s*:/)
+  assert.doesNotMatch(rule, /pointer-events/)
+  const messageRule = css.match(/\.desk-layout--compact \.desk-feedback>\*\s*\{([^}]*)\}/)?.[1]
+  assert.ok(messageRule, 'status/error messages need their own in-flow style')
+  assert.match(messageRule, /flex:0 0 auto/)
+  assert.doesNotMatch(messageRule, /pointer-events/)
+  assert.match(desk, /className="desk-feedback" aria-live="polite"/)
+  assert.match(desk, /className="notice" role="status"/)
+  assert.match(desk, /aria-label="Dispensar aviso"/)
+  assert.match(desk, /onClick=\{\(\)=>setNotice\(''\)\}/)
+  assert.match(desk, /className="primary small"[^>]*onClick=\{\(\)=>void execute/)
+})
+
+test('RC-001 G07 #53 preserves keyboard access to dismissal and existing zoom fixes', () => {
+  const css = read('src/styles.css')
+  const desk = read('src/OperatorDesk.tsx')
+  assert.match(css, /\.desk-layout--compact \.desk-feedback button:focus-visible\s*\{/)
+  assert.match(css, /\.desk-layout--compact \.desk-feedback:empty\{display:none\}/)
+  assert.match(css, /\.desk-layout--compact \.desk-notification-button\s*\{\s*display:inline-flex/)
+  assert.match(desk, /<button aria-label="Dispensar aviso" onClick=\{\(\)=>setNotice\(''\)\}>/)
+})
+
+test('RC-001 G07 #54 keeps offer actions inside a height-constrained dialog', () => {
+  const css = read('src/styles.css')
+  const desk = read('src/OperatorDesk.tsx')
+  const dialogRule = css.match(/\.offer-dialog\s*\{([^}]*)\}/)?.[1]
+  const bodyRule = css.match(/\.offer-dialog__body\s*\{([^}]*)\}/)?.[1]
+  const actionsRule = css.match(/\.offer-dialog__buttons\s*\{([^}]*)\}/)?.[1]
+  assert.ok(dialogRule, 'offer dialog styles missing')
+  assert.ok(bodyRule, 'offer details scrolling styles missing')
+  assert.ok(actionsRule, 'offer action footer styles missing')
+  assert.match(dialogRule, /max-height:calc\(100dvh - 36px\)/)
+  assert.match(dialogRule, /display:flex;flex-direction:column;overflow:hidden/)
+  assert.match(bodyRule, /flex:1 1 auto;min-height:0;overflow-y:auto/)
+  assert.match(actionsRule, /flex:0 0 auto/)
+  assert.match(desk, /className="offer-dialog" role="alertdialog" aria-modal="true"/)
+  assert.match(desk, /className="offer-dialog__body" role="region"/)
+  assert.match(desk, /aria-label="Detalhes da oferta" tabIndex=\{0\}/)
+  assert.match(desk, /<\/div>\s*<div className="offer-dialog__buttons">/)
+  assert.match(desk, /ref=\{acceptButtonRef\} className="primary"/)
+  assert.match(desk, /Recusar<\/button>/)
+  assert.match(desk, /Aceitar atendimento<\/button>/)
+})
+
+test('RC-001 G07 #54 preserves zoom, keyboard scrolling and transfer context', () => {
+  const css = read('src/styles.css')
+  const desk = read('src/OperatorDesk.tsx')
+  assert.match(css, /\.offer-overlay\{position:fixed;inset:0/)
+  assert.match(css, /\.offer-dialog__body:focus-visible\s*\{/)
+  assert.match(css, /\.offer-dialog__buttons button:focus-visible\s*\{/)
+  assert.match(css, /@media\(max-width:700px\)\{[\s\S]*?\.offer-dialog__buttons\{flex-direction:column\}/)
+  assert.match(css, /\.offer-dialog__transfer-note\{margin-top:12px;max-height:170px;overflow:auto\}/)
+  assert.match(desk, /className="offer-dialog__transfer-note" role="note"/)
+  assert.match(desk, /className="offer-dialog__hint"/)
+  assert.match(desk, /acceptButtonRef\.current\?\.focus\(\)/)
+})

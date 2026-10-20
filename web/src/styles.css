@@ -522,15 +522,35 @@ body{background:var(--hub-bg)}
 .desk-alert-controls{display:flex;justify-content:space-between;align-items:center;gap:14px;
   border:1px solid #c6e4d8;border-radius:9px;padding:10px 15px;background:#f1fbf5;color:#527b6b;font-size:12px}
 .offer-overlay{position:fixed;inset:0;background:#081526a8;z-index:300;display:grid;place-items:center;padding:18px}
-.offer-dialog{width:min(510px,100%);border-radius:18px;background:#fff;padding:32px;
-  box-shadow:0 34px 110px #0005;border:1px solid #d8e5ee}
+/* RC-001 / G07 #54: keep offer actions inside the viewport at real 200% zoom.
+   Scroll details, not the entire dialog or its action footer. */
+.offer-dialog{
+  width:min(510px,100%);max-height:calc(100dvh - 36px);min-height:0;
+  display:flex;flex-direction:column;overflow:hidden;
+  border-radius:18px;background:#fff;padding:clamp(12px,3vh,32px);
+  box-shadow:0 34px 110px #0005;border:1px solid #d8e5ee
+}
+.offer-dialog__body{
+  flex:1 1 auto;min-height:0;overflow-y:auto;
+  overscroll-behavior:contain;scrollbar-width:thin;padding-right:4px
+}
+.offer-dialog__body:focus-visible{
+  outline:3px solid #438fe2;outline-offset:-3px
+}
 .offer-dialog h2{font:800 23px Manrope,sans-serif;color:#193c5f;margin:14px 0}
 .offer-dialog>p{font-size:13px;color:#536c82;line-height:1.6}
 .offer-dialog #offer-dialog-text{display:flex;flex-direction:column;gap:7px;padding:16px;
   background:#eff7ff;border:1px solid #d8e9fb;border-radius:9px}
 .offer-dialog #offer-dialog-text strong{font-size:16px;color:#244c75}
 .offer-dialog__hint{padding-top:14px;font-size:12px!important;color:#7a90a4!important}
-.offer-dialog__buttons{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
+.offer-dialog__buttons{
+  display:flex;flex:0 0 auto;justify-content:flex-end;gap:10px;
+  margin-top:12px;padding-top:12px;border-top:1px solid #e6edf4;
+  background:#fff
+}
+.offer-dialog__buttons button:focus-visible{
+  outline:3px solid #438fe2;outline-offset:2px
+}
 .offer-dialog__buttons button{font-size:13px;padding:12px 16px}
 .rotation-panel{padding:14px 24px 19px;border-top:1px solid #e5edf4;background:#fcfdff}
 .rotation-panel h4{font-size:12px;color:#51718d;margin-bottom:12px}
@@ -600,15 +620,22 @@ body{background:var(--hub-bg)}
   padding:7px 8px;font-size:11px;color:#365571;background:#fff
 }
 .desk-layout--compact .desk-notification-button{white-space:nowrap}
+/* RC-001 / G07 #53: status messages occupy their own flex row.
+   A floating toast previously intercepted clicks on Encerrar/Transferir. */
 .desk-layout--compact .desk-feedback{
-  position:absolute;z-index:30;right:7px;top:65px;
-  display:flex;flex-direction:column;gap:4px;
-  width:min(570px,calc(100% - 14px));pointer-events:none
+  position:static;z-index:auto;
+  display:flex;flex:0 0 auto;flex-direction:column;gap:4px;
+  width:100%;min-width:0;max-height:min(160px,28dvh);
+  overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;
+  padding:0 2px 2px
 }
 .desk-layout--compact .desk-feedback:empty{display:none}
 .desk-layout--compact .desk-feedback>*{
-  pointer-events:auto;margin:0;padding:8px 11px;
-  box-shadow:0 12px 26px #102c4617;font-size:11px
+  flex:0 0 auto;margin:0;padding:8px 11px;
+  box-shadow:none;font-size:11px
+}
+.desk-layout--compact .desk-feedback button:focus-visible{
+  outline:3px solid #438fe2;outline-offset:2px
 }
 .operator-portal__main .desk-grid{
   flex:1 1 0;min-height:0!important;height:auto!important;
@@ -722,7 +749,15 @@ body{background:var(--hub-bg)}
   .desk-layout--compact[data-panel="chat"] .desk-inbox{display:none}
   .desk-layout--compact .desk-top{padding:7px 9px;max-height:100px;flex-wrap:wrap}
   .desk-layout--compact .desk-identity{justify-content:flex-start}
-  .desk-layout--compact .desk-notification-button{display:none}
+  /* G07: browser zoom must not remove an actionable notification control. */
+  .operator-portal__main .desk-top{min-height:0;max-height:none}
+  .desk-layout--compact .desk-top{max-height:none}
+  .desk-layout--compact .desk-heading{flex:1 1 100%}
+  .desk-layout--compact .desk-identity{width:100%;justify-content:flex-start}
+  .desk-layout--compact .desk-notification-button{
+    display:inline-flex;align-items:center;justify-content:center;
+    min-height:36px;white-space:normal
+  }
   .desk-layout--compact .desk-chat-tools{gap:3px}
   .desk-layout--compact .desk-chat-tools button{padding:6px;font-size:10px}
   .desk-layout--compact .desk-transfer-panel{grid-template-columns:1fr 1fr}
@@ -887,7 +922,16 @@ body{background:var(--hub-bg)}
   flex-wrap:wrap;gap:12px;padding:18px 20px;border-bottom:1px solid #e3ebf2}
 .admin-inventory__table h3{margin:5px 0;font-size:17px;color:#1e415e}
 .admin-inventory__table p{margin:0;font-size:12px;color:#657f96}
-.admin-inventory__table-scroll{overflow-x:auto;max-width:100%}
+.admin-inventory__table-scroll{
+  overflow-x:auto;max-width:100%;scrollbar-gutter:stable
+}
+.admin-inventory__table-scroll:focus-visible{
+  outline:3px solid #438fe2;outline-offset:-3px
+}
+.admin-inventory__table p.admin-inventory__scroll-hint{
+  margin:0;padding:10px 17px;background:#f4f9ff;color:#345c79;
+  font-size:12px;line-height:1.5;border-bottom:1px solid #e3ebf2
+}
 .admin-inventory__table table{border-collapse:collapse;width:100%;min-width:760px}
 .admin-inventory__table th,.admin-inventory__table td{padding:14px 17px;text-align:left;
   border-bottom:1px solid #e5edf4;font-size:12px;color:#365c7b}
