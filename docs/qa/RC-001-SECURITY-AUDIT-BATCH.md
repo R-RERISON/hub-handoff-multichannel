@@ -24,7 +24,9 @@ o hotfix à RC-001 automaticamente e não transforma um teste local em produçã
 
 O runner gera APENAS `summary.json` com SHAs, contagens e estados fixos;
 não salva stdout/stderr bruto, senhas, tokens, nomes de clientes, dados
-reais, dumps ou SQL. Em caso de falha imprime nome da etapa e exit code;
+reais, dumps ou SQL. A ausência de escrita no banco original depende do
+isolamento e do review do escopo, e **não** é declarada como medição instrumental
+independente no JSON. Em caso de falha imprime nome da etapa e exit code;
 o executor pode investigar no lab separadamente, sem anexar dados sensíveis.
 
 ## Execução única (Windows, PowerShell)

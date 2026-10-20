@@ -69,6 +69,9 @@ def test_persona_matrix_admin_and_operator_boundaries(lab):
                           headers=auth["auditor.demo"]).status_code == 200
         assert client.get(history, params={"queue_id": "n2"},
                           headers=auth["auditor.demo"]).status_code == 404
+        for queue_id in ("n1", "n2"):
+            assert client.get(history, params={"queue_id": queue_id},
+                              headers=auth["supervisor.demo"]).status_code == 200
         for username in ("admin.demo", "ana.demo", "bruno.demo"):
             assert client.get(history, params={"queue_id": "n1"},
                               headers=auth[username]).status_code == 403
