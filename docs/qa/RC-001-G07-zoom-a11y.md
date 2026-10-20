@@ -2,7 +2,7 @@
 
 **Base:** PR #51 / commit `20ff982444310ef5c7dbce15d9d208ee0c1724b0`.  
 **Entrega:** hotfix em `fix/rc001-g07-zoom-a11y`, não integrado à baseline RC-001.  
-**Status:** CODED / QA_WINDOWS_NOT_RUN / BROWSER_RETEST_REQUIRED / NO_MERGE.
+**Status:** CODED / QA_NEW_HEAD_NOT_RUN / BROWSER_RETEST_REQUIRED / NO_MERGE.
 
 ## Evidência de origem: rodada visual informada pelo executor
 
@@ -60,3 +60,63 @@ G07 original foi reportado FAIL; G02, G05 parciais e demais pendentes.
 
 ## Rollback
 Abandonar branch/PR do hotfix; RC-001 `20ff982444310ef5c7dbce15d9d208ee0c1724b0` continua imutável.
+
+
+## Reteste Windows informado em 20/10/2026 — snapshot anterior do hotfix
+
+**SHA:** `5174bfbaf8454140d6f4de9284f0cd6b0dd9bb81`.
+Executor relatou `start.cmd --check`: **173 Python PASS, 1 SKIP, Ruff,
+19 arquitetura frontend, TypeScript e Vite PASS**. No browser integrado,
+viewport real 1366×768 e 1920×1080 a 100%/200%: botão **Ativar alertas**
+visível, focável por Tab, três tabelas focáveis e rolagem por setas até a
+última coluna. Fluxo sintético N1→N2, com aceite, mensagens e encerramento,
+concluído. Tudo isso **pertence exclusivamente ao SHA acima** e não comprova
+a correção adicional feita depois.
+
+### Issue #53 — correção adicional na mesma linha de estabilização
+
+**Causa:** `desk-feedback` usava `position:absolute` dentro do painel
+da Mesa, com os filhos `pointer-events:auto`. Um aviso de sucesso
+sobrepunha-se ao botão **Encerrar**, impedindo o clique até o aviso
+ser dispensado.
+
+**Remediação:** aviso inserido no fluxo flex (sem posição absoluta ou
+coordenadas de sobreposição), com espaço próprio, limite de altura e
+rolagem vertical **do próprio aviso** quando necessário; botão de dispensa
+com nome acessível; preservados `role=status`, `aria-live` e lógica de
+notificações. Os avisos não encobrem botões operacionais nem exigem
+fechamento para executar ações.
+
+**Impacto esperado:** o painel de atendimentos perde temporariamente a
+altura ocupada pelo aviso (sem bloqueio por camada visual). Layout compacto
+com zoom 200% e altura baixa deve ser verificado para não ocultar o
+compositor, menu de transferência ou botões ativos.
+
+**Testes novos:** dois contratos de arquitetura frontend (não substituem
+Playwright/manual na aplicação real).
+
+### Protocolo para o SHA FINAL do PR #52 (PENDENTE)
+
+- [ ] Confirmar `git rev-parse HEAD` com SHA final, worktree limpa.
+- [ ] `.\\start.cmd --check` retorna exit 0; anotar contagem nova.
+- [ ] `.\\start.cmd --lab --lab-dir "<TEMP do laboratório validado>"`
+  ou criar laboratório TEMP novo, jamais iniciar POC original.
+- [ ] Operador N1: criar ticket sintético, aceitar a oferta e enviar uma
+  mensagem para exibir o aviso `Resposta registrada...`.
+- [ ] **Sem dispensar o aviso:** com mouse clicar **Encerrar**; verificar
+  estado persistido `CLOSED` e que a ação não ficou bloqueada.
+- [ ] Repetir o teste antes de encerrar usando **Transferir** enquanto
+  o aviso estiver visível, em outra sessão sintética.
+- [ ] Validar close `Dispensar aviso` por Tab/Enter e que fechar aviso
+  **não** execute ação de atendimento nem altere sessão.
+- [ ] Repetir a 1366×768 e 1920×1080, zoom real 100%/200%;
+  `getComputedStyle(feedback).position === 'static'`, ausência de
+  interseção geométrica entre feedback e botões operacionais,
+  compositor/chats alcançáveis e sem overflow horizontal do documento.
+- [ ] Revalidar G07 original: Ativar alertas visível, três tabelas
+  focáveis e navegáveis com setas.
+- [ ] Sanitizar screenshots e logs; não compartilhar tokens/senhas.
+- [ ] Manter PR #52 Draft, RC-001 original e main sem merge até aceite.
+
+**Status após código da #53:** CODED / HOTFIX_NEW_SHA_QA_NOT_RUN /
+BROWSER_RETEST_REQUIRED / NO_MERGE.

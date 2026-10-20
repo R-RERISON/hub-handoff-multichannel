@@ -284,3 +284,35 @@ test('RC-001 G07 enables keyboard scrolling of all three admin tables', () => {
   assert.match(css, /\.admin-inventory__table-scroll\s*\{\s*overflow-x:auto/)
   assert.match(css, /\.admin-inventory__table table\s*\{min-width:1040px\}/)
 })
+
+test('RC-001 G07 #53 prevents feedback from intercepting operational controls', () => {
+  const css = read('src/styles.css')
+  const desk = read('src/OperatorDesk.tsx')
+  const rule = css.match(/\.desk-layout--compact \.desk-feedback\s*\{([^}]*)\}/)?.[1]
+  assert.ok(rule, 'compact desk feedback rule missing')
+  assert.match(rule, /position:static/)
+  assert.match(rule, /display:flex;flex:0 0 auto;flex-direction:column/)
+  assert.match(rule, /max-height:min\(160px,28dvh\)/)
+  assert.match(rule, /overflow-y:auto/)
+  assert.doesNotMatch(rule, /position:\s*(absolute|fixed|sticky)/)
+  assert.doesNotMatch(rule, /(?:^|;)\s*(top|right|bottom|left)\s*:/)
+  assert.doesNotMatch(rule, /pointer-events/)
+  const messageRule = css.match(/\.desk-layout--compact \.desk-feedback>\*\s*\{([^}]*)\}/)?.[1]
+  assert.ok(messageRule, 'status/error messages need their own in-flow style')
+  assert.match(messageRule, /flex:0 0 auto/)
+  assert.doesNotMatch(messageRule, /pointer-events/)
+  assert.match(desk, /className="desk-feedback" aria-live="polite"/)
+  assert.match(desk, /className="notice" role="status"/)
+  assert.match(desk, /aria-label="Dispensar aviso"/)
+  assert.match(desk, /onClick=\{\(\)=>setNotice\(''\)\}/)
+  assert.match(desk, /className="primary small"[^>]*onClick=\{\(\)=>void execute/)
+})
+
+test('RC-001 G07 #53 preserves keyboard access to dismissal and existing zoom fixes', () => {
+  const css = read('src/styles.css')
+  const desk = read('src/OperatorDesk.tsx')
+  assert.match(css, /\.desk-layout--compact \.desk-feedback button:focus-visible\s*\{/)
+  assert.match(css, /\.desk-layout--compact \.desk-feedback:empty\{display:none\}/)
+  assert.match(css, /\.desk-layout--compact \.desk-notification-button\s*\{\s*display:inline-flex/)
+  assert.match(desk, /<button aria-label="Dispensar aviso" onClick=\{\(\)=>setNotice\(''\)\}>/)
+})

@@ -283,7 +283,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
       {error&&<div className="alert" role="alert"><ShieldAlert size={16}/>{error}
         <button onClick={()=>setError('')}>Fechar</button></div>}
       {notice&&<div className="notice" role="status"><CheckCircle2 size={15}/>{notice}
-        <button onClick={()=>setNotice('')}>×</button></div>}
+        <button aria-label="Dispensar aviso" onClick={()=>setNotice('')}>×</button></div>}
     </div>
     <div className="desk-mobile-tabs" role="group" aria-label="Painel da Mesa do Operador">
       <button className={mobilePanel==='work'?'selected':''} onClick={()=>setMobilePanel('work')}>

@@ -600,15 +600,22 @@ body{background:var(--hub-bg)}
   padding:7px 8px;font-size:11px;color:#365571;background:#fff
 }
 .desk-layout--compact .desk-notification-button{white-space:nowrap}
+/* RC-001 / G07 #53: status messages occupy their own flex row.
+   A floating toast previously intercepted clicks on Encerrar/Transferir. */
 .desk-layout--compact .desk-feedback{
-  position:absolute;z-index:30;right:7px;top:65px;
-  display:flex;flex-direction:column;gap:4px;
-  width:min(570px,calc(100% - 14px));pointer-events:none
+  position:static;z-index:auto;
+  display:flex;flex:0 0 auto;flex-direction:column;gap:4px;
+  width:100%;min-width:0;max-height:min(160px,28dvh);
+  overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;
+  padding:0 2px 2px
 }
 .desk-layout--compact .desk-feedback:empty{display:none}
 .desk-layout--compact .desk-feedback>*{
-  pointer-events:auto;margin:0;padding:8px 11px;
-  box-shadow:0 12px 26px #102c4617;font-size:11px
+  flex:0 0 auto;margin:0;padding:8px 11px;
+  box-shadow:none;font-size:11px
+}
+.desk-layout--compact .desk-feedback button:focus-visible{
+  outline:3px solid #438fe2;outline-offset:2px
 }
 .operator-portal__main .desk-grid{
   flex:1 1 0;min-height:0!important;height:auto!important;
