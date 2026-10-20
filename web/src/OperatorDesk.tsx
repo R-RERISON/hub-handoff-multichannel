@@ -222,6 +222,8 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
     {alertOffer && <div className="offer-overlay" role="presentation">
       <div className="offer-dialog" role="alertdialog" aria-modal="true"
         aria-labelledby="offer-dialog-title" aria-describedby="offer-dialog-text">
+        <div className="offer-dialog__body" role="region"
+          aria-label="Detalhes da oferta" tabIndex={0}>
         <span className="eyebrow">NOVA SOLICITAÇÃO · OFERTA AUTOMÁTICA</span>
         <h2 id="offer-dialog-title">Você recebeu um atendimento</h2>
         <p id="offer-dialog-text"><strong>{alertOffer.requester_label}</strong>
@@ -232,6 +234,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
           <p>{offerTransfer.reason}</p>
         </div>}
         <p className="offer-dialog__hint">A oferta expira em até dois minutos. Se não for aceita, retorna à fila.</p>
+        </div>
         <div className="offer-dialog__buttons">
           <button className="outline" disabled={busy} onClick={()=>void execute(
             ()=>api('/v1/handoffs/'+alertOffer.session_id+'/decline','POST',{operator_id:operatorId}),

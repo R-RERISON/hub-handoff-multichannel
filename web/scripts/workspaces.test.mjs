@@ -316,3 +316,38 @@ test('RC-001 G07 #53 preserves keyboard access to dismissal and existing zoom fi
   assert.match(css, /\.desk-layout--compact \.desk-notification-button\s*\{\s*display:inline-flex/)
   assert.match(desk, /<button aria-label="Dispensar aviso" onClick=\{\(\)=>setNotice\(''\)\}>/)
 })
+
+test('RC-001 G07 #54 keeps offer actions inside a height-constrained dialog', () => {
+  const css = read('src/styles.css')
+  const desk = read('src/OperatorDesk.tsx')
+  const dialogRule = css.match(/\.offer-dialog\s*\{([^}]*)\}/)?.[1]
+  const bodyRule = css.match(/\.offer-dialog__body\s*\{([^}]*)\}/)?.[1]
+  const actionsRule = css.match(/\.offer-dialog__buttons\s*\{([^}]*)\}/)?.[1]
+  assert.ok(dialogRule, 'offer dialog styles missing')
+  assert.ok(bodyRule, 'offer details scrolling styles missing')
+  assert.ok(actionsRule, 'offer action footer styles missing')
+  assert.match(dialogRule, /max-height:calc\(100dvh - 36px\)/)
+  assert.match(dialogRule, /display:flex;flex-direction:column;overflow:hidden/)
+  assert.match(bodyRule, /flex:1 1 auto;min-height:0;overflow-y:auto/)
+  assert.match(actionsRule, /flex:0 0 auto/)
+  assert.match(desk, /className="offer-dialog" role="alertdialog" aria-modal="true"/)
+  assert.match(desk, /className="offer-dialog__body" role="region"/)
+  assert.match(desk, /aria-label="Detalhes da oferta" tabIndex=\{0\}/)
+  assert.match(desk, /<\/div>\s*<div className="offer-dialog__buttons">/)
+  assert.match(desk, /ref=\{acceptButtonRef\} className="primary"/)
+  assert.match(desk, /Recusar<\/button>/)
+  assert.match(desk, /Aceitar atendimento<\/button>/)
+})
+
+test('RC-001 G07 #54 preserves zoom, keyboard scrolling and transfer context', () => {
+  const css = read('src/styles.css')
+  const desk = read('src/OperatorDesk.tsx')
+  assert.match(css, /\.offer-overlay\{position:fixed;inset:0/)
+  assert.match(css, /\.offer-dialog__body:focus-visible\s*\{/)
+  assert.match(css, /\.offer-dialog__buttons button:focus-visible\s*\{/)
+  assert.match(css, /@media\(max-width:700px\)\{[\s\S]*?\.offer-dialog__buttons\{flex-direction:column\}/)
+  assert.match(css, /\.offer-dialog__transfer-note\{margin-top:12px;max-height:170px;overflow:auto\}/)
+  assert.match(desk, /className="offer-dialog__transfer-note" role="note"/)
+  assert.match(desk, /className="offer-dialog__hint"/)
+  assert.match(desk, /acceptButtonRef\.current\?\.focus\(\)/)
+})

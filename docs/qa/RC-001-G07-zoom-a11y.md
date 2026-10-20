@@ -120,3 +120,59 @@ Playwright/manual na aplicação real).
 
 **Status após código da #53:** CODED / HOTFIX_NEW_SHA_QA_NOT_RUN /
 BROWSER_RETEST_REQUIRED / NO_MERGE.
+
+## Reteste Windows — 20/10/2026 — Issue #53 resolvida
+
+**SHA testado:** `d6d044f2980a09bf0ed8971ccedbbb2694d4042e`.
+O executor informou PASS: `start.cmd --check` (173 testes Python, 1 skipped,
+21 frontend, Ruff, TypeScript, Vite); `release_probe.py` PASS;
+feedback `position:static` sem interseção e cliques em **Transferir** e
+**Encerrar** bem-sucedidos com aviso visível. Browser 1366×768 e 1920×1080,
+100%/200% real; 2 conversas QA concluídas CLOSED, sem ofertas pendentes.
+A evidência pertence ao SHA acima e foi registrada na Issue #53, fechada
+como concluída; a RC-001 original continua separada e sem merge.
+
+## Issue #54 — diálogo de oferta com botões fora da viewport (200%)
+
+**Achado no SHA d6d044f:** em 1366×768, zoom real 200%, `Aceitar
+atendimento` ficou fora da viewport e o clique do Playwright falhou com
+`element is outside of the viewport`. O operador conseguiu aceitar por
+Enter (teclado). O problema é diferente do feedback de status (#53).
+
+**Correção nesta nova revisão do PR #52:**
+- Dialog de oferta com `max-height:calc(100dvh - 36px)`, flex vertical e
+  `overflow:hidden`. Preserva margem externa de 18px do overlay.
+- Conteúdo informativo e nota interna dentro de `offer-dialog__body`
+  rolável por teclado (`role=region`, `tabIndex=0`, foco visível).
+- `offer-dialog__buttons` fora do conteúdo rolável, com `flex:0 0 auto`:
+  botões **Aceitar atendimento** e **Recusar** permanecem visíveis;
+  preserva pilha de botões no breakpoint <=700px.
+- Dois novos testes de arquitetura frontend. Nada alterado no backend,
+  autenticação, dispatcher, schema, credenciais ou SQLite.
+
+### Gate necessário no SHA FINAL (QA AINDA PENDENTE)
+
+- [ ] Confirmar o SHA novo do PR #52 e worktree isolada limpa.
+- [ ] `.\\start.cmd --check` (novo total frontend esperado: **23**).
+- [ ] `.\\.venv\\Scripts\\python.exe scripts\\release_probe.py`.
+- [ ] Novo laboratório sintético ou o laboratório anterior já validado;
+  jamais iniciar `start.cmd` sem `--lab`.
+- [ ] **1366×768 com 200% REAL**: gerar oferta N1 e confirmar `Aceitar`
+  e `Recusar` inteiros dentro da viewport, clique real com mouse, sem
+  `element is outside of the viewport` ou JS `element.click()`.
+- [ ] Confirmar botões visíveis **antes de qualquer interação de rolagem**;
+  leitor/teclado deve conseguir focar o container `Detalhes da oferta`,
+  rolar a nota por setas e avançar aos botões com Tab.
+- [ ] Testar uma transferência N1→N2 com nota interna sintética longa;
+  ações permanecem clicáveis com a nota dentro do dialog.
+- [ ] Repetir em 1366×768 e 1920×1080 com zoom 100% e 200%; medir DPR,
+  `innerWidth`, `innerHeight`, bounding boxes de botões/dialog, sem
+  overflow horizontal do documento.
+- [ ] Revalidar regressão #53: toast visível sem cobrir Encerrar/Transferir
+  e foco no botão Dispensar aviso.
+- [ ] Revalidar Ativar alertas em zoom 200% e as três tabelas ADMIN.
+- [ ] Registrar capturas sanitizadas, SHA e notas no PR #52; somente com
+  a aprovação formal incorporar hotfix à RC-001.
+
+**Estado:** ISSUE54_CODED / NEW_SHA_QA_NOT_RUN / PR52_DRAFT /
+RC001_FROZEN / MAIN_UNCHANGED.
