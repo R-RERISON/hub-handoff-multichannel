@@ -157,7 +157,12 @@ def verified_backup(source: Path, backup_dir: Path) -> tuple[Path, str]:
         raise SchemaSafetyError("Backup directory cannot be the database")
     backup_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
-    backup_path = backup_dir / f"{source.stem}-pre006b1-{stamp}-{os.urandom(3).hex()}.db"
+    # The revision is allowlisted and schema-verified by verify_database().
+    revision = before["revision"]
+    source_revision = revision.split("_", 1)[0] if revision else "unversioned"
+    backup_path = (
+        backup_dir / f"{source.stem}-pre{source_revision}-{stamp}-{os.urandom(3).hex()}.db"
+    )
     if backup_path.exists():
         raise SchemaSafetyError("Backup destination unexpectedly exists")
     try:
@@ -170,6 +175,7 @@ def verified_backup(source: Path, backup_dir: Path) -> tuple[Path, str]:
         backup = verify_database(backup_path)
         after = verify_database(source)
         if (backup["revision"] != before["revision"]
+                or after["revision"] != before["revision"]
                 or backup["row_counts"] != before["row_counts"]
                 or after["row_counts"] != before["row_counts"]):
             raise SchemaSafetyError(
