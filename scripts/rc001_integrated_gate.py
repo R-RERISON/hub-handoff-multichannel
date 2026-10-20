@@ -2,7 +2,7 @@
 
 One invocation runs the existing full gate, scoped security/persona/audit suites,
 and the ephemeral release probe. Never opens a POC database, contacts the
-network, logs credentials, or marks independent review/user acceptance as PASS.
+production services, logs credentials, or marks independent review/user acceptance as PASS.
 No GitHub Actions are used.
 """
 from __future__ import annotations
@@ -33,7 +33,6 @@ TARGETED_AUDIT = (
     "tests/test_verified_history.py",
     "tests/test_release_audit_evidence.py",
     "tests/test_release_audit_scenarios.py",
-    "tests/test_release_grant_toggle.py",
     "tests/test_release_ui_evidence_gate.py",
 )
 FORBIDDEN_SUFFIXES = (".db", ".sqlite", ".sqlite3", ".pem", ".p12", ".pfx", ".key")
@@ -61,7 +60,9 @@ def unsafe_changed_files(paths: list[str]) -> list[str]:
         parts = normalized.split("/")
         if (normalized.startswith("data/") or normalized.startswith(".git/")
                 or normalized.endswith(FORBIDDEN_SUFFIXES)
-                or any(part in {".env", "secrets", "credentials", "private_key"} for part in parts)):
+                or any(part in {".env", "secrets", "credentials", "private_key"}
+                       or (part.startswith(".env.") and part != ".env.example")
+                       for part in parts)):
             unsafe.append(path)
     return unsafe
 
@@ -86,8 +87,6 @@ def preflight(expected_sha: str) -> dict:
         raise GateSafetyError("Fetched remote ref differs from expected SHA.")
     if run_git("status", "--porcelain"):
         raise GateSafetyError("Worktree has changes. Refusing destructive or ambiguous QA.")
-    if not (ROOT / ".venv" / "Scripts" / "python.exe").is_file():
-        raise GateSafetyError("Local Windows virtualenv is missing; run normal setup first.")
     touched = run_git("diff", "--name-only", RC_SHA, expected_sha).splitlines()
     unsafe = unsafe_changed_files(touched)
     if unsafe:
@@ -120,6 +119,8 @@ def execute(label: str, args: list[str]) -> dict:
         }
     except subprocess.TimeoutExpired:
         outcome = {"gate": label, "result": "TIMEOUT", "exit_code": None}
+    except OSError:
+        outcome = {"gate": label, "result": "BLOCKED", "exit_code": None}
     print(f"[{label}] {outcome['result']}", flush=True)
     return outcome
 
@@ -160,7 +161,10 @@ def main() -> int:
         ("G02_G08_RELEASE_PROBE", [python, "scripts/release_probe.py"]),
     )
     for name, command in stages:
-        outcome = execute(name, command)
+        if name != "G01_FULL_REGRESSION" and not Path(python).is_file():
+            outcome = {"gate": name, "result": "BLOCKED", "exit_code": None}
+        else:
+            outcome = execute(name, command)
         summary["steps"].append(outcome)
         if outcome["result"] != "PASS":
             summary["automated_result"] = "BLOCKED"

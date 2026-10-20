@@ -1,8 +1,6 @@
 """Security/robustness checks for the single-shot QA runner (no commands run)."""
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from scripts.rc001_integrated_gate import pytest_counts, unsafe_changed_files
@@ -13,6 +11,7 @@ from scripts.rc001_integrated_gate import pytest_counts, unsafe_changed_files
     "data/backups/release.sqlite",
     ".env",
     "web/.env",
+    "web/.env.local",
     "secrets/token.txt",
     "deploy/private_key",
     "certificates/production.pfx",
