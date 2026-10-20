@@ -38,10 +38,13 @@ o executor pode investigar no lab separadamente, sem anexar dados sensíveis.
    `git worktree add --detach "$env:TEMP\handoff-rc001-security-batch" <SHA>`.
    Não usar worktree G07/G03 existentes.
 3. Abrir PowerShell na nova worktree, sem `HANDOFF_DB_URL` definido.
-   Dependências devem estar instaladas para esta worktree
-   (`start.cmd --check` exige Python/Node; seguir setup local oficial).
-4. Executar **um único comando**:
-   `& .\.venv\Scripts\python.exe scripts\rc001_integrated_gate.py --expected-sha <SHA>`.
+   Python 3.12 e Node devem estar instalados no host, conforme setup.
+   **Não é necessário ter `.venv` nesta worktree antes de iniciar**:
+   `start.cmd --check` prepara/valida o ambiente para as suítes dirigidas.
+4. Executar **um único comando** usando o Python do host:
+   `python scripts\rc001_integrated_gate.py --expected-sha <SHA>`.
+   O runner utiliza `.venv\Scripts\python.exe` para as etapas dirigidas
+   após o gate inicial.
 5. O runner confere SHA local, SHA remoto origin, `git status` limpo,
    caminho **filho direto de TEMP via `os.path.samefile`** (suporta alias
    8.3 Windows), e diff RC-001→SHA sem banco/credencial/chave versionada.
