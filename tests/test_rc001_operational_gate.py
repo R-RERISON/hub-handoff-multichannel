@@ -1,4 +1,8 @@
 """Static guards for RC-001 Block 02 operational batch executor."""
+import subprocess
+import sys
+from pathlib import Path
+
 from scripts import rc001_operational_gate as gate
 
 
@@ -19,3 +23,20 @@ def test_operational_runner_never_uses_original_database():
     assert '"candidate_rc_001_integrated": False' in source
     assert '"original_database_write_instrumentation": "NOT_PERFORMED"' in source
     assert '"g09_independent_review": "REQUIRED"' in source
+
+
+def test_operational_runner_help_works_from_both_python_entrypoints():
+    """Regression for ModuleNotFoundError when invoked as a script on Windows."""
+    root = Path(__file__).resolve().parents[1]
+    for entry in (
+        ["scripts/rc001_operational_gate.py"],
+        ["-m", "scripts.rc001_operational_gate"],
+    ):
+        completed = subprocess.run(
+            [sys.executable, *entry, "--help"],
+            cwd=root, capture_output=True, text=True, check=False, timeout=30,
+        )
+        assert completed.returncode == 0, (
+            f"Runner entrypoint {entry} did not import: {completed.stderr}"
+        )
+        assert "--expected-sha" in completed.stdout

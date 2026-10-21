@@ -98,3 +98,31 @@ fila sem CAS, integridade/versionamento, histórico N1/N2, actionability do
 modal/teclado, journal fail-closed ou acesso ao SQLite original **bloqueia**
 a entrega. Corrigir e revalidar como um só bloco. Não lançar a POC com
 `start.cmd` simples nem promover `main` ou RC sem aprovação.
+
+## Rodada bloqueada em 21/10/2026 e correção em lote
+
+No SHA anterior `737da22a8a4072367e1b67c63f884f66a1a8ddd5`:
+- `python scripts\\rc001_operational_gate.py` foi bloqueado na importação
+  do helper `scripts.rc001_integrated_gate` antes de executar gates;
+- `python -m scripts.rc001_operational_gate` iniciou o gate, mas G01 ficou
+  **BLOCKED**: pytest **193 passed / 1 skipped**, Ruff **I001**
+  no import block de `tests/test_rc001_operations_batch.py`. O build Vite
+  e as suítes G04/G06/G07/release probe não foram alcançados.
+
+Esta correção mantém **as duas formas de invocação** disponíveis, adiciona
+teste de subprocesso `--help` para ambas e separa explicitamente com
+`# isort: split` as importações do pacote Python e do harness de QA.
+O SHA novo precisa de nova execução no Windows; nada é considerado PASS
+por herança. **Não** executar `ruff --fix` na worktree de homologação
+detached, pois alteraria o checkout e invalidaria o préflight de árvore limpa.
+
+Para retestar em lote: atualizar as referências remotas por `git fetch`,
+criar **nova** worktree `handoff-rc001-operations-retest` (não alterar a
+worktree bloqueada), confirmar seu SHA e executar exatamente:
+`python scripts\\rc001_operational_gate.py --expected-sha <NOVO_SHA>`.
+Em caso de FAIL, registrar etapa, exit code e contagens, além de **diagnóstico
+local sanitizado** de lint/testes; não divulgar stdout com tokens, senhas,
+identificadores ou conteúdo de conversas.
+
+**Revisões que continuam pendentes:** G04/G06/G07 em Windows no SHA corrigido,
+cenários completos de navegador com ação real e G09/G10 independentes.

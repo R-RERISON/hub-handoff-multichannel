@@ -14,7 +14,13 @@ import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
-from scripts.rc001_integrated_gate import execute, run_git, unsafe_changed_files
+# Windows supports both "python scripts\\rc001_operational_gate.py" and
+# "python -m scripts.rc001_operational_gate". The package root is absent
+# from sys.path for the former, so import its sibling directly in that mode.
+if __package__:
+    from scripts.rc001_integrated_gate import execute, run_git, unsafe_changed_files
+else:
+    from rc001_integrated_gate import execute, run_git, unsafe_changed_files
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE_SHA = "20ff982444310ef5c7dbce15d9d208ee0c1724b0"
