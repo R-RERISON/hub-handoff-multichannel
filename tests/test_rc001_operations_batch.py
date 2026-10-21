@@ -13,7 +13,6 @@ from handoff_hub.schema_admin import upgrade_lifecycle_existing, verify_database
 from scripts import lab_environment
 from scripts.release_grant_toggle import bearer
 
-
 KEY = "rc001-operations-synthetic-in-process"
 CLIENT_HEADERS = {"X-POC-Key": KEY}
 

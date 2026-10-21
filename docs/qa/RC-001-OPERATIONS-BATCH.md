@@ -170,3 +170,26 @@ e, na sequência, G04/G06/G07/release probe **no mesmo comando**.
 
 Isto é uma etapa de diagnóstico antecipado, não uma aprovação
 independente nem substituto de G01 ou G09/G10.
+
+## Terceira execução bloqueada — pré-flight Ruff I001 (21/10/2026)
+
+No SHA `9bdb4d885b7c847004c16a8129ec7ee9976bd54a`,
+em uma nova worktree TEMP limpa, o `G00_SETUP_ONLY` passou e
+`G00_RUFF_PREFLIGHT` bloqueou com `I001`. O comando
+`python -m ruff check --diff tests/test_rc001_operations_batch.py`
+apontou somente **uma linha vazia excedente** entre o import de
+`scripts.release_grant_toggle.bearer` e a constante `KEY`.
+Esta rodada não executou G01, G04, G06, G07 nem release probe;
+isso **não** deve ser relatado como aprovação parcial desses gates.
+
+A correção altera apenas esse espaçamento, exatamente conforme
+a indicação do Ruff, sem voltar a modificar a ordenação dos imports.
+Adiciona teste contratual verificando **um único** newline vazio antes
+de `KEY` e atualiza este runbook. Para homologação, criar worktree
+TEMP nova (p.ex. `handoff-rc001-operations-rerun`), nunca modificar
+`handoff-rc001-operations-final`. Executar o runner consolidado
+e anexar apenas o `summary.json` sanitizado.
+
+**Nota de escopo:** não foi possível executar o binário Ruff do Windows
+neste ambiente de revisão; o próprio `G00_RUFF_PREFLIGHT` do novo SHA
+precisa confirmar o PASS. G09/G10 continuam pendentes.

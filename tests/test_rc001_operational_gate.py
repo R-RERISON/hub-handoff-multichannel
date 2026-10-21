@@ -64,3 +64,12 @@ def test_operational_gate_runs_ruff_before_expensive_pytest():
     assert source.index('"G00_SETUP_ONLY"') < source.index('"G00_RUFF_PREFLIGHT"')
     assert source.index('"G00_RUFF_PREFLIGHT"') < source.index('"G01_FULL"')
     assert '"--setup-only"' in source
+
+
+def test_operational_goldpath_has_exact_one_empty_line_after_imports():
+    """Regression from Ruff I001 --diff seen in the Windows gate on 2026-10-21."""
+    source = (Path(__file__).resolve().parent / "test_rc001_operations_batch.py").read_text(
+        encoding="utf-8",
+    )
+    assert "from scripts.release_grant_toggle import bearer\n\nKEY = " in source
+    assert "from scripts.release_grant_toggle import bearer\n\n\nKEY = " not in source
