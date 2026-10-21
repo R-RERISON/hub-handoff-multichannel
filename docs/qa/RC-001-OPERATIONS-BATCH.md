@@ -193,3 +193,81 @@ e anexar apenas o `summary.json` sanitizado.
 **Nota de escopo:** não foi possível executar o binário Ruff do Windows
 neste ambiente de revisão; o próprio `G00_RUFF_PREFLIGHT` do novo SHA
 precisa confirmar o PASS. G09/G10 continuam pendentes.
+
+## Issue #58 — liveness da API durante SQL de autenticação
+
+Investigação em branch separada `fix/rc001-issue58-api-liveness`, baseada
+no SHA aprovado `8dbbfed6724984560bf3b4b888fa240e4657ded6`. O candidato
+aprovado e o PR #57 permanecem inalterados.
+
+### Reprodução e discriminação de hipóteses
+
+- `tests/test_rc001_issue58_liveness.py` atrasa por 750 ms o `SELECT`
+  real de `auth_sessions.token_hash` durante uma consulta autenticada.
+  Antes da correção, `/health/live` também aguardou: **769 ms**.
+- Um writer lock SQLite controlado por 300 ms, concorrente com uma
+  transição lifecycle e um ciclo do dispatcher, manteve health em **2,9 ms**.
+  Isso descarta o lock lifecycle, isoladamente e naquele cenário, como
+  causa suficiente; não prova a causa única do travamento original.
+
+### Correção e validação local
+
+O trabalho síncrono de autenticação/autorização e suas consultas SQLite
+agora executa fora do event loop via `asyncio.to_thread`; leitura do body
+permanece assíncrona. A UI continua usando CAS e não repete automaticamente
+o `PATCH` de lifecycle.
+
+Com a mesma pausa SQL controlada após a correção, `/health/live` respondeu
+em **5,5 ms**, enquanto a autenticação completou com HTTP 200. Também passaram
+os dois testes determinísticos de liveness/concorrência e o contrato frontend
+de mutação única. Na worktree Windows da nova branch:
+
+- `.\start.cmd --check`: **199 passed / 1 skipped**, Ruff e build frontend PASS;
+- `node --test web\scripts\workspaces.test.mjs`: **25 PASS**;
+- `scripts\release_probe.py`: **PASS**, banco efêmero sintético.
+
+**Limite:** o mecanismo de bloqueio da event loop foi reproduzido e corrigido,
+mas a causa única do travamento intermitente da sessão anterior não está
+determinada. O SHA da correção ainda exige revisão/reteste local e sessão
+focalizada TEMP 007a2; G09 e G10 permanecem pendentes. Não usar logs brutos,
+credenciais, tokens ou dados SQLite como evidência pública.
+
+## Issue #58 — liveness da API durante SQL síncrono de autenticação
+
+**Base da investigação:** SHA aprovado `8dbbfed6724984560bf3b4b888fa240e4657ded6`,
+em worktree separada. O SHA aprovado e o PR #57 não foram alterados.
+
+### Reprodução determinística
+
+`tests/test_rc001_issue58_liveness.py` injeta uma espera controlada no
+`SELECT` real de `auth_sessions.token_hash` por 750 ms enquanto solicita
+`GET /v1/admin/overview` e `GET /health/live` concorrentemente. Na base,
+health respondeu em **769 ms**, confirmando que o SQL síncrono executado
+dentro de `async authenticate` bloqueia o event loop.
+
+Um segundo cenário mantém `BEGIN IMMEDIATE` por 300 ms, executa um ciclo
+do dispatcher e uma transição lifecycle concorrente. Nesse cenário health
+respondeu em **2,9 ms**; a mutação completou uma única vez e o ledger
+permaneceu consistente. Isso descarta, para esse cenário controlado, o
+bloqueio do writer lifecycle como causa suficiente.
+
+### Correção nesta branch de incidente
+
+A autorização local síncrona — principal, escopo e consultas de permissão —
+passa a executar em `asyncio.to_thread`. A leitura assíncrona do corpo HTTP
+continua no event loop; `request.state.principal` só é definido após a
+validação retornar. O frontend mantém CAS e guarda contra clique concorrente,
+sem retry automático da mutação.
+
+Após a correção, a mesma injeção de SQL por 750 ms manteve
+`GET /health/live` em **5,5 ms**. O teste de writer/dispatcher também passou.
+`start.cmd --check`: **199 passed / 1 skipped**, Ruff limpo e build
+TypeScript/Vite aprovado. O frontend arquitetura passou com 25 testes e
+`scripts/release_probe.py` retornou PASS. Nenhum teste acessa a POC original
+ou grava credenciais/tokens em artefatos.
+
+**Estado:** correção e testes em `fix/rc001-issue58-api-liveness`, ainda
+sem commit/publicação. Issue #58 permanece aberta até revisão do diff e
+retorno ao laboratório Windows 007a2 com uma sessão lifecycle concorrente
+e medição sanitizada de health, status HTTP e ledger. Não fechar G06,
+G09 ou G10 com os testes in-process apenas.

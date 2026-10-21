@@ -359,3 +359,15 @@ test('RC-001 operation QA lab login explains temporary credentials without secre
   assert.doesNotMatch(app, /Credenciais geradas em data\/demo-credentials\.txt/)
   assert.match(app, /POC local sem SSO/)
 })
+
+test('issue #58 lifecycle confirmation does not retry a state mutation', () => {
+  const page = read('src/workspaces/AdminLanding.tsx')
+  const transition = page.match(
+    /async function commitTransition\(\)\s*\{([\s\S]*?)\n  \}/,
+  )?.[1]
+  assert.ok(transition, 'lifecycle transition handler is required')
+  assert.match(transition, /if\(!selectedTransition\|\|transitionBusy\)return/)
+  assert.match(transition, /expected_version:change\.version/)
+  assert.equal((transition.match(/\bapi\(/g) ?? []).length, 1)
+  assert.doesNotMatch(transition, /\b(retry|setTimeout|setInterval)\b/i)
+})

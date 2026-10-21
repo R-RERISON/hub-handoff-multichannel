@@ -153,30 +153,48 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
             principal = Principal("legacy-tests", "ADMIN", "demo", None, "legacy")
             request.state.principal = principal
             return principal
-        principal = get_principal(factory, authorization)
+        path = request.url.path
+        method = request.method
         body = None
-        if request.method in ("POST", "PATCH", "PUT"):
+        if method in ("POST", "PATCH", "PUT"):
             try:
                 parsed = await request.json()
                 body = parsed if isinstance(parsed, dict) else None
             except ValueError:
                 body = None
-        assert_access(factory, principal, request, body)
-        with factory() as db:
-            path = request.url.path
-            queue_id = None
-            if path.startswith("/v1/queues/"):
-                queue_id = path.split("/")[3]
-            if path in ("/v1/dispatch/next", "/v1/dispatch/offer"):
-                queue_id = (body or {}).get("queue_id")
-            if path == "/v1/handoffs" and request.method == "POST":
-                queue_id = (body or {}).get("queue_id", DEFAULT_INTAKE_QUEUE_ID)
-            if path == "/v1/operators" and request.method != "GET":
-                raise HTTPException(403, "Cadastro de operadores reservado à administração")
-            if path.startswith("/v1/operators/") and path.endswith("/capacity"):
-                if principal.role not in ("ADMIN", "SUPERVISOR"):
-                    raise HTTPException(403, "Perfil sem permissão para capacidade")
-                if principal.role == "SUPERVISOR":
+
+        def authenticate_synchronously() -> Principal:
+            principal = get_principal(factory, authorization)
+            assert_access(factory, principal, path, method, body)
+            with factory() as db:
+                queue_id = None
+                if path.startswith("/v1/queues/"):
+                    queue_id = path.split("/")[3]
+                if path in ("/v1/dispatch/next", "/v1/dispatch/offer"):
+                    queue_id = (body or {}).get("queue_id")
+                if path == "/v1/handoffs" and method == "POST":
+                    queue_id = (body or {}).get("queue_id", DEFAULT_INTAKE_QUEUE_ID)
+                if path == "/v1/operators" and method != "GET":
+                    raise HTTPException(403, "Cadastro de operadores reservado à administração")
+                if path.startswith("/v1/operators/") and path.endswith("/capacity"):
+                    if principal.role not in ("ADMIN", "SUPERVISOR"):
+                        raise HTTPException(403, "Perfil sem permissão para capacidade")
+                    if principal.role == "SUPERVISOR":
+                        operator_id = path.split("/")[3]
+                        operator = db.get(Operator, operator_id)
+                        affected = set(db.scalars(
+                            select(QueueMembership.queue_id).where(
+                                QueueMembership.operator_id == operator_id
+                            )
+                        ).all())
+                        if (operator is None or operator.operation_id != principal.operation_id
+                                or not affected or not affected.issubset(
+                                    granted_queues(db, principal)
+                                )):
+                            raise HTTPException(403, "Operador participa de fila não autorizada")
+                if (path.startswith("/v1/operators/")
+                        and path.endswith("/presence")
+                        and principal.role == "SUPERVISOR"):
                     operator_id = path.split("/")[3]
                     operator = db.get(Operator, operator_id)
                     affected = set(db.scalars(
@@ -188,40 +206,28 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
                             or not affected or not affected.issubset(
                                 granted_queues(db, principal)
                             )):
-                        raise HTTPException(403, "Operador participa de fila não autorizada")
-            if (path.startswith("/v1/operators/")
-                    and path.endswith("/presence")
-                    and principal.role == "SUPERVISOR"):
-                operator_id = path.split("/")[3]
-                operator = db.get(Operator, operator_id)
-                affected = set(db.scalars(
-                    select(QueueMembership.queue_id).where(
-                        QueueMembership.operator_id == operator_id
+                        raise HTTPException(403, "Presença fora do escopo de filas")
+                if path == "/v1/demo/bootstrap" and principal.role != "ADMIN":
+                    raise HTTPException(403, "Bootstrap demonstrativo requer administrador")
+                if queue_id and principal.role in ("SUPERVISOR", "AUDITOR"):
+                    require_queue(db, principal, queue_id, manage=method != "GET")
+                if path.startswith("/v1/queues/") and queue_id:
+                    require_queue(db, principal, queue_id, manage=method != "GET")
+                if path.startswith("/v1/handoffs/"):
+                    handoff_id = path.split("/")[3]
+                    verified_scoped_read = (
+                        method == "GET"
+                        and len(path.split("/")) == 5
+                        and path.endswith("/verified-history")
                     )
-                ).all())
-                if (operator is None or operator.operation_id != principal.operation_id
-                        or not affected or not affected.issubset(
-                            granted_queues(db, principal)
-                        )):
-                    raise HTTPException(403, "Presença fora do escopo de filas")
-            if path == "/v1/demo/bootstrap" and principal.role != "ADMIN":
-                raise HTTPException(403, "Bootstrap demonstrativo requer administrador")
-            if queue_id and principal.role in ("SUPERVISOR", "AUDITOR"):
-                require_queue(db, principal, queue_id, manage=request.method != "GET")
-            if path.startswith("/v1/queues/") and queue_id:
-                require_queue(db, principal, queue_id, manage=request.method != "GET")
-            if path.startswith("/v1/handoffs/"):
-                handoff_id = path.split("/")[3]
-                verified_scoped_read = (
-                    request.method == "GET"
-                    and len(path.split("/")) == 5
-                    and path.endswith("/verified-history")
-                )
-                if (handoff_id and principal.role in ("SUPERVISOR", "AUDITOR")
-                        and not verified_scoped_read):
-                    require_handoff(db, principal, handoff_id)
-            if principal.role in ("SUPERVISOR", "AUDITOR") and path == "/v1/outbox":
-                raise HTTPException(403, "Outbox não está disponível para este papel")
+                    if (handoff_id and principal.role in ("SUPERVISOR", "AUDITOR")
+                            and not verified_scoped_read):
+                        require_handoff(db, principal, handoff_id)
+                if principal.role in ("SUPERVISOR", "AUDITOR") and path == "/v1/outbox":
+                    raise HTTPException(403, "Outbox não está disponível para este papel")
+            return principal
+
+        principal = await asyncio.to_thread(authenticate_synchronously)
         request.state.principal = principal
         return principal
 

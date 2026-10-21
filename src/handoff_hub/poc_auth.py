@@ -8,7 +8,7 @@ import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -126,8 +126,9 @@ def require_owner(factory, handoff_id: str, operator_id: str) -> None:
             raise HTTPException(403, "Atendimento pertence a outro operador")
 
 
-def assert_access(factory, p: Principal, request: Request, payload: dict | None) -> None:
-    path, method = request.url.path, request.method
+def assert_access(
+    factory, p: Principal, path: str, method: str, payload: dict | None,
+) -> None:
     # Transfer destination discovery belongs to the currently assigned operator.
     # Supervisory queue read grants must not imply permission to impersonate an operator.
     if path.endswith("/transfer-targets") and p.role != "OPERATOR":
