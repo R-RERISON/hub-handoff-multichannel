@@ -10,10 +10,6 @@ from handoff_hub.poc_api import create_app
 from handoff_hub.poc_db import AuthUser, make_session_factory
 from handoff_hub.queue_lifecycle_schema import LIFECYCLE_REVISION
 from handoff_hub.schema_admin import upgrade_lifecycle_existing, verify_database
-
-# Import groups are explicitly separated to keep the src/ library and
-# scripts/ QA harness sorting stable under Ruff's I001 rule.
-# isort: split
 from scripts import lab_environment
 from scripts.release_grant_toggle import bearer
 

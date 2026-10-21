@@ -128,3 +128,32 @@ identificadores ou conteúdo de conversas.
 
 **Revisões que continuam pendentes:** G04/G06/G07 em Windows no SHA corrigido,
 cenários completos de navegador com ação real e G09/G10 independentes.
+
+## Segundo reteste BLOCKED — 21/10/2026
+
+A execução no SHA `cd18c18e48053662c14624611602150b77c19b28`
+confirmou que a importação direta do runner foi corrigida.
+O G01 iniciou, com **194 pytest PASS e 1 SKIP**, porém o Ruff
+continuou recusando `tests/test_rc001_operations_batch.py` com
+`I001`. A estratégia `# isort: split` **não resolveu o problema**.
+O frontend build e os gates G04/G06/G07/release probe não foram
+executados por fail-fast. Worktree limpa, sem acesso ao SQLite original.
+
+### Correção consolidada neste SHA
+
+Remover o marcador `# isort: split` e alinhar as importações
+`handoff_hub` e `scripts` no mesmo bloco de módulos locais,
+exatamente como o arquivo `tests/test_spec007_queue_lifecycle.py`
+que já passou pelo Ruff nos gates anteriores. O contrato do runner
+também passa a verificar que essa regressão não volte a ser introduzida.
+O código de runtime/backend/frontend/migrations não foi alterado.
+
+O reteste deve criar uma NOVA worktree TEMP chamada
+`handoff-rc001-operations-final`. Preservar as anteriores para auditoria.
+O comando é o mesmo da homologação integrada, com o SHA novo:
+`python scripts\\rc001_operational_gate.py --expected-sha <SHA>`.
+Nenhum PASS é herdado para os gates ainda não executados.
+
+**Limitação:** esta correção foi conferida por comparação estática de
+padrão com testes do próprio repositório; a aprovação Ruff real e todo
+o gate Windows ainda precisam ser executados pelo executor local.

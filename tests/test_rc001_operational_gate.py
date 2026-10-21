@@ -40,3 +40,16 @@ def test_operational_runner_help_works_from_both_python_entrypoints():
             f"Runner entrypoint {entry} did not import: {completed.stderr}"
         )
         assert "--expected-sha" in completed.stdout
+
+
+def test_operational_goldpath_uses_ruff_canonical_single_firstparty_import_block():
+    """Keep project imports together, consistent with the already-passing 007a2 tests."""
+    source = (Path(__file__).resolve().parent / "test_rc001_operations_batch.py").read_text(
+        encoding="utf-8",
+    )
+    assert "# isort: split" not in source
+    assert (
+        "from handoff_hub.schema_admin import upgrade_lifecycle_existing, verify_database\n"
+        "from scripts import lab_environment\n"
+        "from scripts.release_grant_toggle import bearer"
+    ) in source
