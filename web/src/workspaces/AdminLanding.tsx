@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { ArrowUpRight, CheckCircle2, LockKeyhole, Plus, RefreshCw, ServerCog, Shield } from 'lucide-react'
 import type { Api } from './types'
 import AdminPeople from './AdminPeople'
+import { EmptyState } from '../design-system/EmptyState'
 
 type QueueRow = {
   id:string
@@ -182,8 +183,8 @@ export default function AdminLanding({api}:{api:Api}){
             </tr>)}</tbody>
           </table>
         </div>
-        {inventory.queues.length===0&&<p className="admin-inventory__empty">
-          Nenhuma fila registrada nesta operação.</p>}
+        {inventory.queues.length===0&&<EmptyState className="admin-inventory__empty">
+          Nenhuma fila registrada nesta operação.</EmptyState>}
       </section>
       {selectedTransition&&<section className="panel admin-inventory__confirm" role="group"
         aria-label="Confirmar mudança de estado">

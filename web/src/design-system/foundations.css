@@ -1,0 +1,180 @@
+/* SPEC-018 / U1 — Light design foundations. Imported AFTER styles.css.
+   Keep G07 modal, transfer, desk-feedback, table widths and scroll behavior intact.
+   This file changes presentation only; no access decisions or workflow behavior. */
+
+:root {
+  color-scheme: light;
+  --hub-bg: #f7f9fc;
+  --hub-border: #dce5ee;
+  --hub-ink: #1d344b;
+  --ux-surface: #ffffff;
+  --ux-surface-subtle: #f4f7fa;
+  --ux-ink: #1d344b;
+  --ux-muted: #51657a;
+  --ux-accent: #1c5da6;
+  --ux-focus: #217ac8;
+  --ux-line: #dce5ee;
+  --ux-border-radius: 12px;
+  --ux-shadow: 0 1px 3px rgb(27 51 76 / 6%);
+  --ux-space-1: 4px;
+  --ux-space-2: 8px;
+  --ux-space-3: 12px;
+  --ux-space-4: 16px;
+  --ux-space-6: 24px;
+}
+
+body {
+  color: var(--ux-ink);
+  background: var(--hub-bg);
+}
+
+/* Clean hierarchy: surface and typography, rather than heavy gradients or shadows. */
+.metric, .panel, .workspace-home__card, .login-panel {
+  border-color: var(--ux-line);
+  box-shadow: var(--ux-shadow);
+}
+.intro-banner, .admin-inventory__operation {
+  background: var(--ux-surface);
+  border-color: var(--ux-line);
+}
+.workspace-home {
+  background: var(--hub-bg);
+}
+.workspace-home__intro h1, .intro-banner h2,
+.admin-inventory__operation h3, .panel-header h3, .overview-metric strong {
+  color: var(--ux-ink);
+}
+.workspace-home__intro p, .intro-banner p, .admin-inventory__table p,
+.overview-metric__label, .overview-metric small {
+  color: var(--ux-muted);
+}
+.workspace-home__card {
+  border-radius: var(--ux-border-radius);
+  min-width: 0;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.workspace-home__card:hover {
+  transform: none;
+  border-color: #96b8db;
+  box-shadow: var(--ux-shadow);
+}
+.workspace-home__card strong { color: var(--ux-ink); }
+.workspace-home__description { color: var(--ux-muted); }
+
+/* Navigation remains a distinct workspace, but no longer feels visually heavy. */
+.sidebar {
+  background: #203247;
+  color: #d8e4f0;
+}
+.sidebar .nav { color: #d8e4f0; }
+.sidebar .nav:hover { background: #2d435b; }
+.sidebar .nav.active {
+  color: #ffffff;
+  background: #334c66;
+  box-shadow: inset 2px 0 #7fb8f2;
+}
+.sidebar .sidebar-title { color: #b6c9dd; }
+.sidebar .nav--external {
+  border-color: #455d75;
+  background: #2c425b;
+  color: #ffffff;
+}
+.operator-portal__header {
+  background: #203247;
+  border-bottom-color: #354b62;
+}
+.operator-portal__actions .outline {
+  background: #2b435c;
+  border-color: #57728f;
+}
+.app-mark { box-shadow: none; }
+
+/* One quiet, consistent visual language for controls. No behavioral overrides. */
+.primary, .outline, .icon-btn {
+  border-radius: 9px;
+  box-shadow: none;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.primary {
+  background: var(--ux-accent);
+  border-color: var(--ux-accent);
+  color: #ffffff;
+}
+.primary:not(:disabled):hover {
+  background: #174e8d;
+  border-color: #174e8d;
+}
+.outline, .icon-btn {
+  background: var(--ux-surface);
+  border-color: #bdcedf;
+  color: #294f71;
+}
+.outline:not(:disabled):hover, .icon-btn:not(:disabled):hover {
+  background: #f0f5fa;
+  border-color: #96b8db;
+}
+.primary:not(.small), .outline:not(.small) { min-height: 40px; }
+.admin-inventory__state-actions button {
+  min-height: 36px;
+  border-color: #bdcedf;
+  background: #f8fbfe;
+  color: #24577f;
+}
+.admin-inventory__state-actions button:not(:disabled):hover {
+  background: #e8f2fc;
+}
+.admin-inventory__create-fields input {
+  border-color: #bdcedf;
+  border-radius: 9px;
+  background: var(--ux-surface);
+}
+.admin-inventory__table thead th {
+  background: var(--ux-surface-subtle);
+  color: var(--ux-ink);
+}
+.admin-inventory__table th, .admin-inventory__table td {
+  border-bottom-color: var(--ux-line);
+}
+.admin-inventory__table tbody tr:hover {
+  background: #f7fafd;
+}
+.admin-inventory__metrics .panel { min-width: 0; }
+.admin-inventory__metric strong { color: var(--ux-ink); }
+
+/* Shared state primitive used across administration and supervision.
+   It exposes semantic status, never credentials or authorization details. */
+.hub-empty-state {
+  padding: 18px 20px;
+  margin: 0;
+  color: var(--ux-muted);
+  background: var(--ux-surface-subtle);
+  border: 1px dashed #b4c9dd;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.55;
+  text-align: center;
+}
+.admin-inventory__table > .hub-empty-state {
+  margin: 12px 16px;
+}
+.overview-panel > .hub-empty-state {
+  margin: 14px 18px;
+}
+
+/* Keyboard navigation: keep focus apparent at normal and 200% browser zoom. */
+:where(button, a, input, textarea, select):focus-visible,
+.workspace-home__card:focus-visible {
+  outline: 3px solid var(--ux-focus);
+  outline-offset: 3px;
+}
+:where(.primary, .outline, .icon-btn):disabled {
+  cursor: not-allowed;
+}
+
+/* Respect motion preferences without altering layout or scroll containers. */
+@media (prefers-reduced-motion: reduce) {
+  .workspace-home__card, .primary, .outline, .icon-btn {
+    transition: none;
+    transform: none;
+  }
+}
