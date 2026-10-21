@@ -33,7 +33,9 @@ Os demais testes de fluxo/UI/regressão continuam compondo o pacote.
 1. Ter Python 3.12/Node no host, parar launchers anteriores e
    `git fetch origin` no clone/worktree RC.
 2. Confirmar **SHA exato do PR de bloco 02** e criar worktree TEMP separada
-   `handoff-rc001-operations-batch`, detached no SHA.
+   `handoff-rc001-operations-retest`, detached no SHA. O destino antigo
+   `handoff-rc001-operations-batch` pertence ao SHA bloqueado: preserve-o
+   para diagnóstico, sem trocar HEAD ou alterar seus testes.
 3. Confirmar `git status --porcelain` vazio e remover `HANDOFF_DB_URL`
    somente da sessão QA.
 4. Execute **um único comando**:
