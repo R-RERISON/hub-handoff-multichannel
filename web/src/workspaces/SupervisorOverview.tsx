@@ -4,6 +4,7 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import type { DashboardSnapshot } from './types'
+import { EmptyState } from '../design-system/EmptyState'
 
 type Props = { snapshot: DashboardSnapshot }
 
@@ -44,7 +45,7 @@ export default function SupervisorOverview({ snapshot }: Props) {
           <p>Solicitações em espera, ofertadas e em andamento</p></div>
           <button className="text-link" onClick={() => navigate('/supervisao/filas')}>Ver filas <ArrowRight size={14}/></button>
         </div>
-        {snapshot.queues.length === 0 && <div className="empty-state">Nenhuma fila cadastrada.</div>}
+        {snapshot.queues.length === 0 && <EmptyState className="empty-state">Nenhuma fila cadastrada.</EmptyState>}
         {snapshot.queues.map(q => <div className="overview-queue" key={q.id}>
           <div><b>{q.name}</b><small>{q.id.toUpperCase()}</small></div>
           <div className="queue-stats"><span>{q.waiting} aguardando</span><span>{q.offered} ofertado(s)</span><span>{q.active} ativo(s)</span></div>
@@ -68,7 +69,7 @@ export default function SupervisorOverview({ snapshot }: Props) {
         <div><b>{t.requester_label}</b><small>{t.subject} · {t.queue_id.toUpperCase()}</small></div>
         <span className={'status '+t.status.toLowerCase()}>{t.status}</span>
       </div>)}
-      {snapshot.handoffs.length===0 && <div className="empty-state">Ainda não há solicitações. Utilize o Laboratório para criar uma.</div>}
+      {snapshot.handoffs.length===0 && <EmptyState className="empty-state">Ainda não há solicitações. Utilize o Laboratório para criar uma.</EmptyState>}
     </section>
   </div>
 }

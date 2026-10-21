@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "npm run test:architecture && tsc -b && vite build",
-    "test:architecture": "node --test scripts/workspaces.test.mjs",
+    "test:architecture": "node --test scripts/workspaces.test.mjs scripts/foundations.test.mjs",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { RefreshCw, ShieldCheck, UsersRound } from 'lucide-react'
 import type { Api } from './types'
+import { EmptyState } from '../design-system/EmptyState'
 
 type Membership = { queue_id:string; queue_name:string }
 type OperatorRecord = {
@@ -92,8 +93,8 @@ export default function AdminPeople({api}:{api:Api}){
           </tr>)}</tbody>
         </table>
       </div>
-      {operators.length===0&&<p className="admin-inventory__empty">
-        Nenhum operador corresponde ao filtro.</p>}
+      {operators.length===0&&<EmptyState className="admin-inventory__empty">
+        Nenhum operador corresponde ao filtro.</EmptyState>}
       <p id="admin-accounts-scroll-hint" className="admin-inventory__scroll-hint">
         Tabela com rolagem horizontal: pressione Tab para focar e use as setas para acessar todas as colunas.
       </p>
@@ -113,8 +114,8 @@ export default function AdminPeople({api}:{api:Api}){
           </tr>)}</tbody>
         </table>
       </div>
-      {people.accounts.length===0&&<p className="admin-inventory__empty">
-        Nenhuma conta na operação.</p>}
+      {people.accounts.length===0&&<EmptyState className="admin-inventory__empty">
+        Nenhuma conta na operação.</EmptyState>}
       <p>Alterações de membership, grants e auditoria administrativa estão reservadas às próximas
         etapas B1.1/B2. O inventário não autoriza novas permissões.</p>
     </>}
