@@ -351,3 +351,11 @@ test('RC-001 G07 #54 preserves zoom, keyboard scrolling and transfer context', (
   assert.match(desk, /className="offer-dialog__hint"/)
   assert.match(desk, /acceptButtonRef\.current\?\.focus\(\)/)
 })
+
+test('RC-001 operation QA lab login explains temporary credentials without secrets', () => {
+  const app = read('src/App.tsx')
+  assert.match(app, /No laboratório, elas ficam exclusivamente no diretório TEMP/)
+  assert.match(app, /ambiente iniciado pelo launcher/)
+  assert.doesNotMatch(app, /Credenciais geradas em data\/demo-credentials\.txt/)
+  assert.match(app, /POC local sem SSO/)
+})

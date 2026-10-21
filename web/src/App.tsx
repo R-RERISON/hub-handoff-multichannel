@@ -201,7 +201,9 @@ export default function App() {
         <Lock size={16}/> Entrar no meu workspace <ArrowRight size={16}/>
       </button>
       {error&&<p className="alert" role="alert">{error}</p>}
-      <small>Credenciais geradas em data/demo-credentials.txt · POC local sem SSO</small>
+      <small>Use as credenciais do ambiente iniciado pelo launcher.
+        No laboratório, elas ficam exclusivamente no diretório TEMP informado no terminal.
+        POC local sem SSO.</small>
     </section>
   </div>
 
