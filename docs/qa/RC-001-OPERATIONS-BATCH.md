@@ -157,3 +157,16 @@ Nenhum PASS é herdado para os gates ainda não executados.
 **Limitação:** esta correção foi conferida por comparação estática de
 padrão com testes do próprio repositório; a aprovação Ruff real e todo
 o gate Windows ainda precisam ser executados pelo executor local.
+
+## Fast-fail de qualidade — mesma rodada, sem microtestes
+
+Antes de iniciar o `start.cmd --check` integral, o runner agora
+executa `start.cmd --setup-only` para preparar dependências (sem
+iniciar a API/POC) e `ruff check src tests` no checkout.
+Se `G00_RUFF_PREFLIGHT` reprovar, o runner **para nesse ponto** e
+gera `summary.json` com nome da etapa/código, sem gastar uma rodada
+inteira de Pytest. Se aprovar, roda a regressão integral (G01)
+e, na sequência, G04/G06/G07/release probe **no mesmo comando**.
+
+Isto é uma etapa de diagnóstico antecipado, não uma aprovação
+independente nem substituto de G01 ou G09/G10.

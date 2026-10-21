@@ -53,3 +53,14 @@ def test_operational_goldpath_uses_ruff_canonical_single_firstparty_import_block
         "from scripts import lab_environment\n"
         "from scripts.release_grant_toggle import bearer"
     ) in source
+
+
+def test_operational_gate_runs_ruff_before_expensive_pytest():
+    import inspect
+
+    source = inspect.getsource(gate.main)
+    assert '"G00_SETUP_ONLY"' in source
+    assert '"G00_RUFF_PREFLIGHT"' in source
+    assert source.index('"G00_SETUP_ONLY"') < source.index('"G00_RUFF_PREFLIGHT"')
+    assert source.index('"G00_RUFF_PREFLIGHT"') < source.index('"G01_FULL"')
+    assert '"--setup-only"' in source

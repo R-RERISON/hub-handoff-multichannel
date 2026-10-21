@@ -97,6 +97,11 @@ def main() -> int:
     }
     py = str(ROOT / ".venv" / "Scripts" / "python.exe")
     stages = (
+        # Setup is separate from data/POC startup; lint-first avoids rerunning
+        # the entire Python suite when a simple Ruff I001 blocks G01.
+        ("G00_SETUP_ONLY", ["cmd.exe", "/D", "/C", str(ROOT / "start.cmd"),
+                            "--setup-only"]),
+        ("G00_RUFF_PREFLIGHT", [py, "-m", "ruff", "check", "src", "tests"]),
         ("G01_FULL", ["cmd.exe", "/D", "/C", str(ROOT / "start.cmd"), "--check"]),
         ("G04_N1_N2_FLOW", [py, "-m", "pytest", "-q", *OPERATION_TESTS]),
         ("G06_QUEUE_PEOPLE", [py, "-m", "pytest", "-q", *ADMIN_TESTS]),
@@ -105,7 +110,7 @@ def main() -> int:
         ("RELEASE_PROBE", [py, "scripts/release_probe.py"]),
     )
     for name, command in stages:
-        if name != "G01_FULL" and name != "G07_FRONTEND_ARCH" and not Path(py).is_file():
+        if name not in ("G00_SETUP_ONLY", "G01_FULL", "G07_FRONTEND_ARCH") and not Path(py).is_file():
             result = {"gate": name, "result": "BLOCKED", "exit_code": None}
         else:
             result = execute(name, command)
