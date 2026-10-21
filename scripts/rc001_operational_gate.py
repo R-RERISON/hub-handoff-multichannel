@@ -9,7 +9,6 @@ import argparse
 import json
 import os
 import re
-import subprocess
 import sys
 import tempfile
 from datetime import UTC, datetime
@@ -71,7 +70,7 @@ def main() -> int:
     args = parser.parse_args()
     try:
         verified = verify(args.expected_sha)
-    except (OSError, RuntimeError, ValueError) as exc:
+    except (OSError, RuntimeError, ValueError):
         print("BLOCKED: QA checkout or revision prerequisites not satisfied.",
               file=sys.stderr)
         return 2
