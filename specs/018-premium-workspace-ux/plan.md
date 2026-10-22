@@ -87,8 +87,8 @@ Por solicitação explícita do Product Owner, a implementação U2 começou em 
 
 O escopo alterado é frontend-only: foco do modal de oferta, single-flight/reconciliação das mutações, estados de histórico, invalidação de snapshots obsoletos e empilhamento do formulário de criação Admin em viewport estreito. Não houve alteração de backend, RBAC, rotas, schema, migrations ou POC original.
 
-`.\start.cmd --check` passou nesta worktree: Pytest 199 passed / 1 skipped, Ruff, 38 contratos frontend, TypeScript e Vite (1604 módulos). O código U2 segue sem commit, portanto essa evidência ainda não representa um SHA imutável de entrega.
+U2 foi congelada no commit local `49db5f424aaa13b9631715c3721f264499070eab`, baseado em `4ad1ffed1e5202698009777135f5bd55d224a32b`. `.\start.cmd --check` foi repetido nesse SHA e passou: Pytest 199 passed / 1 skipped, Ruff, 38 testes frontend, TypeScript e Vite (1604 módulos). O commit permanece local, sem push ou merge.
 
 Homologação funcional/visual desktop T015/T016 foi executada em laboratório sintético TEMP no estado de worktree, incluindo foco/scroll em zoom real, mutações N1→N2, revoke/restore, 401/403/404/409 e timeout. Não houve expansão RBAC ou alteração de schema.
 
-T004 (revisão formal de Segurança/Arquitetura), T005 (freeze formal da baseline), T009/T010 (gate formal U1), T017–T023, G09 e G10 permanecem pendentes. Não há SHA U2 imutável porque as mudanças seguem sem commit; repetir o gate automatizado no SHA final antes de publicar. A homologação 390×844/UX-08 da SPEC-006C continua em trilha separada.
+T004 (revisão formal de Segurança/Arquitetura), T005 (freeze formal da baseline), T009/T010 (gate formal U1), T017–T023, G09 e G10 permanecem pendentes. O SHA de implementação tem evidência automatizada; o commit local não equivale ao freeze formal nem à aprovação de release. A homologação 390×844/UX-08 da SPEC-006C continua em trilha separada.

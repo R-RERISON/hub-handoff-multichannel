@@ -24,7 +24,7 @@
 - [x] T013 — estados de carregamento/erro/vazio/revogação e descarte de respostas/dados protegidos obsoletos.
 - [x] T014 — confirmação lifecycle CAS com single-flight e mensagem segura para resultado não confirmado.
 - [x] T015 — QA sintético N1→N2, grants/revoke/restore, 401/403/404/409/timeout e mouse/teclado executados; o 409 e timeouts de UI foram fault-injected, e os 404/auditoria foram verificados pelo cenário sintético.
-- [x] T016 / GATE-U2 — regressão funcional e visual desktop passou nesta worktree; sem ampliação RBAC ou alteração schema. Repetir no SHA U2 imutável após commit.
+- [x] T016 / GATE-U2 — regressão funcional e visual desktop PASS; gate automatizado repetido no SHA de implementação U2 `49db5f424aaa13b9631715c3721f264499070eab`. Sem ampliação RBAC ou alteração schema.
 
 ## U3 — Certificação e aceite (um PR/evidência)
 - [ ] T017 — UX18-01..08 nos quatro pares desktop/zoom real, rastreio por SHA/persona/browser.
@@ -47,4 +47,4 @@
 | FR-006 | T012, T014–T016, T020 | UX18-03,07 |
 | FR-007 | T011–T020 | UX18-01..08 |
 
-**Estado atual:** T015/T016 passaram na worktree local após QA automatizado e browser em TEMP; T004/T005, T009/T010, T017–T023 e UX-08 mobile da SPEC-006C continuam pendentes. Não existe SHA de commit U2 para fixar esta evidência.
+**Estado atual:** T015 foi executado na mesma árvore de código congelada em `49db5f424aaa13b9631715c3721f264499070eab`; T016/GATE-U2 passou no SHA exato. T004/T005, T009/T010, T017–T023 e UX-08 mobile da SPEC-006C continuam pendentes. O commit não foi enviado nem integrado.

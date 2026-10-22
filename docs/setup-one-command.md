@@ -229,18 +229,19 @@ revisado. A auditoria transacional das mutações de equipe continua pendente pa
 B1/B2; a decisão formal de integração também permanece pendente. Não houve merge
 ou promoção à `main`.
 
-## Evidência local — SPEC-018 U2 — worktree sem commit
+## Evidência local — SPEC-018 U2 — commit de implementação
 
-Na branch local `feat/spec018-u2-operational-journeys-20261022`, baseada no U1
-`4ad1ffed1e5202698009777135f5bd55d224a32b`, `.\start.cmd --check` terminou com
-exit code 0: **199 testes Python aprovados, 1 ignorado, Ruff, 38 contratos
-frontend, TypeScript e Vite (1604 módulos)**. `npm run build` e `git diff --check`
-também passaram.
+Na branch local `feat/spec018-u2-operational-journeys-20261022`, a implementação
+U2 foi congelada no SHA `49db5f424aaa13b9631715c3721f264499070eab`, baseada no U1
+`4ad1ffed1e5202698009777135f5bd55d224a32b`. `.\start.cmd --check` confirmou o
+HEAD esperado e terminou com exit code 0: **199 testes Python aprovados, 1
+ignorado, Ruff aprovado, 38 testes frontend aprovados, TypeScript e Vite
+aprovados (1604 módulos)**. `git diff --cached --check` passou antes do commit.
 
-O resultado cobre a worktree local ainda não commitada; não existe SHA U2
-imutável associado a esta evidência. `git pull --ff-only` no checkout principal
-`fix/rc001-issue58-api-liveness` retornou `Already up to date`; a branch U2
-local não tem upstream e não recebeu pull.
+O gate foi executado no SHA de implementação informado acima. O commit e a
+worktree continuam locais, sem upstream, push, merge ou deploy. `git pull
+--ff-only` no checkout principal `fix/rc001-issue58-api-liveness` retornou
+`Already up to date`; a branch U2 local não recebeu pull.
 
 Na homologação integrada, o laboratório 007a2 percorreu N1→N2, nota interna,
 resposta e encerramento; lifecycle administrativo DRAFT→ACTIVE→PAUSED→ARCHIVED
@@ -264,6 +265,6 @@ overflow horizontal; os campos e o botão de criação Admin ficaram empilhados
 e dentro do painel. Isto não é certificação mobile nem aprovação de UX-08 da
 SPEC-006C.
 
-T004/T005, T009/T010, T017–T023, G09/G10 e UX-08 mobile de SPEC-006C continuam
-pendentes. O QA U2 precisa ser repetido no SHA final após commit; nenhum PR,
-merge ou deploy foi realizado.
+O gate automatizado foi repetido no SHA de implementação após o commit. T004/T005,
+T009/T010, T017–T023, G09/G10 e UX-08 mobile de SPEC-006C continuam pendentes.
+Nenhum PR, merge ou deploy foi realizado.

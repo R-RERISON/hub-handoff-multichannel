@@ -2,7 +2,8 @@
 
 - **Branch local:** `feat/spec018-u2-operational-journeys-20261022`
 - **Base U1:** `4ad1ffed1e5202698009777135f5bd55d224a32b`
-**Status:** gate automatizado e homologação funcional/visual desktop PASS na worktree local; T004/T005, evidência por SHA e aceite final pendentes.
+- **SHA U2 validado:** `49db5f424aaa13b9631715c3721f264499070eab`
+- **Status:** gate automatizado PASS no SHA indicado; homologação funcional/visual desktop PASS no mesmo conteúdo de código. T004/T005, evidências visuais por SHA e aceite final continuam pendentes.
 
 ## Escopo deste incremento
 
@@ -16,20 +17,19 @@
 
 ## Execução automatizada local
 
-Na raiz do worktree U2:
+Na raiz do checkout U2:
 
 ```powershell
 .\start.cmd --check
 ```
 
-O comando cobre Pytest, Ruff, contratos frontend, TypeScript e build Vite. A evidência final deve registrar o SHA do commit U2; enquanto o trabalho estiver sem commit, não declarar um SHA de código U2 aprovado.
+O comando cobre Pytest, Ruff, contratos frontend, TypeScript e build Vite.
 
-Evidência automatizada obtida no worktree local, ainda sem commit U2:
+Evidência automatizada obtida no commit de implementação U2:
 
-- `.\start.cmd --check`: exit code 0; Pytest 199 passed / 1 skipped, Ruff aprovado, 38 contratos frontend, TypeScript e Vite aprovados (1604 módulos).
-- `npm run build`: 38 contratos aprovados, TypeScript e Vite aprovados.
-- `git diff --check`: aprovado.
-- A execução corresponde à worktree baseada no SHA U1 acima; como as alterações U2 ainda não foram commitadas, não há SHA imutável de código U2 aprovado.
+- SHA confirmado antes da execução: `49db5f424aaa13b9631715c3721f264499070eab`.
+- `.\start.cmd --check`: exit code 0; Pytest 199 passed / 1 skipped, Ruff aprovado, 38 testes frontend aprovados, TypeScript e Vite aprovados (1604 módulos).
+- O commit de implementação permaneceu inalterado durante o gate; o registro documental posterior não altera o código executado.
 
 ## Homologação funcional/visual executada
 
@@ -57,7 +57,8 @@ Uma captura sanitizada do formulário Admin em 390×844 foi preservada em
 
 - T004 — revisão formal independente de Segurança/Arquitetura.
 - T005 — freeze formal da baseline, distinto da seleção local do branch.
-- T015/T016 — PASS nesta worktree; repetir após commit para fixar evidência no SHA U2.
+- T015 — cenários funcionais executados antes do freeze na mesma árvore de código do SHA U2 acima.
+- T016 / GATE-U2 — gate automatizado repetido e PASS no SHA U2 acima.
 - T017 — capturas sanitizadas/rastreabilidade por SHA e matriz completa de personas ainda pendentes.
 - T009/T010 — fechamento da evidência e gate formal U1.
 - G09/G10 — revisão independente e aceite humano continuam fora deste incremento.
