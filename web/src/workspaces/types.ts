@@ -48,6 +48,13 @@ export type Api = (
   extra?: Record<string, string>
 ) => Promise<any>
 
+export class ApiError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
 export const formatTime = (iso: string) =>
   new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 

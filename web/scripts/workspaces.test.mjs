@@ -366,8 +366,108 @@ test('issue #58 lifecycle confirmation does not retry a state mutation', () => {
     /async function commitTransition\(\)\s*\{([\s\S]*?)\n  \}/,
   )?.[1]
   assert.ok(transition, 'lifecycle transition handler is required')
-  assert.match(transition, /if\(!selectedTransition\|\|transitionBusy\)return/)
+  assert.match(transition, /if\(!selectedTransition\|\|transitionRequestRef\.current\)return/)
   assert.match(transition, /expected_version:change\.version/)
   assert.equal((transition.match(/\bapi\(/g) ?? []).length, 1)
   assert.doesNotMatch(transition, /\b(retry|setTimeout|setInterval)\b/i)
+})
+
+test('offer dialog traps keyboard focus and provides a return target', () => {
+  const desk = read('src/OperatorDesk.tsx')
+  assert.match(desk, /const offerBodyRef\s*=\s*useRef<HTMLDivElement\|null>\(null\)/)
+  assert.match(desk, /const declineButtonRef\s*=\s*useRef<HTMLButtonElement\|null>\(null\)/)
+  assert.match(desk, /ref=\{offerBodyRef\}/)
+  assert.match(desk, /ref=\{declineButtonRef\}/)
+  assert.match(desk, /event\.shiftKey&&document\.activeElement===first/)
+  assert.match(desk, /!event\.shiftKey&&document\.activeElement===last/)
+  assert.match(desk, /if\(busy\)offerBodyRef\.current\?\.focus\(\)/)
+  assert.match(desk, /focusAfterSelectionRef\.current=select\?'composer':'worklist'/)
+  assert.match(desk, /worklistHeadingRef\.current\?\.focus\(\)/)
+})
+
+test('operator mutations are single-flight and report unconfirmed outcomes safely', () => {
+  const desk = read('src/OperatorDesk.tsx')
+  const execute = desk.match(/async function execute\([\s\S]*?\n  \}/)?.[0]
+  const reload = desk.match(/const reload = useCallback\([\s\S]*?\n  \},\[operatorId,api\]\)/)?.[0]
+  const send = desk.match(/async function sendMessage\([\s\S]*?\n  \}/)?.[0]
+  assert.ok(execute, 'operator mutation executor is required')
+  assert.ok(reload, 'operator work refresh must serialize overlapping polls')
+  assert.ok(send, 'operator message handler is required')
+  assert.match(execute, /operationLockRef\.current/)
+  assert.equal((execute.match(/await action\(\)/g) ?? []).length, 1)
+  assert.match(execute, /await reload\(true\)/)
+  assert.match(reload, /if\(workRequestPendingRef\.current&&!force\)return false/)
+  assert.match(execute, /Resultado não confirmado/)
+  assert.match(execute, /ação foi confirmada/)
+  assert.equal((send.match(/api\(/g) ?? []).length, 1,
+    'message submission must not issue a second request as a retry')
+})
+
+test('operator conversation clears prior messages while the next authorized detail loads', () => {
+  const desk = read('src/OperatorDesk.tsx')
+  const detailEffect = desk.match(
+    /useEffect\(\(\)=>\{\s*if\(!selectedId\)[\s\S]*?\},\[selectedId,api\]\)/,
+  )?.[0]
+  assert.ok(detailEffect, 'selected conversation fetch effect is required')
+  assert.match(detailEffect, /setMessages\(\[\]\)/)
+  assert.match(detailEffect, /setConversationLoading\(true\)/)
+  assert.match(detailEffect, /setSelectedId\(null\)/)
+  assert.match(detailEffect, /setNeedsReconciliation\(true\)/)
+  assert.match(desk, /conversationLoading&&<div className="empty" role="status">/)
+  assert.match(desk, /!conversationLoading&&!messages\.length/)
+})
+
+test('snapshot refresh ignores stale responses and clears protected data on failure', () => {
+  const app = read('src/App.tsx')
+  assert.match(app, /const snapshotRequestRef\s*=\s*useRef\(0\)/)
+  assert.match(app, /const requestId=\+\+snapshotRequestRef\.current/)
+  assert.match(app, /if\(requestId!==snapshotRequestRef\.current\)return/)
+  assert.match(app, /setSnapshot\(EMPTY_SNAPSHOT\)/)
+  assert.match(app, /snapshotUnavailable/)
+  assert.match(app, /status===401/)
+  assert.match(app, /status===403/)
+  assert.match(app, /if\(e instanceof ApiError&&\(e\.status===401\|\|e\.status===403\)\)\{\s*void refresh\(\)/)
+})
+
+test('supervisor conversation details distinguish loading, empty, denied, and stale scopes', () => {
+  const view = read('src/workspaces/SupervisorConversations.tsx')
+  assert.match(view, /const \[detailLoading,setDetailLoading\]\s*=\s*useState\(false\)/)
+  assert.match(view, /setMessages\(\[\]\)[\s\S]*?setTimeline\(null\)[\s\S]*?setDetailLoading\(true\)/)
+  assert.match(view, /finally\(\(\)=>\{if\(!cancelled\)setDetailLoading\(false\)\}\)/)
+  assert.match(view, /!detailLoading&&messages\.length===0/)
+  assert.match(view, /tickets\.some\((?:t|ticket)=>(?:t|ticket)\.id===selectedId\)/)
+  assert.match(view, /if\(selectedId===t\.id\)return/)
+  assert.match(view, /Não foi possível carregar/)
+})
+
+test('admin CAS lifecycle actions use a synchronous single-flight guard', () => {
+  const page = read('src/workspaces/AdminLanding.tsx')
+  const transition = page.match(
+    /async function commitTransition\(\)\s*\{([\s\S]*?)\n  \}/,
+  )?.[1]
+  assert.ok(transition, 'lifecycle transition handler is required')
+  assert.match(page, /const transitionRequestRef=useRef\(false\)/)
+  assert.match(transition, /transitionRequestRef\.current/)
+  assert.match(transition, /expected_version:change\.version/)
+  assert.match(transition, /Resultado não confirmado/)
+  assert.equal((transition.match(/\bapi\(/g) ?? []).length, 1)
+})
+
+test('verified history clears every protected scope on authorization revocation', () => {
+  const view = read('src/workspaces/ScopedVerifiedHistory.tsx')
+  assert.match(view, /import \{ ApiError,/)
+  assert.match(view, /error instanceof ApiError&&\[401,403\]\.includes\(error\.status\)/)
+  assert.match(view, /setQueues\(\[\]\)[\s\S]*?setQueueId\(''\)[\s\S]*?setListing\(null\)[\s\S]*?setSelectedId\(null\)/)
+  assert.match(view, /if\(selectedId===t\.session_id\)return/)
+  assert.match(view, /A concessão foi revogada ou expirou/)
+})
+
+test('admin queue creation stacks and constrains controls on narrow mobile viewports', () => {
+  const css = read('src/design-system/foundations.css')
+  const mobile = css.match(/@media \(max-width:\s*600px\) \{([\s\S]*?)\n\}/)?.[1]
+  assert.ok(mobile, 'mobile queue form layout rule is required')
+  assert.match(mobile, /\.admin-inventory__create-fields\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/)
+  assert.match(mobile, /\.admin-inventory__create-fields\s*>\s*button\s*\{[^}]*width:\s*100%/)
+  assert.match(mobile, /white-space:\s*normal/)
+  assert.match(mobile, /max-width:\s*100%/)
 })

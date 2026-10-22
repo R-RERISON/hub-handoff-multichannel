@@ -228,3 +228,42 @@ A revisão independente do diff B0.1 não identificou vulnerabilidades no escopo
 revisado. A auditoria transacional das mutações de equipe continua pendente para
 B1/B2; a decisão formal de integração também permanece pendente. Não houve merge
 ou promoção à `main`.
+
+## Evidência local — SPEC-018 U2 — worktree sem commit
+
+Na branch local `feat/spec018-u2-operational-journeys-20261022`, baseada no U1
+`4ad1ffed1e5202698009777135f5bd55d224a32b`, `.\start.cmd --check` terminou com
+exit code 0: **199 testes Python aprovados, 1 ignorado, Ruff, 38 contratos
+frontend, TypeScript e Vite (1604 módulos)**. `npm run build` e `git diff --check`
+também passaram.
+
+O resultado cobre a worktree local ainda não commitada; não existe SHA U2
+imutável associado a esta evidência. `git pull --ff-only` no checkout principal
+`fix/rc001-issue58-api-liveness` retornou `Already up to date`; a branch U2
+local não tem upstream e não recebeu pull.
+
+Na homologação integrada, o laboratório 007a2 percorreu N1→N2, nota interna,
+resposta e encerramento; lifecycle administrativo DRAFT→ACTIVE→PAUSED→ARCHIVED
+gerou quatro eventos persistidos. Fault injection 409 confirmou uma única
+mutation e nenhuma transição no estado stale. O timeout sintético no composer
+gerou um único POST, bloqueio até refresh e envio manual posterior sem duplicação.
+O laboratório 006b4 confirmou revoke/restore de grant Auditor, leituras VERIFIED,
+negações cross-queue 404 e diários; `release_audit_evidence` retornou PASS.
+`release_probe.py` também retornou PASS em banco efêmero.
+
+Mesa, Administração, Visão geral e Conversas da Supervisão foram verificadas
+sem overflow horizontal nos quatro pares 1366×768/1920×1080 a 100%/200%. No
+zoom real de 200%, o modal manteve footer/foco e rolou seus detalhes; Tab/Shift+Tab,
+Enter, rolagem de tabela, retorno ao composer e estados de revoke/erro foram
+exercitados. Não houve alteração de backend, RBAC, schema, migrations ou POC
+original. O roteiro está em
+[SPEC-018 U2 — Jornadas operacionais](qa/SPEC-018-U2-OPERATIONAL-JOURNEYS.md).
+
+Na exploração 390×844, Administração e Conversas da Supervisão não tiveram
+overflow horizontal; os campos e o botão de criação Admin ficaram empilhados
+e dentro do painel. Isto não é certificação mobile nem aprovação de UX-08 da
+SPEC-006C.
+
+T004/T005, T009/T010, T017–T023, G09/G10 e UX-08 mobile de SPEC-006C continuam
+pendentes. O QA U2 precisa ser repetido no SHA final após commit; nenhum PR,
+merge ou deploy foi realizado.

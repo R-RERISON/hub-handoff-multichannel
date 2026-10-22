@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { ArrowUpRight, CheckCircle2, LockKeyhole, Plus, RefreshCw, ServerCog, Shield } from 'lucide-react'
 import type { Api } from './types'
 import AdminPeople from './AdminPeople'
@@ -30,10 +30,12 @@ export default function AdminLanding({api}:{api:Api}){
   const [newId,setNewId]=useState('')
   const [newName,setNewName]=useState('')
   const [saving,setSaving]=useState(false)
+  const createRequestRef=useRef(false)
   const [createError,setCreateError]=useState('')
   const [createNotice,setCreateNotice]=useState('')
   const [selectedTransition,setSelectedTransition]=useState<{id:string;name:string;state:'ACTIVE'|'PAUSED'|'ARCHIVED';version:number}|null>(null)
   const [transitionBusy,setTransitionBusy]=useState(false)
+  const transitionRequestRef=useRef(false)
   const [transitionError,setTransitionError]=useState('')
   const [transitionNotice,setTransitionNotice]=useState('')
   const refresh=useCallback(async ()=>{
@@ -48,7 +50,8 @@ export default function AdminLanding({api}:{api:Api}){
   },[api])
   useEffect(()=>{void refresh()},[refresh])
   async function commitTransition(){
-    if(!selectedTransition||transitionBusy)return
+    if(!selectedTransition||transitionRequestRef.current)return
+    transitionRequestRef.current=true
     const change=selectedTransition
     setTransitionBusy(true);setTransitionError('');setTransitionNotice('')
     try{
@@ -61,13 +64,17 @@ export default function AdminLanding({api}:{api:Api}){
       setTransitionNotice('Alteração de estado confirmada no diário administrativo.')
     }catch{
       setSelectedTransition(null)
-      setTransitionError('Alteração não aplicada. Atualize a lista e confira pendências/versão.')
+      setTransitionError('Resultado não confirmado. Atualize a lista e confira estado/versão antes de tentar novamente.')
       await refresh()
-    }finally{setTransitionBusy(false)}
+    }finally{
+      transitionRequestRef.current=false
+      setTransitionBusy(false)
+    }
   }
   async function createQueue(event:FormEvent<HTMLFormElement>){
     event.preventDefault()
-    if(saving||!inventory?.capabilities.queue_create_available)return
+    if(saving||createRequestRef.current||!inventory?.capabilities.queue_create_available)return
+    createRequestRef.current=true
     setSaving(true);setCreateError('');setCreateNotice('')
     try{
       const response=await api('/v1/admin/queues','POST',{id:newId,name:newName})
@@ -77,7 +84,10 @@ export default function AdminLanding({api}:{api:Api}){
       setCreateNotice('Fila cadastrada e auditada na operação autenticada.')
     }catch{
       setCreateError('Cadastro não confirmado. Verifique identificador, permissão e disponibilidade.')
-    }finally{setSaving(false)}
+    }finally{
+      createRequestRef.current=false
+      setSaving(false)
+    }
   }
 
   return <div className="section-stack admin-inventory">

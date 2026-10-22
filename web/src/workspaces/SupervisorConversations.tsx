@@ -14,6 +14,7 @@ export default function SupervisorConversations({tickets,api,showVerified=false}
   const [search,setSearch] = useState('')
   const [messages,setMessages] = useState<ChatMessage[]>([])
   const [timeline,setTimeline] = useState<Timeline|null>(null)
+  const [detailLoading,setDetailLoading] = useState(false)
   const [error,setError] = useState('')
   const selected = tickets.find(t=>t.id===selectedId)
   const visible = tickets.filter(t =>
@@ -24,8 +25,16 @@ export default function SupervisorConversations({tickets,api,showVerified=false}
   )
 
   useEffect(()=>{
-    if(!selectedId) return
+    if(!selectedId){
+      setMessages([])
+      setTimeline(null)
+      setDetailLoading(false)
+      return
+    }
     let cancelled=false
+    setMessages([])
+    setTimeline(null)
+    setDetailLoading(true)
     setError('')
     Promise.all([
       api('/v1/handoffs/'+selectedId+'/messages'),
@@ -34,9 +43,25 @@ export default function SupervisorConversations({tickets,api,showVerified=false}
       if(cancelled)return
       setMessages(m as ChatMessage[])
       setTimeline(t as Timeline)
-    }).catch(e=>!cancelled&&setError((e as Error).message))
+    }).catch(()=>{
+      if(cancelled)return
+      setSelectedId(null)
+      setMessages([])
+      setTimeline(null)
+      setError('Não foi possível carregar o histórico autorizado desta sessão; o conteúdo foi removido.')
+    }).finally(()=>{if(!cancelled)setDetailLoading(false)})
     return ()=>{cancelled=true}
   },[selectedId,api])
+
+  useEffect(()=>{
+    if(selectedId&&!tickets.some(ticket=>ticket.id===selectedId)){
+      setSelectedId(null)
+      setMessages([])
+      setTimeline(null)
+      setDetailLoading(false)
+      setError('A sessão deixou de estar disponível neste escopo; o conteúdo foi removido.')
+    }
+  },[selectedId,tickets])
 
   return <div className="section-stack">
     <section className="intro-banner">
@@ -69,33 +94,41 @@ export default function SupervisorConversations({tickets,api,showVerified=false}
           </select>
         </div>
         <div className="history-list">
-          {visible.map(t=><button key={t.id} className={'history-ticket '+(selectedId===t.id?'selected':'')}
-            onClick={()=>{setSelectedId(t.id);setMessages([]);setTimeline(null)}}>
+          {visible.map(t=><button type="button" key={t.id}
+            className={'history-ticket '+(selectedId===t.id?'selected':'')}
+            aria-pressed={selectedId===t.id}
+            onClick={()=>{
+              if(selectedId===t.id)return
+              setSelectedId(t.id);setMessages([]);setTimeline(null)
+              setDetailLoading(true);setError('')
+            }}>
             <strong>{t.requester_label}</strong><small>{t.subject}</small>
             <span className={'status '+t.status.toLowerCase()}>{t.status}</span>
           </button>)}
           {visible.length===0&&<p className="empty-state">Nenhuma sessão corresponde ao filtro.</p>}
         </div>
       </section>
-      <section className="panel history-details">
+      <section className="panel history-details" aria-busy={detailLoading}>
+        {error&&<div className="alert" role="alert">{error}</div>}
         {selected?<><header className="history-details__header"><div>
             <h3>{selected.requester_label}</h3><p>{selected.subject} · {selected.queue_id.toUpperCase()}</p>
           </div><span className={'status '+selected.status.toLowerCase()}>{selected.status}</span></header>
           <div className="history-meta">Sessão: {selected.id} · Bot: {selected.integration_id} · Operador: {selected.operator_id??'Não atribuído'}</div>
-          {error&&<div className="alert" role="alert">{error}</div>}
+          {detailLoading&&<p className="empty-state" role="status">Carregando histórico autorizado…</p>}
           <div className="history-messages">
             <div className="chat-notice">HISTÓRICO DE SIMULAÇÃO · SOMENTE LEITURA</div>
             {messages.map(m=><div className={'bubble-row '+(m.sender==='OPERATOR'?'right':'')} key={m.id}>
               <div className="bubble"><b>{m.sender==='OPERATOR'?'Operador':'Usuário'}</b>
                 <p>{m.content}</p><small>{formatTime(m.created_at)}</small></div>
             </div>)}
-            {messages.length===0&&<p className="empty-state">Sem mensagens registradas.</p>}
+            {!detailLoading&&messages.length===0&&!error&&
+              <p className="empty-state">Sem mensagens registradas.</p>}
           </div>
           <div className="history-events"><b>Trilha de auditoria</b>
             {timeline?.events?.map((e,i)=><span key={i}>{e.type} · {e.actor} · {formatTime(e.at)}</span>)}
             {timeline?.transfers?.map((t,i)=><span key={'t'+i}>Transferência {t.from_queue_id} → {t.to_queue_id}: {t.reason}</span>)}
           </div>
-        </>:<div className="center-empty"><MessageSquareText size={37}/>
+        </>:!error&&<div className="center-empty"><MessageSquareText size={37}/>
             <h3>Selecione uma sessão</h3><p>Consulte as mensagens e o histórico sem interferir no atendimento.</p>
           </div>}
       </section>

@@ -160,6 +160,35 @@ body {
 .overview-panel > .hub-empty-state {
   margin: 14px 18px;
 }
+@media (max-width: 600px) {
+  .admin-inventory__create-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-inventory__create-fields > button {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+  }
+}
+.workspace-data-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ux-space-3);
+  padding: var(--ux-space-6);
+}
+.workspace-data-state h2 {
+  margin: 0;
+  color: var(--ux-ink);
+  font-size: 18px;
+}
+.workspace-data-state p {
+  margin: 0;
+  color: var(--ux-muted);
+  line-height: 1.55;
+}
 
 /* Keyboard navigation: keep focus apparent at normal and 200% browser zoom. */
 :where(button, a, input, textarea, select):focus-visible,

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { LockKeyhole, RefreshCw, ShieldCheck } from 'lucide-react'
-import type { Api, ChatMessage } from './types'
+import { ApiError, type Api, type ChatMessage } from './types'
 import { formatTime } from './types'
 
 type GrantQueue = {id:string;name:string;operation_id:string}
@@ -80,12 +80,18 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
         if(cancelled)return
         setListing(data as Listing)
       })
-      .catch(()=>{
+      .catch(error=>{
         if(cancelled)return
         setListing(null)
         setSelectedId(null)
         setDetail(null)
-        setError('Consulta indisponível ou permissão de fila revogada.')
+        if(error instanceof ApiError&&[401,403].includes(error.status)){
+          setQueues([])
+          setQueueId('')
+          setError('A concessão foi revogada ou expirou. Os dados protegidos foram removidos.')
+        }else{
+          setError('Consulta indisponível; nenhum dado anterior foi mantido.')
+        }
       })
       .finally(()=>{if(!cancelled)setLoading(false)})
     return ()=>{cancelled=true}
@@ -105,10 +111,19 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
       '/verified-history?queue_id='+encodeURIComponent(queueId)+
       '&message_page='+messagePage+'&event_page='+eventPage)
       .then(data=>{if(!cancelled)setDetail(data as VerifiedDetails)})
-      .catch(()=>{
+      .catch(error=>{
         if(cancelled)return
         setDetail(null)
-        setError('O acesso ao segmento foi negado ou a concessão mudou.')
+        if(error instanceof ApiError&&[401,403].includes(error.status)){
+          setQueues([])
+          setQueueId('')
+          setListing(null)
+          setSelectedId(null)
+          setError('A concessão foi revogada ou expirou. Os dados protegidos foram removidos.')
+        }else{
+          setSelectedId(null)
+          setError('O acesso ao segmento não pôde ser confirmado; o conteúdo foi removido.')
+        }
       })
       .finally(()=>{if(!cancelled)setDetailLoading(false)})
     return ()=>{cancelled=true}
@@ -172,6 +187,7 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
             className={'history-ticket '+(selectedId===t.session_id?'selected':'')}
             aria-pressed={selectedId===t.session_id}
             onClick={()=>{
+              if(selectedId===t.session_id)return
               setMessagePage(1);setEventPage(1)
               setDetail(null);setDetailLoading(true)
               setSelectedId(t.session_id)

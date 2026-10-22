@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import {
   ArrowLeftRight, ArrowRight, ChartNoAxesCombined,
@@ -13,7 +13,7 @@ import SupervisorOverview from './workspaces/SupervisorOverview'
 import SupervisorQueues from './workspaces/SupervisorQueues'
 import SupervisorTeam from './workspaces/SupervisorTeam'
 import WorkspaceHome from './workspaces/WorkspaceHome'
-import type { Api, DashboardSnapshot } from './workspaces/types'
+import { ApiError, type Api, type DashboardSnapshot } from './workspaces/types'
 
 const API_URL = 'http://127.0.0.1:8000'
 const EMPTY_SNAPSHOT: DashboardSnapshot = {
@@ -45,6 +45,8 @@ export default function App() {
   const [user,setUser] = useState<{username:string;role:'ADMIN'|'SUPERVISOR'|'OPERATOR'|'AUDITOR';operator_id:string|null}|null>(null)
   const [connected,setConnected] = useState(false)
   const [snapshot,setSnapshot] = useState<DashboardSnapshot>(EMPTY_SNAPSHOT)
+  const [snapshotUnavailable,setSnapshotUnavailable] = useState('')
+  const snapshotRequestRef = useRef(0)
   const [operatorId,setOperatorId] = useState('op-ana')
   const [busy,setBusy] = useState(false)
   const [error,setError] = useState('')
@@ -63,21 +65,42 @@ export default function App() {
       headers: {'Authorization':'Bearer '+token,'Content-Type':'application/json',...(extra||{})},
       body: body ? JSON.stringify(body) : undefined,
     })
-    if(!response.ok)throw new Error(String(response.status)+': '+(await response.text()).slice(0,240))
+    if(!response.ok)throw new ApiError(
+      response.status,String(response.status)+': '+(await response.text()).slice(0,240)
+    )
     return response.json()
   },[token])
 
   const refresh = useCallback(async ()=>{
     if(!connected)return
+    const requestId=++snapshotRequestRef.current
     try {
       if(user?.role==='OPERATOR'){
         const queues=await api('/v1/queues')
+        if(requestId!==snapshotRequestRef.current)return
         setSnapshot(s=>({...s,queues}))
       }else{
         const data:DashboardSnapshot = await api('/v1/dashboard')
+        if(requestId!==snapshotRequestRef.current)return
         setSnapshot(data)
       }
-    }catch(e){setError((e as Error).message)}
+      setSnapshotUnavailable('')
+      setError('')
+    }catch(e){
+      if(requestId!==snapshotRequestRef.current)return
+      setSnapshot(EMPTY_SNAPSHOT)
+      if(e instanceof ApiError&&e.status===401){
+        snapshotRequestRef.current+=1
+        setToken('');setUser(null);setConnected(false)
+        setSnapshotUnavailable('')
+        setError('Sessão expirada ou revogada. Faça login novamente.')
+        return
+      }
+      setSnapshotUnavailable(e instanceof ApiError&&e.status===403
+        ? 'A autorização foi revogada ou não cobre este escopo. Os dados protegidos foram removidos.'
+        : 'Não foi possível atualizar a operação. Os dados protegidos foram removidos.')
+      setError('')
+    }
   },[connected,api,user?.role])
 
   useEffect(()=>{
@@ -93,12 +116,18 @@ export default function App() {
 
   useEffect(()=>{
     if(!connected||!token)return
-    const ping=()=>{void api('/v1/auth/heartbeat','POST').catch(e=>setError((e as Error).message))}
+    const ping=()=>{void api('/v1/auth/heartbeat','POST').catch(e=>{
+      if(e instanceof ApiError&&(e.status===401||e.status===403)){
+        void refresh()
+        return
+      }
+      setError((e as Error).message)
+    })}
     ping()
     const id=window.setInterval(ping,10000)
     document.addEventListener('visibilitychange',ping)
     return ()=>{window.clearInterval(id);document.removeEventListener('visibilitychange',ping)}
-  },[connected,token,api])
+  },[connected,token,api,refresh])
 
   useEffect(()=>{
     setError('')
@@ -106,7 +135,9 @@ export default function App() {
   },[location.pathname])
 
   async function connect(){
+    snapshotRequestRef.current+=1
     setBusy(true);setError('')
+    setSnapshotUnavailable('')
     try{
       const response=await fetch(API_URL+'/v1/auth/login',{
         method:'POST',headers:{'Content-Type':'application/json'},
@@ -133,6 +164,7 @@ export default function App() {
         setSnapshot(await r.json())
       }
       setToken(accessToken);setUser(principal);setConnected(true);setPassword('')
+      setSnapshotUnavailable('')
       const path=principal.role==='OPERATOR'?'/operador'
         :principal.role==='AUDITOR'?'/supervisao/conversas'
         :principal.role==='SUPERVISOR'?'/supervisao':'/inicio'
@@ -142,9 +174,12 @@ export default function App() {
   }
 
   async function logout(){
-    try{await api('/v1/auth/logout','POST')}catch{ /* token expires if offline */ }
+    const logoutRequest=api('/v1/auth/logout','POST')
+    snapshotRequestRef.current+=1
     setToken('');setUser(null);setConnected(false);setSnapshot(EMPTY_SNAPSHOT)
+    setSnapshotUnavailable('')
     setNotice('');setError('');navigate('/',{replace:true})
+    try{await logoutRequest}catch{ /* Local state is cleared; the server session expires if offline. */ }
   }
 
   async function createTicket(){
@@ -304,22 +339,30 @@ export default function App() {
         <button onClick={()=>setError('')}>Fechar</button></div>}
       {notice&&<div className="notice" role="status"><CheckCircle2 size={16}/>{notice}
         <button aria-label="Dispensar aviso" onClick={()=>setNotice('')}>×</button></div>}
-      <Routes>
-        <Route path="/" element={<Navigate to="/supervisao" replace/>}/>
-        <Route path="/supervisao" element={<SupervisorOverview snapshot={snapshot}/>}/>
-        <Route path="/supervisao/conversas" element={<SupervisorConversations
-          tickets={snapshot.handoffs} api={api}
-          showVerified={user?.role==='SUPERVISOR'||user?.role==='AUDITOR'}/>}/>
-        <Route path="/supervisao/filas" element={<SupervisorQueues
-          queues={snapshot.queues} operators={snapshot.operators}
-          tickets={snapshot.handoffs} api={api} onChanged={refresh}/>}/>
-        <Route path="/supervisao/equipe" element={<SupervisorTeam
-          operators={snapshot.operators} busy={busy} onPresence={changePresence}
-          onCapacity={changeCapacity}/>}/>
-        <Route path="/laboratorio" element={<DemoLab
-          tickets={snapshot.handoffs} busy={busy} onCreate={createTicket}/>}/>
-        <Route path="*" element={<Navigate to="/supervisao" replace/>}/>
-      </Routes>
+      {snapshotUnavailable
+        ? <section className="panel workspace-data-state" role="alert">
+            <h2>Dados da operação indisponíveis</h2>
+            <p>{snapshotUnavailable}</p>
+            <button className="outline" type="button" onClick={()=>void refresh()}>
+              Revalidar acesso
+            </button>
+          </section>
+        : <Routes>
+            <Route path="/" element={<Navigate to="/supervisao" replace/>}/>
+            <Route path="/supervisao" element={<SupervisorOverview snapshot={snapshot}/>}/>
+            <Route path="/supervisao/conversas" element={<SupervisorConversations
+              tickets={snapshot.handoffs} api={api}
+              showVerified={user?.role==='SUPERVISOR'||user?.role==='AUDITOR'}/>}/>
+            <Route path="/supervisao/filas" element={<SupervisorQueues
+              queues={snapshot.queues} operators={snapshot.operators}
+              tickets={snapshot.handoffs} api={api} onChanged={refresh}/>}/>
+            <Route path="/supervisao/equipe" element={<SupervisorTeam
+              operators={snapshot.operators} busy={busy} onPresence={changePresence}
+              onCapacity={changeCapacity}/>}/>
+            <Route path="/laboratorio" element={<DemoLab
+              tickets={snapshot.handoffs} busy={busy} onCreate={createTicket}/>}/>
+            <Route path="*" element={<Navigate to="/supervisao" replace/>}/>
+          </Routes>}
       <footer>Handoff Hub · POC SQLite 0.5 · Controle de acesso por perfil · Uso local</footer>
     </main>
   </div>
