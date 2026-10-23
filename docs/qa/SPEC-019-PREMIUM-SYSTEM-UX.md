@@ -2,9 +2,10 @@
 
 ## Baseline e limites
 
-- **Branch local**: `feat/spec018-ux-premium-batch-20261022`
+- **Branch publicada**: `feat/spec018-ux-premium-batch-20261022`
 - **Base publicada U2**: `641ea2fc3c77c7f365f36f8af939f7e404a44c84`
-- **Estado da entrega**: alterações SPEC-019 sem commit; os resultados abaixo são da worktree local e ainda não estão fixados em SHA imutável.
+- **Commit de implementação testado**: `8aa60368a5a33deb8c8446b5db6126353af3286a`
+- **Estado da entrega**: branch pushed; PR ainda não aberto; sem merge ou deploy.
 - **Escopo**: login/seleção, Operador, Visão geral, Conversas, Filas, Equipe, Administração, histórico verificado e Laboratório.
 - **Ambiente**: laboratório sintético TEMP 007a2; backup offline verificado antes da migração. A POC SQLite original e as credenciais do modo normal não foram usadas.
 - **Limite de release**: este registro não aprova UX-08 da SPEC-006C, G09, G10, produção ou entrega real por Teams.
@@ -63,14 +64,15 @@ Após parar API e Vite, o diretório TEMP sintético e os logs do launcher criad
 ## Pendências e gates não aprovados
 
 - Revisão independente de Segurança/Arquitetura, freeze e integração ainda não foram aprovados.
-- Matriz de evidências anexada a SHA imutável ainda depende do commit final do feature branch.
+- Matriz de evidências vinculada ao commit de implementação acima; revisão independente ainda pendente.
 - UX-08 mobile da SPEC-006C, avaliação WCAG integral, G09 e G10 continuam gates separados.
 - Não foi criado/atualizado PR, não houve push, merge ou deploy.
 
 ## Convergência — rodada complementar
 
-As observações abaixo são da worktree local após os ajustes da convergência e ainda
-não estão ligadas a um SHA imutável.
+As observações abaixo foram executadas antes do commit de implementação
+`8aa60368a5a33deb8c8446b5db6126353af3286a`; o commit contém o mesmo código e a
+matriz agora está vinculada a esse SHA.
 
 O `.\start.cmd --check` final foi executado com `HANDOFF_DB_URL` removido e serviços
 parados: **199 testes Python aprovados, 1 ignorado; Ruff aprovado; 52 contratos
@@ -107,4 +109,4 @@ integral de leitor de tela/WCAG. UX-08, WCAG integral, G09 e G10 continuam gates
 separados.
 
 O laboratório TEMP complementar e os logs foram removidos; as portas 8000/5173 estão
-livres. A worktree continua sem commit ou SHA imutável.
+livres. A branch está publicada, sem PR, merge ou deploy.

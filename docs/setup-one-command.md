@@ -273,9 +273,9 @@ Nenhum PR, merge ou deploy foi realizado.
 
 Branch de trabalho criada sobre a branch U2 publicada:
 `feat/spec018-ux-premium-batch-20261022`. Base de implementação U2:
-`641ea2fc3c77c7f365f36f8af939f7e404a44c84`. As mudanças SPEC-019 permanecem
-locais e sem commit; os resultados abaixo correspondem a essa worktree, não a
-um SHA final imutável.
+`641ea2fc3c77c7f365f36f8af939f7e404a44c84`. Commit de implementação:
+`8aa60368a5a33deb8c8446b5db6126353af3286a`. A branch está publicada; PR ainda não
+foi aberto e nenhum merge ou deploy foi feito.
 
 O pacote é frontend-only: navegação e login acessíveis; limpeza de conteúdo
 protegido em negação; orientação interna de oferta com estados explícitos;
@@ -328,9 +328,9 @@ backup verificado, inspecionar a revisão e então retomar com
 `--lab` para homologar estes fluxos. Não incluir credenciais sintéticas em
 relatórios, screenshots, logs ou commits.
 
-**Pendências**: branch local sem commit final nem push; T004/T005/T009/T010,
-T017–T023, WCAG integral, UX-08 mobile da SPEC-006C, G09 e G10 continuam gates
-separados. Nenhum PR, merge ou deploy foi feito.
+**Pendências**: criar/atualizar o PR para revisão independente; WCAG integral,
+UX-08 mobile da SPEC-006C, G09 e G10 continuam gates separados. Nenhum merge ou
+deploy foi feito.
 
 os serviços foram encerrados após a validação; as portas 8000/5173 estão livres.
 O laboratório TEMP sintético e os logs de launcher desta rodada foram removidos.
@@ -356,4 +356,5 @@ O gate após a convergência passou com `HANDOFF_DB_URL` removido e serviços pa
 aprovados; TypeScript aprovado; Vite aprovou 1606 módulos.
 `git diff --check` também passou após as atualizações de evidência.
 O laboratório TEMP complementar e os logs foram removidos; as portas 8000/5173
-estão livres. A worktree continua sem commit ou SHA imutável.
+estão livres. A branch publicada contém o commit de implementação
+`8aa60368a5a33deb8c8446b5db6126353af3286a`; PR, merge e deploy ainda pendentes.
