@@ -8,6 +8,7 @@ import {
 import OperatorDesk from './OperatorDesk'
 import AdminLanding from './workspaces/AdminLanding'
 import DemoLab from './workspaces/DemoLab'
+import { userFacingError } from './design-system/presentation'
 import SupervisorConversations from './workspaces/SupervisorConversations'
 import SupervisorOverview from './workspaces/SupervisorOverview'
 import SupervisorQueues from './workspaces/SupervisorQueues'
@@ -23,14 +24,15 @@ const EMPTY_SNAPSHOT: DashboardSnapshot = {
 function Logo() {
   return <div className="brand">
     <div className="app-mark"><Headset size={20}/></div>
-    <div><b>Handoff Hub</b><small>MULTICHANNEL PLATFORM</small></div>
+    <div><b>Handoff Hub</b><small>PLATAFORMA MULTICANAL</small></div>
   </div>
 }
 
 function ActiveLink({to,icon,label,count,countMeaning}:{
   to:string;icon:ReactNode;label:string;count?:number;countMeaning?:string
 }) {
-  return <NavLink to={to} end={to==='/supervisao'} className={({isActive})=>'nav '+(isActive?'active':'')}>
+  return <NavLink to={to} end={to==='/supervisao'} aria-label={label} title={label}
+    className={({isActive})=>'nav '+(isActive?'active':'')}>
     {icon}<span>{label}</span>
     {count!==undefined&&<em title={countMeaning} aria-label={countMeaning??String(count)}>{count}</em>}
   </NavLink>
@@ -56,6 +58,10 @@ export default function App() {
   const adminMode = location.pathname.startsWith('/administracao')
   const offered = snapshot.handoffs.filter(t=>t.status==='OFFERED').length
   const waiting = snapshot.queues.reduce((sum,q)=>sum+q.waiting,0)
+
+  useEffect(()=>{
+    document.querySelector<HTMLElement>('[data-page-focus]')?.focus()
+  },[connected,location.pathname])
 
   const api:Api = useCallback(async (
     path:string,method='GET',body?:object,extra?:Record<string,string>
@@ -121,7 +127,7 @@ export default function App() {
         void refresh()
         return
       }
-      setError((e as Error).message)
+      setError(userFacingError(e,'Não foi possível confirmar a sessão. Atualize os dados antes de continuar.'))
     })}
     ping()
     const id=window.setInterval(ping,10000)
@@ -169,7 +175,7 @@ export default function App() {
         :principal.role==='AUDITOR'?'/supervisao/conversas'
         :principal.role==='SUPERVISOR'?'/supervisao':'/inicio'
       navigate(path,{replace:true})
-    }catch(e){setError((e as Error).message)}
+    }catch(e){setError(userFacingError(e,'Usuário ou senha inválidos. Confira os dados e a disponibilidade do serviço local.'))}
     finally{setBusy(false)}
   }
 
@@ -194,8 +200,7 @@ export default function App() {
       },{'Idempotency-Key':id})
       await refresh()
       setNotice('Solicitação criada. A distribuição ocorrerá automaticamente quando houver operador conectado e disponível.')
-      navigate('/supervisao/filas')
-    }catch(e){setError((e as Error).message)}
+    }catch(e){setError(userFacingError(e,'Não foi possível criar a solicitação sintética. Atualize os dados e tente novamente.'))}
     finally{setBusy(false)}
   }
 
@@ -204,8 +209,7 @@ export default function App() {
     try{
       await api('/v1/operators/'+operator+'/capacity','PATCH',{capacity})
       await refresh()
-      setNotice('Capacidade do operador atualizada.')
-    }catch(e){setError((e as Error).message)}
+    }
     finally{setBusy(false)}
   }
 
@@ -214,33 +218,33 @@ export default function App() {
     try{
       await api('/v1/operators/'+operator+'/presence','PATCH',{presence})
       await refresh()
-      setNotice('Presença demonstrativa atualizada.')
-    }catch(e){setError((e as Error).message)}
+    }
     finally{setBusy(false)}
   }
 
-  if(!connected)return <div className="login-wrap">
-    <section className="login-panel">
+  if(!connected)return <main className="login-wrap">
+    <section className="login-panel" aria-labelledby="login-heading">
       <div className="app-mark"><Headset size={26}/></div>
       <span className="kicker">HANDOFF HUB · SQLITE POC</span>
-      <h1>Bem-vindo ao Handoff Hub.</h1>
+      <h1 id="login-heading" tabIndex={-1} data-page-focus>Bem-vindo ao Handoff Hub.</h1>
       <p>Acesse com seu perfil de operador, supervisor, auditor ou administrador. A API valida suas permissões.</p>
-      <label htmlFor="username">Usuário</label>
-      <input id="username" autoComplete="username" value={username}
-        onChange={e=>setUsername(e.target.value)} placeholder="ex.: ana.demo"/>
-      <label htmlFor="password">Senha</label>
-      <input id="password" type="password" autoComplete="current-password" value={password}
-        onChange={e=>setPassword(e.target.value)}
-        onKeyDown={e=>{if(e.key==='Enter')void connect()}}/>
-      <button className="primary full" disabled={!username.trim()||!password||busy} onClick={()=>void connect()}>
-        <Lock size={16}/> Entrar no meu workspace <ArrowRight size={16}/>
-      </button>
-      {error&&<p className="alert" role="alert">{error}</p>}
+      <form aria-busy={busy} onSubmit={event=>{event.preventDefault();void connect()}}>
+        <label htmlFor="username">Usuário</label>
+        <input id="username" required autoComplete="username" value={username}
+          aria-invalid={!!error} onChange={e=>setUsername(e.target.value)} placeholder="ex.: ana.demo"/>
+        <label htmlFor="password">Senha</label>
+        <input id="password" type="password" required autoComplete="current-password" value={password}
+          aria-invalid={!!error} onChange={e=>setPassword(e.target.value)}/>
+        <button className="primary full" type="submit" disabled={!username.trim()||!password||busy}>
+          <Lock size={16}/> {busy?'Entrando…':'Entrar no meu workspace'} <ArrowRight size={16}/>
+        </button>
+        {error&&<p className="alert" role="alert" aria-live="assertive">{error}</p>}
+      </form>
       <small>Use as credenciais do ambiente iniciado pelo launcher.
         No laboratório, elas ficam exclusivamente no diretório TEMP informado no terminal.
         POC local sem SSO.</small>
     </section>
-  </div>
+  </main>
 
   const permitted=!!user && ((user.role==='ADMIN' && !operatorMode) ||
     (user.role==='OPERATOR' && operatorMode) ||
@@ -248,14 +252,16 @@ export default function App() {
       location.pathname.startsWith('/supervisao') || location.pathname==='/laboratorio')) ||
     (user.role==='AUDITOR' && (
       location.pathname==='/supervisao' || location.pathname==='/supervisao/conversas')))
-  if(!permitted)return <div className="login-wrap"><section className="login-panel">
-    <h1>Acesso não permitido</h1><p>Este espaço não pertence ao seu perfil.</p>
+  if(!permitted)return <main className="login-wrap"><section className="login-panel"
+    aria-labelledby="access-denied-heading">
+    <h1 id="access-denied-heading" tabIndex={-1} data-page-focus>Acesso não permitido</h1>
+    <p>Este espaço não pertence ao seu perfil.</p>
     <button className="primary full" onClick={()=>navigate(user?.role==='OPERATOR'?'/operador':
       user?.role==='AUDITOR'?'/supervisao/conversas':'/supervisao')}>Ir para meu workspace</button>
     <button className="outline full" onClick={()=>void logout()}>Sair</button>
-  </section></div>
+  </section></main>
 
-  if(homeMode)return <WorkspaceHome/>
+  if(homeMode)return <WorkspaceHome onLogout={()=>void logout()}/>
 
   if(operatorMode)return <div className="operator-portal">
     <header className="operator-portal__header">
@@ -299,7 +305,7 @@ export default function App() {
         <button className="outline" onClick={()=>navigate('/inicio')}>
           <ArrowLeftRight size={15}/> Trocar espaço
         </button><button className="outline" onClick={()=>void logout()}>Sair</button></header>
-      <Routes><Route path="/administracao" element={<AdminLanding api={api}/>}/>
+      <Routes><Route path="/administracao" element={<AdminLanding api={api} onChanged={refresh}/>}/>
         <Route path="*" element={<Navigate to="/administracao" replace/>}/></Routes>
     </main>
   </div>
@@ -315,12 +321,17 @@ export default function App() {
         <ActiveLink to="/supervisao/filas" icon={<Layers size={18}/>} label="Filas" count={waiting+offered}/>
         <ActiveLink to="/supervisao/equipe" icon={<Users size={18}/>} label="Equipe"/>
       </>}
-      <div className="sidebar-separator"/>
-      <span className="sidebar-title">AMBIENTE DE TESTES</span>
-      {user?.role!=='AUDITOR'&&<ActiveLink to="/laboratorio" icon={<FlaskConical size={18}/>} label="Laboratório"/>}
-      <div className="sidebar-separator"/>
-      <span className="sidebar-title">OUTROS ESPAÇOS</span>
-      {user?.role==='ADMIN'&&<NavLink className="nav nav--external" to="/inicio"><ArrowLeftRight size={18}/><span>Escolher espaço</span><ArrowRight size={14}/></NavLink>}
+      {user?.role!=='AUDITOR'&&<>
+        <div className="sidebar-separator"/>
+        <span className="sidebar-title">AMBIENTE DE TESTES</span>
+        <ActiveLink to="/laboratorio" icon={<FlaskConical size={18}/>} label="Laboratório"/>
+      </>}
+      {user?.role==='ADMIN'&&<>
+        <div className="sidebar-separator"/>
+        <span className="sidebar-title">OUTROS ESPAÇOS</span>
+        <NavLink className="nav nav--external" to="/inicio" aria-label="Escolher espaço"
+          title="Escolher espaço"><ArrowLeftRight size={18}/><span>Escolher espaço</span><ArrowRight size={14}/></NavLink>
+      </>}
       <div className="sidebar-bottom"><span className="online-dot"/> API local · SQLite
         <small>POC 0.5 · Sem integração Teams</small></div>
     </aside>
@@ -358,7 +369,7 @@ export default function App() {
               tickets={snapshot.handoffs} api={api} onChanged={refresh}/>}/>
             <Route path="/supervisao/equipe" element={<SupervisorTeam
               operators={snapshot.operators} busy={busy} onPresence={changePresence}
-              onCapacity={changeCapacity}/>}/>
+              onCapacity={changeCapacity} onRefresh={refresh}/>}/>
             <Route path="/laboratorio" element={<DemoLab
               tickets={snapshot.handoffs} busy={busy} onCreate={createTicket}/>}/>
             <Route path="*" element={<Navigate to="/supervisao" replace/>}/>

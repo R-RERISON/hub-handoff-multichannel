@@ -1,10 +1,11 @@
 import {
-  Activity, ArrowRight, CircleCheck, Clock3, Headset, Layers, MessageSquareText,
+  Activity, ArrowRight, Clock3, Headset, Layers, MessageSquareText,
   Users
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import type { DashboardSnapshot } from './types'
 import { EmptyState } from '../design-system/EmptyState'
+import { queueStateLabel } from '../design-system/presentation'
 
 type Props = { snapshot: DashboardSnapshot }
 
@@ -26,8 +27,8 @@ export default function SupervisorOverview({ snapshot }: Props) {
   return <div className="section-stack">
     <section className="intro-banner">
       <div><span className="eyebrow">CENTRAL DE SUPERVISÃO</span>
-        <h2>Visão geral da operação</h2>
-        <p>Acompanhe filas, capacidade e atendimentos de todos os bots integrados à operação.</p>
+        <h2 tabIndex={-1} data-page-focus>Visão geral da operação</h2>
+        <p>Acompanhe filas, capacidade e atendimentos demonstrativos desta operação local.</p>
       </div>
       <button className="primary" onClick={() => navigate('/supervisao/filas')}>
         Gerenciar filas <ArrowRight size={16}/>
@@ -54,10 +55,10 @@ export default function SupervisorOverview({ snapshot }: Props) {
       <section className="panel overview-panel">
         <div className="panel-header"><div><h3>Saúde operacional</h3>
           <p>Indicadores da POC e dependências</p></div></div>
-        <div className="health-line"><span><CircleCheck size={17}/> API local e SQLite</span><b>Ativos</b></div>
-        <div className="health-line"><span><Activity size={17}/> Outbox aguardando integração</span><b>{snapshot.outbox.pending} mensagem(ns)</b></div>
+        <div className="health-line"><span><Activity size={17}/> API local e SQLite</span><b>Sem monitoramento em tempo real</b></div>
+        <div className="health-line"><span><Activity size={17}/> Mensagens locais pendentes de integração</span><b>{snapshot.outbox.pending} pendente(s) · não enviada(s)</b></div>
         <div className="health-line"><span><Headset size={17}/> Adapter Microsoft Teams</span><b>Não instalado</b></div>
-        <p className="operational-note">As respostas registradas na outbox ainda não são enviadas aos usuários. Esta versão utiliza apenas dados simulados.</p>
+        <p className="operational-note">As respostas registradas localmente não são enviadas aos usuários. Esta versão utiliza apenas dados simulados.</p>
       </section>
     </div>
     <section className="panel overview-panel">
@@ -67,7 +68,7 @@ export default function SupervisorOverview({ snapshot }: Props) {
       </div>
       {snapshot.handoffs.slice(0,5).map(t => <div className="recent-item" key={t.id}>
         <div><b>{t.requester_label}</b><small>{t.subject} · {t.queue_id.toUpperCase()}</small></div>
-        <span className={'status '+t.status.toLowerCase()}>{t.status}</span>
+        <span className={'status '+t.status.toLowerCase()}>{queueStateLabel(t.status)}</span>
       </div>)}
       {snapshot.handoffs.length===0 && <EmptyState className="empty-state">Ainda não há solicitações. Utilize o Laboratório para criar uma.</EmptyState>}
     </section>

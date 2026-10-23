@@ -3,6 +3,8 @@ import {
   ArrowRightLeft, CheckCircle2, Clock3, Headset, Inbox, MessageSquareText,
   RefreshCw, Send, ShieldAlert, XCircle
 } from 'lucide-react'
+import { ApiError } from './workspaces/types'
+import { eventLabel, presenceLabel, userFacingError } from './design-system/presentation'
 
 type Operator = {id: string; name: string; presence: string; capacity: number; active: number; offered?: number}
 type Queue = {id: string; name: string; waiting: number}
@@ -57,6 +59,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
   const [work,setWork] = useState<Work|null>(null)
   const [workLoading,setWorkLoading] = useState(true)
   const [conversationLoading,setConversationLoading] = useState(false)
+  const [conversationStale,setConversationStale] = useState(false)
   const [needsReconciliation,setNeedsReconciliation] = useState(false)
   const [selectedId,setSelectedId] = useState<string|null>(null)
   const [messages,setMessages] = useState<ChatMessage[]>([])
@@ -74,6 +77,8 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
   const [timeline,setTimeline] = useState<string[]>([])
   const [transferNotes,setTransferNotes] = useState<TransferNote[]>([])
   const [offerTransfer,setOfferTransfer] = useState<TransferNote|null>(null)
+  const [offerTransferState,setOfferTransferState] =
+    useState<'idle'|'loading'|'ready'|'empty'|'unavailable'>('idle')
   const selected = work?.active.find(h=>h.id===selectedId) ?? null
   const queueTitle = (id:string) => transferTargets.find(q=>q.id===id)?.name
     ?? queues.find(q=>q.id===id)?.name ?? id
@@ -88,7 +93,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
   useEffect(()=>{
     if(alertOffer){
       offerWasOpenRef.current=true
-      if(busy)offerBodyRef.current?.focus()
+      if(busy||offerTransferState==='loading'||offerTransferState==='idle')offerBodyRef.current?.focus()
       else acceptButtonRef.current?.focus()
       return
     }
@@ -102,7 +107,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
     else if(requestedFocus==='worklist')worklistHeadingRef.current?.focus()
     else if(selected)composerRef.current?.focus()
     else worklistHeadingRef.current?.focus()
-  },[alertOffer?.offer_id,selectedId,selected?.id,busy])
+  },[alertOffer?.offer_id,selectedId,selected?.id,busy,offerTransferState])
 
   const reload = useCallback(async (force=false):Promise<boolean> => {
     if (!operatorId) return false
@@ -129,7 +134,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
       setAlertOffer(current=>current && !result.offers.some(o=>o.offer_id===current.offer_id)
         ? null : current)
       return true
-    }catch{
+    }catch(e){
       if(requestId!==workRequestRef.current)return false
       setWork(null)
       setSelectedId(null)
@@ -144,7 +149,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
       setAlertOffer(null)
       notified.current.clear()
       setNeedsReconciliation(true)
-      setError('Não foi possível validar os atendimentos autorizados; os dados anteriores foram removidos.')
+      setError(userFacingError(e,'Não foi possível validar os atendimentos autorizados; os dados anteriores foram removidos.'))
       return false
     }finally{
       if(requestId===workRequestRef.current){
@@ -160,6 +165,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
     setWork(null)
     setWorkLoading(true)
     setMessages([])
+    setConversationStale(false)
     setTimeline([])
     setTransferNotes([])
     setConversationLoading(false)
@@ -178,11 +184,13 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
   useEffect(()=>{
     if(!selectedId) {
       setMessages([]);setTimeline([]);setTransferNotes([])
+      setConversationStale(false)
       setConversationLoading(false)
       return
     }
     let cancelled=false
     setMessages([])
+    setConversationStale(false)
     setTimeline([])
     setTransferNotes([])
     setConversationLoading(true)
@@ -195,29 +203,42 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
       setMessages(msgs)
       setTimeline(history.events.map(e=>e.type+' · '+e.actor))
       setTransferNotes(history.transfers??[])
-    }).catch(()=>{
+    }).catch(e=>{
       if(cancelled)return
       setMessages([])
       setTimeline([])
       setTransferNotes([])
       setSelectedId(null)
       setNeedsReconciliation(true)
-      setError('Não foi possível validar o histórico autorizado; o conteúdo anterior foi removido.')
+      setError(userFacingError(e,'Não foi possível validar o histórico autorizado; o conteúdo anterior foi removido.'))
+      if(e instanceof ApiError&&e.status===401)void onChanged()
     }).finally(()=>{if(!cancelled)setConversationLoading(false)})
     return ()=>{cancelled=true}
-  },[selectedId,api])
+  },[selectedId,api,onChanged])
 
   // Show the previous operator's handoff note before the new operator accepts.
   // A transfer note is INTERNAL metadata, never a message to the end user.
   useEffect(()=>{
-    if(!alertOffer){setOfferTransfer(null);return}
+    if(!alertOffer){
+      setOfferTransfer(null)
+      setOfferTransferState('idle')
+      return
+    }
     let cancelled=false
     setOfferTransfer(null)
+    setOfferTransferState('loading')
     void api('/v1/handoffs/'+encodeURIComponent(alertOffer.session_id)+'/timeline')
       .then((history:TimelineResponse)=>{
-        if(!cancelled)setOfferTransfer(history.transfers?.at(-1)??null)
+        if(cancelled)return
+        const note=history.transfers?.at(-1)??null
+        setOfferTransfer(note)
+        setOfferTransferState(note?'ready':'empty')
       })
-      .catch(()=>{if(!cancelled)setOfferTransfer(null)})
+      .catch(()=>{
+        if(cancelled)return
+        setOfferTransfer(null)
+        setOfferTransferState('unavailable')
+      })
     return ()=>{cancelled=true}
   },[alertOffer?.session_id,api])
 
@@ -241,7 +262,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
         setTransferTargets(destinations)
         setTargetQueue(destinations[0]?.id??'')
       })
-      .catch(e=>{if(!cancelled)setError((e as Error).message)})
+      .catch(e=>{if(!cancelled)setError(userFacingError(e,'Não foi possível consultar as filas de destino.'))})
       .finally(()=>{if(!cancelled)setTransferLoading(false)})
     return ()=>{cancelled=true}
   },[api,selectedId,transferOpen])
@@ -252,12 +273,31 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
     let cancelled=false
     const refreshMessages=()=>{
       void api('/v1/handoffs/'+selectedId+'/messages').then((items:ChatMessage[])=>{
-        if(!cancelled)setMessages(items)
-      }).catch(e=>{if(!cancelled)setError((e as Error).message)})
+        if(cancelled)return
+        setMessages(items)
+        if(!needsReconciliation)setConversationStale(false)
+      }).catch(e=>{
+        if(cancelled)return
+        setNeedsReconciliation(true)
+        if(e instanceof ApiError&&[401,403,404].includes(e.status)){
+          setMessages([])
+          setTimeline([])
+          setTransferNotes([])
+          setConversationStale(false)
+          setSelectedId(null)
+          setError(e.status===401
+            ? userFacingError(e,'Sua sessão expirou. Entre novamente.')
+            : 'O acesso a esta conversa foi removido. O conteúdo protegido foi apagado.')
+          if(e.status===401)void onChanged()
+          return
+        }
+        setConversationStale(true)
+        setError(userFacingError(e,'A conversa está desatualizada. Atualize antes de responder ou transferir.'))
+      })
     }
     const interval=window.setInterval(refreshMessages,3000)
     return ()=>{cancelled=true;window.clearInterval(interval)}
-  },[selectedId,api])
+  },[selectedId,api,onChanged,needsReconciliation])
 
   useEffect(()=>{
     if(messagePaneRef.current)messagePaneRef.current.scrollTop=messagePaneRef.current.scrollHeight
@@ -302,7 +342,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
     }catch(e){
       setAlertOffer(null)
       setNeedsReconciliation(true)
-      setError('Resultado não confirmado. Clique Atualizar antes de tentar novamente. '+(e as Error).message)
+      setError('Resultado não confirmado. '+userFacingError(e,'Clique Atualizar para reconciliar o estado antes de tentar novamente.'))
     }finally{
       operationLockRef.current=false
       setBusy(false)
@@ -319,7 +359,9 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
         external_message_id:crypto.randomUUID(),
       })
       if(sender==='OPERATOR')setReply('')
-    },sender==='OPERATOR'?'Resposta registrada na outbox local.':'Mensagem de usuário simulada recebida.')
+    },sender==='OPERATOR'
+      ? 'Resposta registrada localmente; não foi enviada ao usuário final.'
+      : 'Mensagem de usuário simulada recebida.')
   }
 
   const offerCount=work?.offers.length??0
@@ -354,14 +396,24 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
           <small>{transferHeading(offerTransfer)} · {transferAuthor(offerTransfer)}</small>
           <p>{offerTransfer.reason}</p>
         </div>}
+        {offerTransferState==='loading'&&<p className="offer-dialog__guidance-state"
+          role="status" aria-live="polite">Consultando orientação interna da transferência…</p>}
+        {offerTransferState==='empty'&&<p className="offer-dialog__guidance-state"
+          role="status" aria-live="polite">Não há orientação interna para esta oferta.</p>}
+        {offerTransferState==='unavailable'&&<p className="offer-dialog__guidance-state offer-dialog__guidance-state--warning"
+          role="status" aria-live="polite">
+          Não foi possível consultar a orientação interna. Verifique o contexto antes de aceitar.
+        </p>}
         <p className="offer-dialog__hint">A oferta expira em até dois minutos. Se não for aceita, retorna à fila.</p>
         </div>
         <div className="offer-dialog__buttons">
-          <button ref={declineButtonRef} className="outline" disabled={busy||needsReconciliation} onClick={()=>void execute(
+          <button ref={declineButtonRef} className="outline"
+            disabled={busy||needsReconciliation||offerTransferState==='loading'||offerTransferState==='idle'} onClick={()=>void execute(
             ()=>api('/v1/handoffs/'+alertOffer.session_id+'/decline','POST',{operator_id:operatorId}),
             'Oferta recusada; atendimento devolvido à fila.',null
           )}><XCircle size={16}/> Recusar</button>
-          <button ref={acceptButtonRef} className="primary" disabled={busy||needsReconciliation} onClick={()=>void execute(
+          <button ref={acceptButtonRef} className="primary"
+            disabled={busy||needsReconciliation||offerTransferState==='loading'||offerTransferState==='idle'} onClick={()=>void execute(
             ()=>api('/v1/handoffs/'+alertOffer.session_id+'/accept','POST',{operator_id:operatorId}),
             'Atendimento aceito e iniciado.',alertOffer.session_id
           )}><CheckCircle2 size={16}/> Aceitar atendimento</button>
@@ -371,7 +423,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
     <div className="desk-top">
       <div className="desk-heading">
         <span className="desk-kicker"><Headset size={15}/> CENTRAL DE ATENDIMENTO</span>
-        <h3>Mesa do Operador</h3>
+        <h3 tabIndex={-1} data-page-focus>Mesa do Operador</h3>
       </div>
       <div className="desk-identity">
         {lockedIdentity?<strong>{work?.operator.name??operators.find(o=>o.id===operatorId)?.name??operatorId}</strong>
@@ -390,7 +442,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
             <option value="AVAILABLE">Disponível</option>
             <option value="AWAY">Em pausa</option>
             <option value="OFFLINE">Indisponível</option>
-          </select>:<b>{work?.operator.presence??'OFFLINE'}</b>}
+          </select>:<b>{presenceLabel(work?.operator.presence??'OFFLINE')}</b>}
         </span>
         {lockedIdentity&&<button className="outline small desk-notification-button"
           title="Ativar notificações do sistema operacional" disabled={browserAlerts||!('Notification' in window)}
@@ -410,14 +462,18 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
         <button aria-label="Dispensar aviso" onClick={()=>setNotice('')}>×</button></div>}
     </div>
     <div className="desk-mobile-tabs" role="group" aria-label="Painel da Mesa do Operador">
-      <button className={mobilePanel==='work'?'selected':''} onClick={()=>setMobilePanel('work')}>
+      <button type="button" className={mobilePanel==='work'?'selected':''}
+        aria-pressed={mobilePanel==='work'} aria-controls="desk-inbox-panel"
+        onClick={()=>setMobilePanel('work')}>
         Atendimentos <span>{offerCount+activeCount}</span>
       </button>
-      <button className={mobilePanel==='chat'?'selected':''} onClick={()=>setMobilePanel('chat')}
+      <button type="button" className={mobilePanel==='chat'?'selected':''}
+        aria-pressed={mobilePanel==='chat'} aria-controls="desk-chat-panel"
+        onClick={()=>setMobilePanel('chat')}
         disabled={!selectedId}>Conversa</button>
     </div>
     <div className="desk-grid">
-      <section className="panel desk-inbox">
+      <section id="desk-inbox-panel" className="panel desk-inbox">
         <div className="panel-header desk-worklist-head"><h3 ref={worklistHeadingRef} tabIndex={-1}>Meus atendimentos</h3>
           <span>{activeCount} ativo(s) · {offerCount} oferta(s)</span></div>
         <div className="desk-worklist" role="region" aria-label="Ofertas e atendimentos">
@@ -443,7 +499,9 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
         </div>)}
         <div className="desk-block-header">EM ATENDIMENTO <span>{activeCount}</span></div>
         {work&&!activeCount&&<div className="desk-empty desk-empty--small">Nenhum atendimento ativo para este operador.</div>}
-        {work?.active.map(h=><button className={'desk-active '+(selectedId===h.id?'desk-active--selected':'')}
+        {work?.active.map(h=><button type="button"
+          className={'desk-active '+(selectedId===h.id?'desk-active--selected':'')}
+          aria-pressed={selectedId===h.id} disabled={needsReconciliation}
           key={h.id} onClick={()=>{setTransferOpen(false);setTransferNotes([]);setTimeline([]);setSelectedId(h.id);setMobilePanel('chat')}}>
           <div className="avatar">{h.requester_label.slice(0,2).toUpperCase()}</div>
           <div><b>{h.requester_label}</b><p>{h.subject}</p><small>{queueTitle(h.queue_id)}</small></div>
@@ -451,37 +509,44 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
         </button>)}
         </div>
       </section>
-      <section className="panel desk-chat">
+      <section id="desk-chat-panel" className="panel desk-chat">
         {selected?<><div className="conversation-head"><div className="avatar">OP</div>
           <div className="desk-chat-identity"><b>{selected.requester_label}</b>
             <p>{selected.subject} · {queueTitle(selected.queue_id)}</p></div>
           <div className="desk-chat-tools">
-            <button className="outline small" disabled={busy} aria-expanded={auditOpen}
+            <button className="outline small" disabled={busy||needsReconciliation||conversationStale}
+              aria-expanded={auditOpen}
               onClick={()=>setAuditOpen(value=>!value)}>Histórico</button>
-            <button className="outline small" disabled={busy||needsReconciliation||conversationLoading} aria-expanded={transferOpen}
+            <button className="outline small"
+              disabled={busy||needsReconciliation||conversationLoading||conversationStale}
+              aria-expanded={transferOpen}
               onClick={()=>{setTransferOpen(value=>!value);setAuditOpen(false)}}>
               <ArrowRightLeft size={14}/> Transferir</button>
-            <button className="primary small" disabled={busy||needsReconciliation} onClick={()=>void execute(
+            <button className="primary small" disabled={busy||needsReconciliation||conversationStale} onClick={()=>void execute(
               ()=>api('/v1/operators/'+operatorId+'/handoffs/'+selected.id+'/close','POST'),
               'Atendimento encerrado.',null
             )}><CheckCircle2 size={14}/> Encerrar</button>
           </div>
         </div>
+        {conversationStale&&<div className="desk-stale-state" role="status" aria-live="polite">
+          <span>Conversa desatualizada. Atualize antes de responder ou transferir.</span>
+          <button className="outline small" type="button" onClick={()=>void refreshWork()}>Atualizar</button>
+        </div>}
         {transferOpen&&<div className="desk-transfer-panel" role="region"
           aria-label="Transferência de atendimento">
           <label htmlFor="transfer-destination">Fila de destino</label>
           <select id="transfer-destination" value={targetQueue}
-            disabled={busy||needsReconciliation||conversationLoading||transferLoading||transferTargets.length===0}
+            disabled={busy||needsReconciliation||conversationLoading||conversationStale||transferLoading||transferTargets.length===0}
             onChange={e=>setTargetQueue(e.target.value)}>
             {transferLoading?<option value="">Carregando destinos...</option>
               :transferTargets.length===0?<option value="">Nenhuma fila disponível</option>
               :transferTargets.map(q=><option value={q.id} key={q.id}>{q.name}</option>)}
           </select>
-          <input value={transferReason} disabled={busy||needsReconciliation||conversationLoading}
+          <input value={transferReason} disabled={busy||needsReconciliation||conversationLoading||conversationStale}
             onChange={e=>setTransferReason(e.target.value)}
             maxLength={300} aria-label="Motivo da transferência" placeholder="Motivo da transferência"/>
           <button className="primary small"
-            disabled={busy||needsReconciliation||conversationLoading||transferLoading||!transferTargets.some(q=>q.id===targetQueue)
+            disabled={busy||needsReconciliation||conversationLoading||conversationStale||transferLoading||!transferTargets.some(q=>q.id===targetQueue)
               ||transferReason.trim().length<3}
             onClick={()=>void execute(
               ()=>api('/v1/handoffs/'+selected.id+'/transfer','POST',{
@@ -491,7 +556,10 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
         </div>}
         {auditOpen&&<div className="desk-audit-panel">
           <b>Histórico auditável</b>
-          <span>{timeline.slice(-6).join('  •  ') || 'Aguardando eventos'}</span>
+          <span>{timeline.slice(-6).map(event=>{
+            const [type,...details]=event.split(' · ')
+            return eventLabel(type)+' · '+details.join(' · ')
+          }).join('  •  ') || 'Aguardando eventos'}</span>
           {transferNotes.length>0&&<div className="desk-audit-transfers">
             {transferNotes.map((note,i)=><p key={note.at+'-'+i}>
               <strong>{transferHeading(note)} · {transferAuthor(note)}:</strong> {note.reason}
@@ -515,7 +583,8 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
           </div>)}
         </div>
         <div className="desk-compose">
-          <textarea ref={composerRef} value={reply} disabled={busy||needsReconciliation||conversationLoading}
+          <textarea ref={composerRef} value={reply}
+            disabled={busy||needsReconciliation||conversationLoading||conversationStale}
             onChange={e=>setReply(e.target.value)} rows={2}
             onKeyDown={e=>{
               if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){
@@ -527,7 +596,9 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
             aria-label="Responder como operador"/>
           <div className="desk-actions">
             {!lockedIdentity&&<button className="outline small" disabled={busy} onClick={()=>void sendMessage('USER')}>Simular usuário</button>}
-            <button className="primary small" disabled={busy||needsReconciliation||conversationLoading||!reply.trim()} onClick={()=>void sendMessage('OPERATOR')}><Send size={14}/> Enviar resposta</button>
+            <button className="primary small"
+              disabled={busy||needsReconciliation||conversationLoading||conversationStale||!reply.trim()}
+              onClick={()=>void sendMessage('OPERATOR')}><Send size={14}/> Enviar resposta</button>
           </div>
         </div>
         </>:<div className="center-empty"><Inbox size={38}/><h3>Selecione um atendimento ativo</h3>

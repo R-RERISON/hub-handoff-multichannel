@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { RefreshCw, ShieldCheck, UsersRound } from 'lucide-react'
 import type { Api } from './types'
 import { EmptyState } from '../design-system/EmptyState'
+import { presenceLabel, roleLabel } from '../design-system/presentation'
 
 type Membership = { queue_id:string; queue_name:string }
 type OperatorRecord = {
@@ -48,10 +49,10 @@ export default function AdminPeople({api}:{api:Api}){
   return <section className="panel admin-inventory__table" aria-labelledby="admin-people-heading">
     <header>
       <div>
-        <span className="eyebrow">SPEC-007 / B1.0 · GOVERNANÇA DE PESSOAS</span>
+        <span className="eyebrow">GOVERNANÇA DE PESSOAS</span>
         <h3 id="admin-people-heading"><UsersRound size={19}/> Pessoas e vínculos operacionais</h3>
-        <p>Identidades autenticadas, perfis de operador e memberships são entidades independentes.
-          Vínculo de despacho não concede acesso à fila.</p>
+        <p>Contas autenticadas, perfis de operador e vínculos de despacho são independentes.
+          Um vínculo de despacho não concede acesso de leitura à fila.</p>
       </div>
       <span className="admin-inventory__tag"><ShieldCheck size={15}/> Consulta restrita a ADMIN</span>
     </header>
@@ -74,18 +75,18 @@ export default function AdminPeople({api}:{api:Api}){
         Tabela com rolagem horizontal: pressione Tab para focar e use as setas para acessar todas as colunas.
       </p>
       <div className="admin-inventory__table-scroll" role="region"
-        aria-label="Tabela de operadores e memberships"
+        aria-label="Tabela de operadores e vínculos de despacho"
         aria-describedby="admin-operators-scroll-hint" tabIndex={0}>
         <table>
           <caption>Operadores da operação {people.operation.name} ({operators.length} exibidos de {people.operators.length})</caption>
           <thead><tr>
             <th scope="col">Operador</th><th scope="col">Presença</th>
             <th scope="col">Capacidade</th><th scope="col">Ofertados</th>
-            <th scope="col">Ativos</th><th scope="col">Memberships (despacho)</th>
+            <th scope="col">Ativos</th><th scope="col">Vínculos de despacho</th>
           </tr></thead>
           <tbody>{operators.map(operator=><tr key={operator.id}>
             <th scope="row"><strong>{operator.name}</strong><small>{operator.id}</small></th>
-            <td>{operator.presence}</td><td>{operator.capacity}</td>
+            <td>{presenceLabel(operator.presence)}</td><td>{operator.capacity}</td>
             <td>{operator.offered}</td><td>{operator.active}</td>
             <td>{operator.memberships.length
               ? operator.memberships.map(m=>m.queue_name+' ('+m.queue_id+')').join(', ')
@@ -102,13 +103,13 @@ export default function AdminPeople({api}:{api:Api}){
         aria-label="Tabela de contas de autenticação"
         aria-describedby="admin-accounts-scroll-hint" tabIndex={0}>
         <table>
-          <caption>Contas de autenticação da operação ({people.accounts.length}) — não representam grants</caption>
+          <caption>Contas de autenticação da operação ({people.accounts.length}) — não representam concessões de acesso</caption>
           <thead><tr>
             <th scope="col">Conta</th><th scope="col">Papel local</th>
             <th scope="col">Situação</th><th scope="col">Operador associado</th>
           </tr></thead>
           <tbody>{people.accounts.map(account=><tr key={account.id}>
-            <th scope="row">{account.username}</th><td>{account.role}</td>
+            <th scope="row">{account.username}</th><td>{roleLabel(account.role)}</td>
             <td>{account.is_active?'Ativa':'Desativada'}</td>
             <td>{account.operator_id??'Sem perfil operacional'}</td>
           </tr>)}</tbody>
@@ -116,8 +117,8 @@ export default function AdminPeople({api}:{api:Api}){
       </div>
       {people.accounts.length===0&&<EmptyState className="admin-inventory__empty">
         Nenhuma conta na operação.</EmptyState>}
-      <p>Alterações de membership, grants e auditoria administrativa estão reservadas às próximas
-        etapas B1.1/B2. O inventário não autoriza novas permissões.</p>
+      <p>Alterações de vínculos, concessões de acesso e auditoria administrativa estão reservadas a
+        incrementos posteriores. Este inventário não concede novas permissões.</p>
     </>}
   </section>
 }
