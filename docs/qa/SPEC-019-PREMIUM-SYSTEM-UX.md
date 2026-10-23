@@ -123,6 +123,7 @@ Os contratos focados e o gate completo final passaram após alinhar um contrato
 de navegação legado ao nome acessível dinâmico (`accessibleLabel`): 199 testes
 Python aprovados, 1 ignorado; Ruff aprovado; 55 contratos frontend aprovados,
 0 falhas; TypeScript aprovado; Vite aprovou 1606 módulos. O gate foi executado
-com `HANDOFF_DB_URL` removido e os serviços sintéticos parados. G09 ainda requer
-revisão independente do commit atualizado; até essa re-revisão, não marcar G09
-PASS. G10 e UX-08 da SPEC-006C permanecem gates separados.
+com `HANDOFF_DB_URL` removido e os serviços sintéticos parados. As correções de
+código validadas estão no commit `9ed2b7851e638ad401dce99510d1c74f10015a7d`.
+G09 ainda requer revisão independente desse commit; até essa re-revisão, não
+marcar G09 PASS. G10 e UX-08 da SPEC-006C permanecem gates separados.

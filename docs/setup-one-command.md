@@ -379,6 +379,8 @@ Python aprovados, 1 ignorado, Ruff aprovado, 55 contratos frontend aprovados,
 TypeScript aprovado e Vite com 1606 módulos.
 
 O gate foi executado com `HANDOFF_DB_URL` removido e os serviços sintéticos
-parados. A evidência detalhada está em [SPEC-019 Premium UX](qa/SPEC-019-PREMIUM-SYSTEM-UX.md).
-G09 ainda exige revisão independente do commit atualizado; G10 e UX-08 da
-SPEC-006C continuam gates separados. [PR #62](https://github.com/R-RERISON/hub-handoff-multichannel/pull/62) permanece Draft, sem merge ou deploy.
+parados. As correções de código foram validadas no commit
+`9ed2b7851e638ad401dce99510d1c74f10015a7d`. A evidência detalhada está em
+[SPEC-019 Premium UX](qa/SPEC-019-PREMIUM-SYSTEM-UX.md). G09 ainda exige revisão
+independente desse commit; G10 e UX-08 da SPEC-006C continuam gates separados.
+[PR #62](https://github.com/R-RERISON/hub-handoff-multichannel/pull/62) permanece Draft, sem merge ou deploy.
