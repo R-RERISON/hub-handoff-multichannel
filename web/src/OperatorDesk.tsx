@@ -79,6 +79,10 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
   const [offerTransfer,setOfferTransfer] = useState<TransferNote|null>(null)
   const [offerTransferState,setOfferTransferState] =
     useState<'idle'|'loading'|'ready'|'empty'|'unavailable'>('idle')
+  function focusWorklistAfterProtectedContentClears(){
+    focusAfterSelectionRef.current='worklist'
+    setMobilePanel('work')
+  }
   const selected = work?.active.find(h=>h.id===selectedId) ?? null
   const queueTitle = (id:string) => transferTargets.find(q=>q.id===id)?.name
     ?? queues.find(q=>q.id===id)?.name ?? id
@@ -136,6 +140,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
       return true
     }catch(e){
       if(requestId!==workRequestRef.current)return false
+      focusWorklistAfterProtectedContentClears()
       setWork(null)
       setSelectedId(null)
       setMessages([])
@@ -208,6 +213,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
       setMessages([])
       setTimeline([])
       setTransferNotes([])
+      focusWorklistAfterProtectedContentClears()
       setSelectedId(null)
       setNeedsReconciliation(true)
       setError(userFacingError(e,'Não foi possível validar o histórico autorizado; o conteúdo anterior foi removido.'))
@@ -284,6 +290,7 @@ export default function OperatorDesk({operators,queues,preferredOperatorId,locke
           setTimeline([])
           setTransferNotes([])
           setConversationStale(false)
+          focusWorklistAfterProtectedContentClears()
           setSelectedId(null)
           setError(e.status===401
             ? userFacingError(e,'Sua sessão expirou. Entre novamente.')

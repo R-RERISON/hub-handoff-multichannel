@@ -31,10 +31,11 @@ function Logo() {
 function ActiveLink({to,icon,label,count,countMeaning}:{
   to:string;icon:ReactNode;label:string;count?:number;countMeaning?:string
 }) {
-  return <NavLink to={to} end={to==='/supervisao'} aria-label={label} title={label}
+  const accessibleLabel=count===undefined?label:`${label}: ${count}. ${countMeaning??'Itens'}`
+  return <NavLink to={to} end={to==='/supervisao'} aria-label={accessibleLabel} title={label}
     className={({isActive})=>'nav '+(isActive?'active':'')}>
     {icon}<span>{label}</span>
-    {count!==undefined&&<em title={countMeaning} aria-label={countMeaning??String(count)}>{count}</em>}
+    {count!==undefined&&<em title={countMeaning} aria-hidden="true">{count}</em>}
   </NavLink>
 }
 
@@ -318,7 +319,8 @@ export default function App() {
       <ActiveLink to="/supervisao/conversas" icon={<MessageSquareText size={18}/>} label="Conversas" count={snapshot.handoffs.length}
         countMeaning="Quantidade de atendimentos correntes; não inclui o histórico verificado"/>
       {user?.role!=='AUDITOR'&&<>
-        <ActiveLink to="/supervisao/filas" icon={<Layers size={18}/>} label="Filas" count={waiting+offered}/>
+        <ActiveLink to="/supervisao/filas" icon={<Layers size={18}/>} label="Filas" count={waiting+offered}
+          countMeaning="Solicitações aguardando ou com oferta pendente"/>
         <ActiveLink to="/supervisao/equipe" icon={<Users size={18}/>} label="Equipe"/>
       </>}
       {user?.role!=='AUDITOR'&&<>

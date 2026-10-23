@@ -194,6 +194,15 @@ test('verified history clears sensitive view state before grant refresh', () => 
   assert.match(view,/setListing\(null\)[\s\S]*?setSelectedId\(null\)[\s\S]*?setDetail\(null\)/)
 })
 
+test('SPEC-019 sidebar accessible names preserve live conversation and queue counts', () => {
+  const app = read('src/App.tsx')
+  assert.match(app, /const accessibleLabel=/)
+  assert.match(app, /aria-label=\{accessibleLabel\}/)
+  assert.match(app, /aria-hidden="true">\{count\}<\/em>/)
+  assert.match(app, /countMeaning="Quantidade de atendimentos correntes; não inclui o histórico verificado"/)
+  assert.match(app, /countMeaning="Solicitações aguardando ou com oferta pendente"/)
+})
+
 test('supervisor release QA displays current POC version and live-only counter semantics', () => {
   const app = read('src/App.tsx')
   const css = read('src/styles.css')
@@ -480,7 +489,7 @@ test('SPEC-019 login and compact navigation stay semantic without widening role 
   assert.match(app, /type="submit"/)
   assert.match(app, /role="alert" aria-live="assertive"/)
   assert.match(app, /<main\b/)
-  assert.match(app, /aria-label=\{label\}/)
+  assert.match(app, /aria-label=\{accessibleLabel\}/)
   assert.match(app, /title=\{label\}/)
   assert.match(css, /\.sidebar \.nav\[aria-label\]:focus-visible::after/)
   assert.match(app, /data-page-focus/)
@@ -506,6 +515,15 @@ test('SPEC-019 operator polling clears denied content and labels transient stale
   assert.match(desk, /Conversa desatualizada/)
   assert.match(desk, /disabled=\{[^}]*conversationStale/)
   assert.match(desk, /No Teams|NÃO ENVIADA AO TEAMS/)
+})
+
+test('SPEC-019 operator authorization denial restores focus to the worklist', () => {
+  const desk = read('src/OperatorDesk.tsx')
+  assert.match(desk, /function focusWorklistAfterProtectedContentClears\(\)/)
+  assert.equal((desk.match(/focusWorklistAfterProtectedContentClears\(\)/g) ?? []).length, 4)
+  assert.match(desk, /if\(e instanceof ApiError&&\[401,403,404\]\.includes\(e\.status\)\)\{[\s\S]*?focusWorklistAfterProtectedContentClears\(\)/)
+  assert.match(desk, /setMobilePanel\('work'\)/)
+  assert.match(desk, /if\(requestedFocus==='worklist'\)worklistHeadingRef\.current\?\.focus\(\)/)
 })
 
 test('SPEC-019 offer guidance exposes loading, empty, unavailable, and available states', () => {
@@ -556,6 +574,17 @@ test('SPEC-019 team changes use semantic table headers and confirmation before m
   assert.match(css, /\.team-table__scroll\s*\{[^}]*contain:\s*paint/)
   assert.doesNotMatch(team, /onChange=\{e=>void onPresence/)
   assert.doesNotMatch(team, /onChange=\{e=>void onCapacity/)
+})
+
+test('SPEC-019 team authorization denial focuses the recovery state', () => {
+  const team = read('src/workspaces/SupervisorTeam.tsx')
+  assert.match(team, /deniedFocusRef/)
+  assert.match(team, /teamHeadingRef/)
+  assert.match(team, /previouslyDeniedRef/)
+  assert.match(team, /if\(denied\)deniedFocusRef\.current\?\.focus\(\)/)
+  assert.match(team, /else if\(previouslyDeniedRef\.current\)teamHeadingRef\.current\?\.focus\(\)/)
+  assert.match(team, /<h3 ref=\{deniedFocusRef\} tabIndex=\{-1\} data-page-focus>Acesso à equipe não autorizado/)
+  assert.match(team, /<h3 id="team-table-heading" tabIndex=\{-1\} data-page-focus\s*ref=\{teamHeadingRef\}/)
 })
 
 test('SPEC-019 lifecycle confirmation receives focus and announces its target', () => {

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Users } from 'lucide-react'
 import { ConfirmDialog } from '../design-system/ConfirmDialog'
 import { presenceLabel, userFacingError } from '../design-system/presentation'
@@ -26,6 +26,15 @@ export default function SupervisorTeam({operators,busy,onPresence,onCapacity,onR
   const [error,setError] = useState('')
   const [notice,setNotice] = useState('')
   const requestRef = useRef(false)
+  const deniedFocusRef = useRef<HTMLHeadingElement|null>(null)
+  const teamHeadingRef = useRef<HTMLHeadingElement|null>(null)
+  const previouslyDeniedRef = useRef(false)
+
+  useEffect(()=>{
+    if(denied)deniedFocusRef.current?.focus()
+    else if(previouslyDeniedRef.current)teamHeadingRef.current?.focus()
+    previouslyDeniedRef.current=denied
+  },[denied])
 
   function requestChange(operator:Operator,field:'presence'|'capacity',next:string) {
     if(busy||saving||denied)return
@@ -98,12 +107,13 @@ export default function SupervisorTeam({operators,busy,onPresence,onCapacity,onR
     {notice&&<div className="notice" role="status" aria-live="polite">{notice}</div>}
     {denied
       ? <section className="panel team-data-state" role="alert">
-          <h3>Acesso à equipe não autorizado</h3>
+          <h3 ref={deniedFocusRef} tabIndex={-1} data-page-focus>Acesso à equipe não autorizado</h3>
           <p>Os dados de operadores foram removidos desta tela.</p>
           <button className="outline" type="button" onClick={()=>void revalidate()}>Revalidar acesso</button>
         </section>
       : <section className="panel team-table" aria-labelledby="team-table-heading">
-        <div className="panel-header"><div><h3 id="team-table-heading">Operadores da operação</h3>
+        <div className="panel-header"><div><h3 id="team-table-heading" tabIndex={-1} data-page-focus
+          ref={teamHeadingRef}>Operadores da operação</h3>
           <p>Alterações de presença são demonstrativas e não representam status real do Teams ou Finesse.</p></div></div>
         <p id="team-table-scroll-hint" className="admin-inventory__scroll-hint">
           Em telas estreitas, deslize a tabela para os lados. No teclado, foque a região e use as setas.

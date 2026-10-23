@@ -110,3 +110,19 @@ separados.
 
 O laboratório TEMP complementar e os logs foram removidos; as portas 8000/5173 estão
 livres. A branch está publicada e [PR #62](https://github.com/R-RERISON/hub-handoff-multichannel/pull/62) permanece Draft, sem merge ou deploy.
+
+## G09 — correções dos achados independentes
+
+| Achado | Correção | Evidência integrada |
+|---|---|---|
+| Nome acessível das contagens de navegação | O nome de Conversas/Filas agora inclui contagem e significado; o badge visual é ocultado da árvore para evitar duplicação. | O browser encontrou ambos os links pelos nomes acessíveis com contagem e descrição. |
+| Foco após negação de conversa | Todas as rotas que removem a seleção protegida direcionam o foco ao título da worklist e retornam o painel mobile para Atendimentos. | 403 sintético após exibir conteúdo sentinela: 1 GET negado; sentinela removido; foco em “Meus atendimentos”; painel `work`; sem ações de conversa. |
+| Foco após negação de mutation de equipe | 401/403/404 foca o título do estado negado; revalidação bem-sucedida retorna foco ao título da tabela. | PATCH sintético 403: 1 tentativa; tabela removida; foco no título da negação e botão “Revalidar acesso” disponível. |
+
+Os contratos focados e o gate completo final passaram após alinhar um contrato
+de navegação legado ao nome acessível dinâmico (`accessibleLabel`): 199 testes
+Python aprovados, 1 ignorado; Ruff aprovado; 55 contratos frontend aprovados,
+0 falhas; TypeScript aprovado; Vite aprovou 1606 módulos. O gate foi executado
+com `HANDOFF_DB_URL` removido e os serviços sintéticos parados. G09 ainda requer
+revisão independente do commit atualizado; até essa re-revisão, não marcar G09
+PASS. G10 e UX-08 da SPEC-006C permanecem gates separados.

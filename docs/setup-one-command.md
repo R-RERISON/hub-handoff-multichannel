@@ -356,3 +356,29 @@ aprovados; TypeScript aprovado; Vite aprovou 1606 módulos.
 O laboratório TEMP complementar e os logs foram removidos; as portas 8000/5173
 estão livres. A branch publicada contém o commit de implementação
 `8aa60368a5a33deb8c8446b5db6126353af3286a`; [PR #62](https://github.com/R-RERISON/hub-handoff-multichannel/pull/62) está Draft, sem merge ou deploy.
+
+### SPEC-019 — follow-up das correções G09
+
+Foram implementados os três ajustes da revisão independente:
+
+- Conversas e Filas agora incluem contagem e significado no nome acessível; o
+  badge visual não duplica a leitura do link.
+- Após 401/403/404 de conteúdo protegido, o Operador apaga os dados e a seleção,
+  retorna o painel mobile para Atendimentos e foca o título da worklist. No
+  browser, um 403 sintético removeu o sentinela; o contrato também cobre os três
+  status.
+- Após PATCH 403 da equipe, a tabela é substituída pelo estado negado, que recebe
+  foco e mantém a ação de revalidação acessível.
+
+A validação integrada confirmou os nomes acessíveis das contagens, o 403 do
+Operador em viewport 390 px e o 403 da equipe, sem ampliar permissões. O primeiro
+gate completo apontou um contrato antigo que esperava o padrão anterior de
+`aria-label`; o contrato foi alinhado à nova expressão e a suíte final passou:
+`npm run test:architecture` — 55 aprovados; `.\start.cmd --check` — 199 testes
+Python aprovados, 1 ignorado, Ruff aprovado, 55 contratos frontend aprovados,
+TypeScript aprovado e Vite com 1606 módulos.
+
+O gate foi executado com `HANDOFF_DB_URL` removido e os serviços sintéticos
+parados. A evidência detalhada está em [SPEC-019 Premium UX](qa/SPEC-019-PREMIUM-SYSTEM-UX.md).
+G09 ainda exige revisão independente do commit atualizado; G10 e UX-08 da
+SPEC-006C continuam gates separados. [PR #62](https://github.com/R-RERISON/hub-handoff-multichannel/pull/62) permanece Draft, sem merge ou deploy.

@@ -181,3 +181,9 @@ This branch and local POC evidence do not constitute production readiness, G09 i
 - [x] T033 [US4] Preserve a meaningful keyboard focus target after lifecycle conflict or timeout reconciliation; add a regression contract in `web/scripts/workspaces.test.mjs` and browser evidence in `docs/qa/SPEC-019-PREMIUM-SYSTEM-UX.md` per SC-004 and US4/AC2 (partial).
 - [x] T034 Complete keyboard-only primary-task validation for every in-scope role and route; record verified input methods, defects, and remaining gaps in `docs/qa/SPEC-019-PREMIUM-SYSTEM-UX.md` and `docs/setup-one-command.md` per SC-004, SC-013, and T030 (partial).
 - [x] T035 [US5] Extend contrast contracts and browser verification to all applicable text and non-text indicators in normal, focused, selected, disabled, hover, and error states; document coverage and exclusions in `web/scripts/foundations.test.mjs` and `docs/qa/SPEC-019-PREMIUM-SYSTEM-UX.md` per FR-011, SC-003, and T030 (partial).
+
+## Phase 10: G09 Review Corrections
+
+- [x] T036 [US1] Include live conversation/queue counts and their meaning in sidebar link accessible names; add a regression contract in `web/scripts/workspaces.test.mjs` for `web/src/App.tsx` per FR-003 and US1/AC1 (partial).
+- [x] T037 [US2] After a denied protected-conversation request clears selection, focus a persistent recovery target and return the mobile panel to work; cover 401/403/404 paths in `web/src/OperatorDesk.tsx` and `web/scripts/workspaces.test.mjs` per FR-002, SC-004, and US2/AC4 (partial).
+- [x] T038 [US3] After a team mutation denial removes the table, focus the denied state or its revalidation action; add a regression contract in `web/scripts/workspaces.test.mjs` and validate `web/src/workspaces/SupervisorTeam.tsx` in the integrated browser per SC-004 and US3/AC2 (partial).
