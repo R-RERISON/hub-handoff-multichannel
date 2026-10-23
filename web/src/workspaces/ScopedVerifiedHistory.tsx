@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { LockKeyhole, RefreshCw, ShieldCheck } from 'lucide-react'
 import { ApiError, type Api, type ChatMessage } from './types'
 import { formatTime } from './types'
+import { eventLabel, userFacingError } from '../design-system/presentation'
 
 type GrantQueue = {id:string;name:string;operation_id:string}
 type TicketScope = {session_id:string;segment_started_at:string}
@@ -47,7 +48,7 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
       const available=data as GrantQueue[]
       setQueues(available)
       setQueueId(available.find(q=>q.id===preferredQueueRef.current)?.id??available[0]?.id??'')
-    }).catch(()=>{
+    }).catch(error=>{
       if(cancelled)return
       // Fail closed in the VIEW too: no stale queue or message remains visible.
       setQueues([])
@@ -55,7 +56,7 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
       setListing(null)
       setSelectedId(null)
       setDetail(null)
-      setError('Não foi possível validar as filas concedidas.')
+      setError(userFacingError(error,'Não foi possível validar as filas concedidas.'))
     }).finally(()=>{if(!cancelled)setGrantsLoading(false)})
     return ()=>{cancelled=true}
   },[api,refreshKey])
@@ -90,7 +91,7 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
           setQueueId('')
           setError('A concessão foi revogada ou expirou. Os dados protegidos foram removidos.')
         }else{
-          setError('Consulta indisponível; nenhum dado anterior foi mantido.')
+          setError(userFacingError(error,'Consulta indisponível; nenhum dado anterior foi mantido.'))
         }
       })
       .finally(()=>{if(!cancelled)setLoading(false)})
@@ -122,7 +123,7 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
           setError('A concessão foi revogada ou expirou. Os dados protegidos foram removidos.')
         }else{
           setSelectedId(null)
-          setError('O acesso ao segmento não pôde ser confirmado; o conteúdo foi removido.')
+          setError(userFacingError(error,'O acesso ao segmento não pôde ser confirmado; o conteúdo foi removido.'))
         }
       })
       .finally(()=>{if(!cancelled)setDetailLoading(false)})
@@ -131,7 +132,7 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
 
   return <div className="section-stack">
     <section className="panel verified-history-intro">
-      <div><span className="eyebrow">SPEC-006B / PROVENIÊNCIA COMPROVADA</span>
+      <div><span className="eyebrow">HISTÓRICO · EVIDÊNCIA POR FILA</span>
         <h3>Histórico autorizado por fila</h3>
         <p>Apenas evidências registradas e verificadas nesta fila. O conteúdo de outras filas,
           notas internas de transferência e histórico sem comprovação são omitidos.</p>
@@ -172,7 +173,7 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
     </div>
     {loading&&<p className="empty-state" role="status">Consultando segmentos autorizados…</p>}
     {listing&&!listing.schema_ready&&<section className="panel verified-history-unavailable">
-      <h3>Proveniência por segmento indisponível neste banco</h3>
+      <h3>Evidências por fila indisponíveis neste banco</h3>
       <p>O SQLite POC original ainda não está versionado. Nenhum histórico foi desbloqueado;
         a homologação de migração continua restrita a cópias isoladas.</p>
     </section>}
@@ -259,7 +260,7 @@ export default function ScopedVerifiedHistory({api}:{api:Api}) {
         <div className="history-events" role="region" aria-label="Eventos comprovados" tabIndex={0}>
           <b>Eventos comprovados</b>
           {detail.events.map((e,i)=><span key={i}>
-            {e.type} · {e.actor} · {formatTime(e.at)}
+            {eventLabel(e.type)} · {e.actor} · {formatTime(e.at)}
           </span>)}
           {detail.events.length===0&&<p className="empty-state">
             Nenhum evento comprovado nesta página.

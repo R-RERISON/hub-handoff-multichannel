@@ -9,12 +9,12 @@ export default function DemoLab({tickets,busy,onCreate}:Props) {
   return <div className="section-stack">
     <section className="intro-banner intro-banner--lab"><div>
       <span className="eyebrow">AMBIENTE DE HOMOLOGAÇÃO</span>
-      <h2>Laboratório de simulação</h2>
+      <h2 tabIndex={-1} data-page-focus>Laboratório de simulação</h2>
       <p>Gere solicitações fictícias para validar a distribuição, os atendimentos, as transferências e a auditoria, sem conectar bots externos.</p>
     </div><div className="banner-icon"><FlaskConical size={28}/></div></section>
     <section className="panel lab-onboarding">
       <div className="lab-stage"><span>01</span><b>Crie uma solicitação</b><p>Ela entrará na fila Suporte N1.</p></div>
-      <div className="lab-stage"><span>02</span><b>Distribuição automática</b><p>O sistema identifica operadores online e disponíveis e envia a oferta.</p></div>
+      <div className="lab-stage"><span>02</span><b>Distribuição automática</b><p>A distribuição local cria uma oferta para um operador elegível.</p></div>
       <div className="lab-stage"><span>03</span><b>Atenda na Mesa</b><p>Aceite, converse, transfira ou encerre.</p></div>
       <div className="lab-stage"><span>04</span><b>Audite em Supervisão</b><p>Confira histórico e estado da sessão.</p></div>
     </section>

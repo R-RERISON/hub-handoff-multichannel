@@ -78,3 +78,90 @@ test('SPEC-018 U1 keeps backend permissions, routes, lifecycle retry, and mobile
   assert.equal((handler.match(/\bapi\(/g) ?? []).length, 1)
   assert.doesNotMatch(handler, /\b(retry|setInterval|setTimeout)\b/i)
 })
+
+test('SPEC-019 semantic status colors meet text contrast and focus visibility thresholds', () => {
+  const pairs = [
+    ['--ux-status-active-text', '--ux-status-active-bg'],
+    ['--ux-status-queued-text', '--ux-status-queued-bg'],
+    ['--ux-status-offered-text', '--ux-status-offered-bg'],
+    ['--ux-status-closed-text', '--ux-status-closed-bg'],
+    ['--ux-status-draft-text', '--ux-status-draft-bg'],
+    ['--ux-status-paused-text', '--ux-status-paused-bg'],
+    ['--ux-status-archived-text', '--ux-status-archived-bg'],
+    ['--ux-status-available-text', '--ux-status-available-bg'],
+    ['--ux-status-away-text', '--ux-status-away-bg'],
+    ['--ux-status-offline-text', '--ux-status-offline-bg'],
+  ]
+  for (const [foreground, background] of pairs) {
+    assert.ok(
+      contrast(token(foreground), token(background)) >= 4.5,
+      foreground + ' on ' + background + ' must meet 4.5:1',
+    )
+  }
+  assert.ok(contrast(token('--ux-focus'), token('--ux-surface')) >= 3,
+    'focus indicator must contrast with the surface')
+  assert.ok(contrast(token('--ux-disabled-text'), token('--ux-disabled-bg')) >= 4.5,
+    'disabled control text must meet 4.5:1')
+  assert.ok(contrast(token('--ux-disabled-border'), token('--ux-disabled-bg')) >= 3,
+    'disabled control boundary must meet 3:1')
+  assert.match(css, /\.search-field:focus-within/)
+  assert.match(css, /:where\(button, a, input, textarea, select\):focus-visible/)
+  assert.match(css, /verified-history-pagination button:disabled/)
+  assert.match(css, /--ux-disabled-border/)
+})
+
+test('SPEC-019 interactive text and non-text states meet contrast thresholds', () => {
+  const styles = read('src/styles.css')
+  assert.ok(contrast('#ffffff', token('--ux-accent')) >= 4.5)
+  assert.ok(contrast('#ffffff', '#174e8d') >= 4.5)
+  assert.ok(contrast('#294f71', '#ffffff') >= 4.5)
+  assert.ok(contrast('#294f71', '#f0f5fa') >= 4.5)
+  assert.ok(contrast('#2985ee', '#edf5ff') >= 3,
+    'selected-session indicator must contrast with its selected surface')
+  assert.ok(contrast('#a43d3d', '#fff0f0') >= 4.5)
+  assert.ok(contrast('#9c2939', '#ffffff') >= 4.5)
+  assert.ok(contrast('#20694d', '#ffffff') >= 4.5)
+  assert.ok(contrast(token('--ux-selection-indicator'), '#edf5ff') >= 3)
+  assert.ok(contrast(token('--ux-selection-indicator'), '#eaf4ff') >= 3)
+  assert.ok(contrast(token('--ux-selection-indicator'), '#e4f0ff') >= 3)
+  assert.ok(contrast(token('--ux-control-border'), token('--ux-surface')) >= 3)
+  assert.ok(contrast(token('--ux-control-border'), token('--ux-surface-subtle')) >= 3)
+  assert.ok(contrast(token('--ux-control-border-dark'), '#2b435c') >= 3)
+  assert.ok(contrast(token('--ux-focus-dark'), '#203247') >= 3)
+  assert.ok(contrast(token('--ux-focus-dark'), '#334c66') >= 3)
+  assert.match(css, /\.desk-layout--compact \.desk-mobile-tabs button:disabled\s*\{[^}]*color:\s*var\(--ux-disabled-text\)[^}]*background-color:\s*var\(--ux-disabled-bg\)[^}]*border-color:\s*var\(--ux-disabled-border\)/)
+  assert.match(css, /\.primary:not\(:disabled\):hover\s*\{[^}]*background:\s*#174e8d/)
+  assert.match(css, /\.outline,\s*\.icon-btn\s*\{[^}]*color:\s*#294f71/)
+  assert.match(styles, /\.session\.selected\{[^}]*background:#edf5ff;box-shadow:inset 3px 0 #2985ee/)
+  assert.match(styles, /\.alert\{[^}]*background:#fff0f0;[^}]*color:#a43d3d/)
+  assert.match(styles, /\.admin-inventory__error\{color:#9c2939/)
+  assert.match(styles, /\.admin-inventory__success\{color:#20694d/)
+  const controlBorderRule = css.match(
+    /\.outline:not\(:disabled\),[\s\S]*?\.desk-layout--compact \.desk-mobile-tabs button:not\(:disabled\)\s*\{([^}]*)\}/,
+  )?.[1]
+  assert.ok(controlBorderRule)
+  assert.match(controlBorderRule, /border-color:\s*var\(--ux-control-border\)/)
+  assert.match(css, /\.history-ticket\.selected,[\s\S]*?\{[^}]*box-shadow:\s*inset 3px 0 var\(--ux-selection-indicator\)/)
+  assert.match(css, /\.history-mode-tabs button\.active\s*\{[^}]*border-color:\s*var\(--ux-selection-indicator\)/)
+  assert.match(css, /\.verified-history-detail-pages button:focus-visible,[\s\S]*?\.workspace-home__card:focus-visible\s*\{[^}]*outline-color:\s*var\(--ux-focus\)/)
+  assert.match(css, /\.admin-inventory__create-fields input:focus-visible,[\s\S]*?\{[^}]*outline:\s*3px solid var\(--ux-focus\)/)
+  assert.match(css, /\.admin-inventory__confirm button:focus-visible\s*\{[^}]*outline:\s*3px solid var\(--ux-focus\)/)
+  assert.match(css, /\.sidebar \.nav:focus-visible,[\s\S]*?\.operator-portal__actions :focus-visible\s*\{[^}]*outline-color:\s*var\(--ux-focus-dark\)/)
+})
+
+test('SPEC-019 shared Portuguese presentation labels are explicit and do not expose raw errors', () => {
+  const presentation = read('src/design-system/presentation.ts')
+  for (const label of ['Na fila', 'Oferta pendente', 'Ativo', 'Encerrado',
+    'Rascunho', 'Pausado', 'Arquivado', 'Disponível', 'Em pausa',
+    'Indisponível', 'Administrador', 'Supervisor', 'Operador', 'Auditor',
+    'Atendimento aceito', 'Oferta recusada', 'Atendimento transferido']) {
+    assert.ok(presentation.includes(label), 'missing localized label ' + label)
+  }
+  assert.match(presentation, /export function userFacingError/)
+  assert.match(presentation, /export function eventLabel/)
+  assert.match(presentation, /401/)
+  assert.match(presentation, /403/)
+  assert.match(presentation, /404/)
+  assert.match(presentation, /409/)
+  assert.doesNotMatch(presentation, /error\.message/)
+})

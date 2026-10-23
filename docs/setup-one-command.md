@@ -268,3 +268,119 @@ SPEC-006C.
 O gate automatizado foi repetido no SHA de implementação após o commit. T004/T005,
 T009/T010, T017–T023, G09/G10 e UX-08 mobile de SPEC-006C continuam pendentes.
 Nenhum PR, merge ou deploy foi realizado.
+
+## SPEC-019 — Premium UX em todo o sistema
+
+Branch de trabalho criada sobre a branch U2 publicada:
+`feat/spec018-ux-premium-batch-20261022`. Base de implementação U2:
+`641ea2fc3c77c7f365f36f8af939f7e404a44c84`. Commit de implementação:
+`8aa60368a5a33deb8c8446b5db6126353af3286a`. A branch está publicada e [PR #62](https://github.com/R-RERISON/hub-handoff-multichannel/pull/62) permanece Draft; nenhum merge ou deploy foi feito.
+
+O pacote é frontend-only: navegação e login acessíveis; limpeza de conteúdo
+protegido em negação; orientação interna de oferta com estados explícitos;
+confirmações seguras para operações de fila/equipe/administração; tabelas
+semânticas; rótulos e erros em português; correção de contraste/foco e copy
+factual da POC. Não altera RBAC, identidade, API, schema, migrations, SQLite
+original ou entrega externa ao Teams.
+
+### Gate automatizado local
+
+```powershell
+Remove-Item Env:HANDOFF_DB_URL -ErrorAction SilentlyContinue
+.\start.cmd --check
+```
+
+Resultado real: exit code 0; **199 testes Python aprovados, 1 ignorado; Ruff
+aprovado; 49 contratos frontend aprovados, 0 falhas; TypeScript aprovado; Vite
+aprovado (1606 módulos)**. `git diff --check` e `npm run build` também passaram
+na worktree.
+
+### Laboratório e navegador integrado
+
+Foi criado um laboratório sintético novo por `.\start.cmd --lab --no-browser`,
+migrado offline de 006b4 para 007a2 com backup verificado e retomado pelo
+launcher. Nenhuma requisição foi direcionada a `data/handoff-poc.db` ou às
+credenciais do modo POC normal. A validação usou o browser integrado em Edge/
+Chromium; os dados e credenciais do laboratório ficaram somente em TEMP.
+
+| Superfície/persona | Validação observada |
+|---|---|
+| Login e seleção Admin | Login válido chegou à seleção de espaços; login inválido mostrou orientação genérica em português com `role=alert` assertivo; a seleção inclui botão Sair. |
+| Administração | Três tabelas com caption/cabeçalhos/row headers e rolagem interna; em 390×844, 1366×768 e 1920×1080, @100%/@200%, sem overflow horizontal do documento. Criar fila foi 1 POST; a nova fila apareceu imediatamente na visão da Supervisão. Cancelar lifecycle enviou 0 PATCH; confirmar arquivamento enviou 1 PATCH. O diálogo coube em 960×540 CSS px a 200% (sem overflow/falha de contraste), focou Cancelar, aceitou Tab/Shift+Tab e devolveu foco ao botão acionador. |
+| Supervisão | Visão geral, Conversas, Filas, Equipe e Laboratório verificados em 390×844 e nos dois viewports desktop a 100%/200%; sem overflow horizontal do documento. Equipe apresentou tabela semântica com caption e cabeçalhos. |
+| Supervisor — Filas | Injeção sintética 403 na rotação removeu membros da tela, exibiu estado de acesso negado e permitiu revalidar com sucesso; nenhuma mutação foi enviada. |
+| Supervisor — Equipe | Alteração de capacidade abriu confirmação com alvo/impacto; cancelar enviou 0 PATCH. Confirmar enviou 1 PATCH e atualizou a capacidade; a alteração sintética foi revertida com outra confirmação/1 PATCH. |
+| Auditor | Navegação mostrou apenas Visão geral e Conversas; segmentos verificados permaneceram somente leitura e sem controles de resposta. A rota direta `/supervisao/filas` foi negada e o retorno levou a Conversas. |
+| Operador | Oferta exibiu explicitamente ausência de orientação interna; a 200% real em 1366×768, o modal e as duas ações couberam na viewport e o foco inicial ficou em Aceitar. Aceite enviou 1 POST e moveu foco ao compositor. A resposta local informou que não foi enviada ao usuário final. |
+| Operador — falhas | POST de mensagem com 503 sintético enviou 1 requisição, não foi repetido e bloqueou ações com “Resultado não confirmado”. Poll de conversa com 403 após exibir conteúdo-sentinela sintético removeu o conteúdo, a seleção e o compositor; o sentinela não permaneceu visível. |
+| Responsividade e contraste | Matriz visual em todos os portais para 390×844, 1366×768 e 1920×1080, @100%/@200% reais (DPR 2 no zoom), sem overflow horizontal global. Scanner de contraste sobre texto visível nas telas/estados exercitados não encontrou pares abaixo do limiar aplicável. |
+
+O scanner de contraste cobre apenas texto renderizado nos estados visitados; não equivale a certificação WCAG integral nem verifica todos os estados hover/não textuais. Capturas foram inspecionadas no browser integrado, mas não exportadas ao repositório. A matriz e limitações estão em [SPEC-019 Premium UX](qa/SPEC-019-PREMIUM-SYSTEM-UX.md).
+
+### Inicialização segura para nova rodada
+
+`.\start.cmd --lab --no-browser` cria um diretório TEMP único e imprime seu
+caminho. `--lab-dir` só retoma um laboratório existente. Para lifecycle, parar
+os serviços, executar upgrade offline 006b4→007a2 nesse SQLite sintético com
+backup verificado, inspecionar a revisão e então retomar com
+`.\start.cmd --lab --lab-dir $lab --no-browser`. Não usar `.\start.cmd` sem
+`--lab` para homologar estes fluxos. Não incluir credenciais sintéticas em
+relatórios, screenshots, logs ou commits.
+
+**Pendências**: revisão independente G09 e aceite humano G10; WCAG integral e
+UX-08 mobile da SPEC-006C continuam gates separados. [PR #62](https://github.com/R-RERISON/hub-handoff-multichannel/pull/62) permanece Draft; nenhum merge ou deploy foi feito.
+
+os serviços foram encerrados após a validação; as portas 8000/5173 estão livres.
+O laboratório TEMP sintético e os logs de launcher desta rodada foram removidos.
+
+### Convergência — validação complementar
+
+Após os ajustes de foco e contraste, uma rodada isolada em laboratório TEMP 007a2
+confirmou: timeout de lifecycle com um único PATCH, estado Rascunho preservado,
+feedback sem sucesso falso e foco no alerta acessível; lifecycle confirmado com um
+PATCH e foco no status de sucesso; vínculo de fila adicionado e restaurado, um PATCH
+por confirmação e foco no feedback acessível. O 409 de vínculo preservou o estado e
+focou o alerta sem permitir nova ação antes de revalidar. Nenhum dado da POC original
+foi usado.
+
+A revisão de estilos computados no browser verificou bordas de controles, foco em
+superfícies claras/escuras, estado selecionado, hover, estado desabilitado e layout
+390×844. Os contratos de contraste foram ampliados; isto não substitui certificação
+WCAG integral. T034 foi validado por teclado por persona e rota primária; a matriz
+sanitizada está em [SPEC-019 Premium UX](qa/SPEC-019-PREMIUM-SYSTEM-UX.md).
+
+O gate após a convergência passou com `HANDOFF_DB_URL` removido e serviços parados:
+199 testes Python aprovados, 1 ignorado; Ruff aprovado; 52 contratos frontend
+aprovados; TypeScript aprovado; Vite aprovou 1606 módulos.
+`git diff --check` também passou após as atualizações de evidência.
+O laboratório TEMP complementar e os logs foram removidos; as portas 8000/5173
+estão livres. A branch publicada contém o commit de implementação
+`8aa60368a5a33deb8c8446b5db6126353af3286a`; [PR #62](https://github.com/R-RERISON/hub-handoff-multichannel/pull/62) está Draft, sem merge ou deploy.
+
+### SPEC-019 — follow-up das correções G09
+
+Foram implementados os três ajustes da revisão independente:
+
+- Conversas e Filas agora incluem contagem e significado no nome acessível; o
+  badge visual não duplica a leitura do link.
+- Após 401/403/404 de conteúdo protegido, o Operador apaga os dados e a seleção,
+  retorna o painel mobile para Atendimentos e foca o título da worklist. No
+  browser, um 403 sintético removeu o sentinela; o contrato também cobre os três
+  status.
+- Após PATCH 403 da equipe, a tabela é substituída pelo estado negado, que recebe
+  foco e mantém a ação de revalidação acessível.
+
+A validação integrada confirmou os nomes acessíveis das contagens, o 403 do
+Operador em viewport 390 px e o 403 da equipe, sem ampliar permissões. O primeiro
+gate completo apontou um contrato antigo que esperava o padrão anterior de
+`aria-label`; o contrato foi alinhado à nova expressão e a suíte final passou:
+`npm run test:architecture` — 55 aprovados; `.\start.cmd --check` — 199 testes
+Python aprovados, 1 ignorado, Ruff aprovado, 55 contratos frontend aprovados,
+TypeScript aprovado e Vite com 1606 módulos.
+
+O gate foi executado com `HANDOFF_DB_URL` removido e os serviços sintéticos
+parados. As correções de código foram validadas no commit
+`9ed2b7851e638ad401dce99510d1c74f10015a7d`. A evidência detalhada está em
+[SPEC-019 Premium UX](qa/SPEC-019-PREMIUM-SYSTEM-UX.md). G09 ainda exige revisão
+independente desse commit; G10 e UX-08 da SPEC-006C continuam gates separados.
+[PR #62](https://github.com/R-RERISON/hub-handoff-multichannel/pull/62) permanece Draft, sem merge ou deploy.

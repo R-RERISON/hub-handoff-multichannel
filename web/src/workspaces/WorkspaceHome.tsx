@@ -1,4 +1,5 @@
 import { ArrowRight, FlaskConical, Headset, Shield, Users } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 const spaces = [
@@ -6,22 +7,27 @@ const spaces = [
     description:'Minhas ofertas, atendimentos, mensagens, transferências e encerramentos.',
     icon:<Headset size={24}/>,kind:'operator',status:'Operacional na POC'},
   {name:'Central de Supervisão',path:'/supervisao',
-    description:'Visão geral, monitoramento das filas, equipe e histórico.',
+    description:'Visão geral demonstrativa de filas, equipe e histórico autorizado.',
     icon:<Users size={24}/>,kind:'supervisor',status:'Operacional na POC'},
   {name:'Administração',path:'/administracao',
-    description:'Bots, operações, permissões e políticas do produto.',
-    icon:<Shield size={24}/>,kind:'admin',status:'Estrutura planejada'},
+    description:'Inventário da operação e ciclo de vida de filas disponíveis na POC.',
+    icon:<Shield size={24}/>,kind:'admin',status:'Operacional na POC'},
   {name:'Laboratório',path:'/laboratorio',
     description:'Crie solicitações fictícias e valide o ciclo de atendimento.',
     icon:<FlaskConical size={24}/>,kind:'lab',status:'Somente testes'},
 ]
 
-export default function WorkspaceHome(){
+export default function WorkspaceHome({onLogout}:{onLogout:()=>void}){
   const navigate=useNavigate()
-  return <div className="workspace-home">
+  const headingRef=useRef<HTMLHeadingElement|null>(null)
+  useEffect(()=>headingRef.current?.focus(),[])
+  return <main className="workspace-home" aria-labelledby="workspace-home-heading">
+    <div className="workspace-home__actions">
+      <button type="button" className="outline" onClick={onLogout}>Sair</button>
+    </div>
     <div className="workspace-home__intro">
-      <span className="eyebrow">HANDOFF HUB · MULTICHANNEL PLATFORM</span>
-      <h1>Qual espaço você deseja acessar?</h1>
+      <span className="eyebrow">HANDOFF HUB · PLATAFORMA MULTICANAL</span>
+      <h1 id="workspace-home-heading" ref={headingRef} tabIndex={-1}>Qual espaço você deseja acessar?</h1>
       <p>O atendimento humano e a gestão operacional compartilham o mesmo núcleo, mas possuem interfaces e responsabilidades independentes.</p>
       <span className="workspace-home__warning">POC SQLite local · Seleção demonstrativa sem autenticação corporativa</span>
     </div>
@@ -35,5 +41,5 @@ export default function WorkspaceHome(){
         <span className="workspace-home__open">Acessar espaço <ArrowRight size={16}/></span>
       </button>)}
     </div>
-  </div>
+  </main>
 }

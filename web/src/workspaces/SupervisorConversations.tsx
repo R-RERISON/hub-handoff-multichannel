@@ -3,6 +3,7 @@ import { MessageSquareText, Search, ShieldCheck } from 'lucide-react'
 import ScopedVerifiedHistory from './ScopedVerifiedHistory'
 import type { Api, ChatMessage, Ticket } from './types'
 import { formatTime } from './types'
+import { eventLabel, queueStateLabel, userFacingError } from '../design-system/presentation'
 
 type Props = {tickets:Ticket[];api:Api;showVerified?:boolean}
 type Timeline = { events: {type:string;actor:string;at:string}[]; transfers: {reason:string;from_queue_id:string;to_queue_id:string}[] }
@@ -43,12 +44,12 @@ export default function SupervisorConversations({tickets,api,showVerified=false}
       if(cancelled)return
       setMessages(m as ChatMessage[])
       setTimeline(t as Timeline)
-    }).catch(()=>{
+    }).catch(e=>{
       if(cancelled)return
       setSelectedId(null)
       setMessages([])
       setTimeline(null)
-      setError('Não foi possível carregar o histórico autorizado desta sessão; o conteúdo foi removido.')
+      setError(userFacingError(e,'Não foi possível carregar o histórico autorizado desta sessão; o conteúdo foi removido.'))
     }).finally(()=>{if(!cancelled)setDetailLoading(false)})
     return ()=>{cancelled=true}
   },[selectedId,api])
@@ -66,7 +67,7 @@ export default function SupervisorConversations({tickets,api,showVerified=false}
   return <div className="section-stack">
     <section className="intro-banner">
       <div><span className="eyebrow">SUPERVISÃO / HISTÓRICO</span>
-        <h2>Conversas da operação</h2>
+        <h2 tabIndex={-1} data-page-focus>Conversas da operação</h2>
         <p>Consulte o estado, o histórico e as evidências das sessões. O atendimento é realizado exclusivamente na Mesa do Operador.</p>
       </div>
       <div className="banner-icon"><MessageSquareText size={28}/></div>
@@ -103,7 +104,7 @@ export default function SupervisorConversations({tickets,api,showVerified=false}
               setDetailLoading(true);setError('')
             }}>
             <strong>{t.requester_label}</strong><small>{t.subject}</small>
-            <span className={'status '+t.status.toLowerCase()}>{t.status}</span>
+            <span className={'status '+t.status.toLowerCase()}>{queueStateLabel(t.status)}</span>
           </button>)}
           {visible.length===0&&<p className="empty-state">Nenhuma sessão corresponde ao filtro.</p>}
         </div>
@@ -112,7 +113,7 @@ export default function SupervisorConversations({tickets,api,showVerified=false}
         {error&&<div className="alert" role="alert">{error}</div>}
         {selected?<><header className="history-details__header"><div>
             <h3>{selected.requester_label}</h3><p>{selected.subject} · {selected.queue_id.toUpperCase()}</p>
-          </div><span className={'status '+selected.status.toLowerCase()}>{selected.status}</span></header>
+          </div><span className={'status '+selected.status.toLowerCase()}>{queueStateLabel(selected.status)}</span></header>
           <div className="history-meta">Sessão: {selected.id} · Bot: {selected.integration_id} · Operador: {selected.operator_id??'Não atribuído'}</div>
           {detailLoading&&<p className="empty-state" role="status">Carregando histórico autorizado…</p>}
           <div className="history-messages">
@@ -125,7 +126,7 @@ export default function SupervisorConversations({tickets,api,showVerified=false}
               <p className="empty-state">Sem mensagens registradas.</p>}
           </div>
           <div className="history-events"><b>Trilha de auditoria</b>
-            {timeline?.events?.map((e,i)=><span key={i}>{e.type} · {e.actor} · {formatTime(e.at)}</span>)}
+            {timeline?.events?.map((e,i)=><span key={i}>{eventLabel(e.type)} · {e.actor} · {formatTime(e.at)}</span>)}
             {timeline?.transfers?.map((t,i)=><span key={'t'+i}>Transferência {t.from_queue_id} → {t.to_queue_id}: {t.reason}</span>)}
           </div>
         </>:!error&&<div className="center-empty"><MessageSquareText size={37}/>
