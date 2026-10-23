@@ -5,7 +5,7 @@
 - **Branch publicada**: `feat/spec018-ux-premium-batch-20261022`
 - **Base publicada U2**: `641ea2fc3c77c7f365f36f8af939f7e404a44c84`
 - **Commit de implementação testado**: `8aa60368a5a33deb8c8446b5db6126353af3286a`
-- **Estado da entrega**: branch pushed; PR ainda não aberto; sem merge ou deploy.
+- **Estado da entrega**: branch pushed; [PR #62](https://github.com/R-RERISON/hub-handoff-multichannel/pull/62) Draft; sem merge ou deploy.
 - **Escopo**: login/seleção, Operador, Visão geral, Conversas, Filas, Equipe, Administração, histórico verificado e Laboratório.
 - **Ambiente**: laboratório sintético TEMP 007a2; backup offline verificado antes da migração. A POC SQLite original e as credenciais do modo normal não foram usadas.
 - **Limite de release**: este registro não aprova UX-08 da SPEC-006C, G09, G10, produção ou entrega real por Teams.
@@ -109,4 +109,4 @@ integral de leitor de tela/WCAG. UX-08, WCAG integral, G09 e G10 continuam gates
 separados.
 
 O laboratório TEMP complementar e os logs foram removidos; as portas 8000/5173 estão
-livres. A branch está publicada, sem PR, merge ou deploy.
+livres. A branch está publicada e [PR #62](https://github.com/R-RERISON/hub-handoff-multichannel/pull/62) permanece Draft, sem merge ou deploy.
